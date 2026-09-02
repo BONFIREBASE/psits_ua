@@ -1,130 +1,122 @@
-<div align="center">
-
-# Philippine Society of Information Technology Students
-### University of Antique Chapter (PSITS-UA)
-**Official Digital Portal & Student Governance Platform**
+# Philippine Society of Information Technology Students — University of Antique (PSITS-UA)
+### Official Digital Portal & Student Governance Platform
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-gold.svg)](https://opensource.org/licenses/MIT)
 [![Framework: Next.js 16](https://img.shields.io/badge/Framework-Next.js%2016-black.svg?logo=next.js)](https://nextjs.org/)
 [![Styling: Tailwind CSS v4](https://img.shields.io/badge/Styling-Tailwind%20CSS%20v4-38bdf8.svg?logo=tailwindcss)](https://tailwindcss.com/)
 [![Maintained by: Bonfire Base Studio](https://img.shields.io/badge/Pro%20Bono-Bonfire%20Base%20Studio-F5A623.svg)](https://bonfire.base69.studio)
 
-</div>
+---
+
+## Overview
+
+The **Philippine Society of Information Technology Students — University of Antique (PSITS-UA)** is the official recognized student organization under the **College of Computing and Information Sciences (CCIS)** at the University of Antique Main Campus (Sibalom, Antique, Philippines).
+
+- **Historical Foundation**: Established on **January 8, 1993** as the *Computer Society* through the initiative of **Mrs. Nelly E. Mistio** and formally sanctioned by the College President of the Polytechnic State College of Antique (PSCA).
+- **Charter Amendment**: Formally reconstituted as **PSITS-UA** during Academic Year **2016–2017**, establishing an exclusive governance body for all Bachelor of Science in Information Technology (BSIT) undergraduates.
+- **Official Motto**: *"Students Together in Information Technology."*
 
 ---
 
-## 🏛️ About the Organization
+## Engineering Attribution
 
-The **Philippine Society of Information Technology Students — University of Antique (PSITS-UA)** is the official accredited student organization under the **College of Computing and Information Sciences (CCIS)** at the University of Antique Main Campus.
+This platform was designed, engineered, and delivered as a **pro bono public service project** for the student body and faculty of the University of Antique by:
 
-- **Historical Foundation**: Founded on **January 8, 1993** as the *Computer Society* under the initiative of **Mrs. Nelly E. Mistio** and approved by the College President of the Polytechnic State College of Antique (PSCA).
-- **Charter Amendment**: Officially amended to **PSITS-UA** during Academic Year **2016–2017**, establishing an exclusive organization for all Bachelor of Science in Information Technology (BSIT) students.
-- **Motto**: *"Students Together in Information Technology."*
-
----
-
-## 💡 Pro Bono Engineering Attribution
-
-This platform was designed, engineered, and delivered as a **pro bono public service initiative** for the student body of the University of Antique by:
-
-### **Bonfire Base Studio**
-> *Crafting bespoke, high-performance digital software and modern web experiences.*
-
-- **Official Website**: [https://bonfire.base69.studio](https://bonfire.base69.studio)
-- **Direct Support & Inquiries**: [support@base69.studio](mailto:support@base69.studio)
-- **Contribution Type**: Full-stack architecture, UI/UX design system, and technical implementation (Pro Bono).
+**Bonfire Base Studio**  
+Website: [https://bonfire.base69.studio](https://bonfire.base69.studio)  
+Support & Inquiries: [support@base69.studio](mailto:support@base69.studio)  
+Contribution: Full-stack system architecture, user interface design system, and technical delivery.
 
 ---
 
-## 🚀 Key Features
+## Architecture & Core Modules
 
-- **Constitution & By-Laws (CBL) Reader**:
-  - Interactive governance viewer codifying Articles I through VI and the By-Laws.
-  - Verbatim preamble, founding provenance, membership policies (₱25.00 semestral fee), fines, and election schedules.
-- **Calendar of Activities (COA)**:
-  - Editorial Kanban-Bento board for Academic Year 2026–2027.
-  - Term 01 (1st Semester 2026) & Term 02 (2nd Semester 2027) schedule covering 15 official assemblies, hackathons, demo days, and bootcamps.
-  - Segmented category filters with contextual Lucide micro-icons.
-- **Leadership & Faculty Directory**:
-  - Highlights BSIT Program Head & PSITS Adviser **Carl Spence Percy, MIT**.
-  - Complete 16-member student executive roster grouped by governance functions (Executive, Secretariat & Finance, Operations & PR, and Year Representatives).
-- **Zero-Glow Editorial Dark Minimalism**:
-  - Designed with high-contrast typography, matte surfaces, and hairline grid dividers for optimum legibility across all screen sizes and display types.
+### 1. Constitution and By-Laws (CBL)
+- Full codified text of Articles I through VI and the By-Laws.
+- Official Preamble, founding provenance, semestral membership fees (PHP 25.00), meeting attendance policies, and statutory election timelines.
+- Typography-first, high-contrast reading interface with zero artificial design bloat.
 
----
+### 2. Calendar of Activities (COA)
+- Codified schedule for Academic Year 2026–2027 split into Term 01 (1st Semester 2026) and Term 02 (2nd Semester 2027).
+- Covers 15 official assemblies, technical hackathons, bootcamps, job fairs, and regular council meetings.
+- Interactive category filters with segmented controls and contextual iconography.
 
-## 🛠️ Technology Stack
+### 3. Leadership & Administration Directory
+- Features BSIT Program Head & PSITS Adviser **Carl Spence Percy, MIT**.
+- Official roster of 16 student executive officers grouped by functional governance roles (Executive Leadership, Secretariat & Finance, Operations & PR, and Year Level Representatives).
 
-| Layer | Technology |
-| :--- | :--- |
-| **Framework** | [Next.js 16 (Turbopack, React 19, App Router)](https://nextjs.org/) |
-| **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) with custom `@theme inline` tokens |
-| **Icons & Micro-Animations** | [Lucide React](https://lucide.dev/), [React UseAnimations](https://useanimations.github.io/react-useanimations/), [Lordicon](https://lordicon.com/) |
-| **Typography** | `Syne` (Display headings), `Inter` (Body typography), System Monospace (Metadata) |
-| **Language** | TypeScript (Strict mode enabled) |
+### 4. Zero-Glow Minimalist Design System
+- Built using an editorial dark minimalist aesthetic inspired by modern enterprise software standards.
+- Strict adherence to WCAG AAA contrast ratios across OLED, IPS, and low-brightness displays.
 
 ---
 
-## 📦 Project Structure
+## Technology Stack
+
+- **Core Framework**: Next.js 16 (App Router, Turbopack, React 19)
+- **Styling**: Tailwind CSS v4 with custom `@theme inline` design tokens
+- **Iconography**: Lucide React, React UseAnimations
+- **Typography**: Syne (Display headings), Inter (Body copy), Monospace (Metadata)
+- **Language**: TypeScript (Strict Mode)
+
+---
+
+## Project Directory Structure
 
 ```
 psits-ua/
-├── app/                        # Next.js App Router
-│   ├── globals.css             # Tailwind v4 theme tokens & resets
-│   ├── layout.tsx              # Root layout with Navbar & Footer
-│   ├── page.tsx                # Hero section & core feature overview
-│   ├── about/page.tsx          # Official Constitution & By-Laws (CBL)
-│   ├── events/page.tsx         # Calendar of Activities (COA) Kanban board
-│   ├── officers/page.tsx       # Leadership & Adviser directory
-│   └── contact/page.tsx        # Inquiries & student outreach portal
-├── components/                 # Reusable UI components
-│   ├── Navbar.tsx              # Top navigation with animated hamburger
-│   ├── Footer.tsx              # Footer with quick links & social icons
-│   ├── ConstitutionViewer.tsx  # Interactive CBL accordion reader
-│   ├── OfficerCard.tsx         # Typography-first leadership cell
-│   └── LordIcon.tsx            # SSR-safe animated web-component wrapper
-├── data/                       # Codified institutional datasets
-│   ├── constitution.ts         # Verbatim CBL legal articles & history
-│   ├── events.ts               # Official 15-event Calendar of Activities
-│   └── officers.ts             # 16 executive officers & faculty adviser data
+├── app/                        # Next.js App Router routes
+│   ├── globals.css             # Tailwind v4 theme specifications
+│   ├── layout.tsx              # Root HTML layout and global navigation
+│   ├── page.tsx                # Homepage and portal introduction
+│   ├── about/page.tsx          # Constitution and By-Laws (CBL)
+│   ├── events/page.tsx         # Calendar of Activities (COA)
+│   ├── officers/page.tsx       # Officers and Adviser directory
+│   └── contact/page.tsx        # Contact and inquiry form
+├── components/                 # Reusable UI component library
+│   ├── Navbar.tsx              # Primary site navigation bar
+│   ├── Footer.tsx              # Standard site footer
+│   ├── ConstitutionViewer.tsx  # Interactive CBL reader
+│   └── OfficerCard.tsx         # Standardized leadership directory tile
+├── data/                       # Verified institutional datasets
+│   ├── constitution.ts         # Verbatim CBL articles and history
+│   ├── events.ts               # Academic Year 2026–2027 activities
+│   └── officers.ts             # Leadership and faculty data
 └── public/
-    └── assets/logo/            # Official University & PSITS shield assets
+    └── assets/logo/            # Institutional seal and chapter logos
 ```
 
 ---
 
-## 💻 Getting Started Locally
+## Local Development Setup
 
 ### Prerequisites
-- Node.js 18.18.0 or newer
-- npm, pnpm, or bun
+- Node.js version 18.18.0 or higher
+- npm, pnpm, or bun package managers
 
-### Installation
+### Installation Steps
 
-1. Clone or download the repository:
+1. Clone the repository:
    ```bash
-   git clone https://github.com/bonfire-base/psits-ua.git
-   cd psits-ua
+   git clone https://github.com/bonfire404/psits_ua.git
+   cd psits_ua
    ```
 
-2. Install dependencies:
+2. Install project dependencies:
    ```bash
    npm install
    ```
 
-3. Start the local development server:
+3. Run the development server:
    ```bash
    npm run dev
    ```
 
-4. Open your browser and navigate to:
-   ```
-   http://localhost:3000
-   ```
+4. Navigate to `http://localhost:3000` in your web browser.
 
-### Production Build
+### Production Build & Verification
 
-To test production compilation and static page generation:
+To generate the optimized static production bundle:
 ```bash
 npm run build
 npm run start
@@ -132,16 +124,8 @@ npm run start
 
 ---
 
-## 📄 License
+## License
 
-This project is licensed under the **MIT License** — free for community, academic, and non-commercial development. See the [LICENSE](./LICENSE) file for complete legal terms.
+This project is licensed under the **MIT License**. For complete license terms, refer to the [LICENSE](./LICENSE) file.
 
-```
-Copyright (c) 2026 Bonfire Base Studio & Philippine Society of Information Technology Students — UA
-```
-
----
-
-<div align="center">
-  <sub>Built with precision and care for the CCIS student community by <a href="https://bonfire.base69.studio">Bonfire Base Studio</a>.</sub>
-</div>
+Copyright (c) 2026 Bonfire Base Studio & Philippine Society of Information Technology Students — University of Antique (PSITS-UA).
