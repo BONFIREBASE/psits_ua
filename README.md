@@ -5,6 +5,8 @@
 [![Framework: Next.js 16](https://img.shields.io/badge/Framework-Next.js%2016-black.svg?logo=next.js)](https://nextjs.org/)
 [![Styling: Tailwind CSS v4](https://img.shields.io/badge/Styling-Tailwind%20CSS%20v4-38bdf8.svg?logo=tailwindcss)](https://tailwindcss.com/)
 [![Maintained by: Bonfire Base Studio](https://img.shields.io/badge/Pro%20Bono-Bonfire%20Base%20Studio-F5A623.svg)](https://bonfire.base69.studio)
+[![Project Status: In Progress](https://img.shields.io/badge/Status-In%20Progress-blue.svg)](https://github.com/bonfire404/psits_ua)
+[![Contributions: Welcome](https://img.shields.io/badge/Contributions-Welcome-success.svg)](https://github.com/bonfire404/psits_ua)
 
 ---
 
@@ -15,6 +17,12 @@ The **Philippine Society of Information Technology Students — University of An
 - **Historical Foundation**: Established on **January 8, 1993** as the *Computer Society* through the initiative of **Mrs. Nelly E. Mistio** and formally sanctioned by the College President of the Polytechnic State College of Antique (PSCA).
 - **Charter Amendment**: Formally reconstituted as **PSITS-UA** during Academic Year **2016–2017**, establishing an exclusive governance body for all Bachelor of Science in Information Technology (BSIT) undergraduates.
 - **Official Motto**: *"Students Together in Information Technology."*
+
+---
+
+## Project Status
+
+This system is currently under **active development (Work in Progress)**. Core informational modules including the Constitution & By-Laws (CBL), Calendar of Activities (COA), and Officers Directory are codified and live. Additional capabilities, including student service integration, event registrations, and administrative tooling, are continuously being designed and integrated.
 
 ---
 
@@ -58,6 +66,37 @@ Contribution: Full-stack system architecture, user interface design system, and 
 - **Iconography**: Lucide React, React UseAnimations
 - **Typography**: Syne (Display headings), Inter (Body copy), Monospace (Metadata)
 - **Language**: TypeScript (Strict Mode)
+
+---
+
+## Contributing
+
+Contributions are **actively open** to IT students, alumni, faculty members, and community developers who want to help advance the PSITS-UA digital infrastructure.
+
+We welcome:
+- Feature proposals and student utility additions
+- Bug fixes, performance improvements, and accessibility enhancements
+- Documentation and governance record corrections
+- UI/UX polish adhering to the established minimalist design system
+
+### Contribution Workflow
+
+1. Fork the repository on GitHub.
+2. Create a dedicated feature or fix branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+3. Implement your changes and verify that the build compiles cleanly:
+   ```bash
+   npm run build
+   ```
+4. Commit your work following standard atomic commit conventions:
+   ```bash
+   git commit -m "feat: description of contribution"
+   ```
+5. Push to your fork and submit a Pull Request against the `main` branch.
+
+For questions, architectural discussions, or collaboration inquiries, contact the maintainers at `support@base69.studio`.
 
 ---
 
