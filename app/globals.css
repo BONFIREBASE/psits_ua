@@ -2,7 +2,7 @@
 
 @theme inline {
   /* ── Colors ── */
-  --color-base: #0D1117;
+  --color-canvas: #0D1117;
   --color-surface: #121929;
   --color-navy: #1B2A6B;
   --color-gold: #F5A623;
@@ -31,6 +31,26 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.12) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.12);
+    border-radius: 99px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(245,166,35,0.35);
   }
 
   html {
@@ -38,15 +58,19 @@
   }
 
   body {
-    background-color: var(--color-base);
+    background-color: var(--color-canvas);
     color: var(--color-text);
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
   }
 
+  .bg-base {
+    background-color: var(--color-canvas);
+  }
+
   ::selection {
     background-color: var(--color-gold);
-    color: var(--color-base);
+    color: var(--color-canvas);
   }
 
   /* Gold underline accent used on section headings */
@@ -74,5 +98,28 @@
   .card-hover:hover {
     border-color: var(--color-gold);
     transform: translateY(-2px);
+  }
+
+  /* ── Minimalist Scrollbar ── */
+  .scrollbar-minimal {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.12) transparent;
+  }
+
+  .scrollbar-minimal::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .scrollbar-minimal::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-minimal::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.12);
+    border-radius: 99px;
+  }
+
+  .scrollbar-minimal::-webkit-scrollbar-thumb:hover {
+    background: rgba(245,166,35,0.35);
   }
 }

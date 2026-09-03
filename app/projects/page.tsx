@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import Image from 'next/image'
 import {
   FolderGit2,
   GraduationCap,
@@ -14,6 +14,7 @@ import {
   Clock,
   CheckCircle2,
   Send,
+  type LucideIcon,
 } from 'lucide-react'
 import UseAnimations from 'react-useanimations'
 import github from 'react-useanimations/lib/github'
@@ -24,7 +25,7 @@ import {
   ProjectStatus,
 } from '@/data/projects'
 
-const categories: { label: ProjectCategory; icon: any }[] = [
+const categories: { label: ProjectCategory; icon: LucideIcon }[] = [
   { label: 'All', icon: Layers },
   { label: 'Capstone', icon: GraduationCap },
   { label: 'Open Source', icon: FolderGit2 },
@@ -165,13 +166,26 @@ export default function ProjectsPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className={`grid grid-cols-1 ${filteredProjects.length === 1 ? 'max-w-2xl' : 'md:grid-cols-2'} gap-6`}>
           {filteredProjects.map((project: Project) => (
             <div
               key={project.id}
               className="group bg-surface border border-white/5 hover:border-gold/30 rounded-2xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,166,35,0.08)]"
             >
               <div className="space-y-4">
+                {/* Visual Thumbnail */}
+                {project.imageUrl && (
+                  <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-[#0a0e17] border border-white/10 mb-2">
+                    <Image
+                      src={project.imageUrl}
+                      alt={project.title}
+                      fill
+                      className="object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                      sizes="(max-width: 768px) 100vw, 700px"
+                    />
+                  </div>
+                )}
+
                 {/* Meta header */}
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2">
