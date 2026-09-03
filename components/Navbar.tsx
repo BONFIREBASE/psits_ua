@@ -13,7 +13,7 @@ const links = [
   { href: '/about', label: 'CBL' },
   { href: '/officers', label: 'Officers' },
   { href: '/events', label: 'COA' },
-  { href: '/contact', label: 'Contact' },
+  { href: '/projects', label: 'Projects' },
 ]
 
 export default function Navbar() {

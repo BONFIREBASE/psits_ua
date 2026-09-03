@@ -9,8 +9,22 @@ import mail from 'react-useanimations/lib/mail'
 
 export default function Footer() {
   return (
-    <footer className="border-t border-white/5 bg-surface mt-24">
-      <div className="max-w-6xl mx-auto px-6 py-12 flex flex-col md:flex-row items-start justify-between gap-8">
+    <footer className="relative border-t border-white/5 bg-surface mt-24 overflow-hidden">
+      {/* CCIS Seal Watermark Backdrop */}
+      <div
+        aria-hidden="true"
+        className="absolute -right-14 sm:-right-8 md:right-2 lg:right-12 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.05] md:opacity-[0.07]"
+      >
+        <Image
+          src="/assets/logo/ccis new logo.png"
+          alt=""
+          width={380}
+          height={380}
+          className="w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 object-contain"
+        />
+      </div>
+
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-12 flex flex-col md:flex-row items-start justify-between gap-8">
         <div>
           <div className="flex items-center gap-3 mb-3">
             <Image
@@ -39,7 +53,7 @@ export default function Footer() {
             { href: '/about', label: 'CBL' },
             { href: '/officers', label: 'Officers' },
             { href: '/events', label: 'COA' },
-            { href: '/contact', label: 'Contact' },
+            { href: '/projects', label: 'Projects' },
           ].map(({ href, label }) => (
             <Link
               key={label}
@@ -57,7 +71,9 @@ export default function Footer() {
           </p>
           <div className="flex items-center gap-2">
             <a
-              href="#"
+              href="https://www.facebook.com/p/PSITS-UA-100086983023496/"
+              target="_blank"
+              rel="noopener noreferrer"
               className="p-1 rounded-lg hover:bg-white/5 transition-colors"
               aria-label="Facebook"
             >
@@ -81,7 +97,7 @@ export default function Footer() {
               />
             </a>
             <a
-              href="mailto:psitsua@ua.edu.ph"
+              href="mailto:psits-ua@antiquespride.edu.ph"
               className="p-1 rounded-lg hover:bg-white/5 transition-colors"
               aria-label="Email"
             >
@@ -95,9 +111,8 @@ export default function Footer() {
           </div>
         </div>
       </div>
-      <div className="border-t border-white/5 py-4 text-center text-xs text-muted">
-        © {new Date().getFullYear()} PSITS-UA. Built with 💛 by Bonfire Base
-        Studio.
+      <div className="relative z-10 border-t border-white/5 py-4 text-center text-xs text-muted">
+        © {new Date().getFullYear()} PSITS-UA. Built by Bonfire Base Studio.
       </div>
     </footer>
   )
