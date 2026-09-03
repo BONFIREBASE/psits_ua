@@ -25,6 +25,11 @@ export const metadata: Metadata = {
     description: "Students Together in Information Technology.",
     images: ["/og-image.png"],
   },
+  icons: {
+    icon: "/assets/logo/PSITS%20logo.png",
+    shortcut: "/assets/logo/PSITS%20logo.png",
+    apple: "/assets/logo/PSITS%20logo.png",
+  },
 };
 
 export default function RootLayout({

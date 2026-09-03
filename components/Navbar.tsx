@@ -46,7 +46,7 @@ export default function Navbar() {
             className="object-contain"
           />
           <span className="font-display font-bold text-white text-lg tracking-tight">
-            PSITS<span className="text-gold">-UA</span>
+            PSITS<span className="text-gold">-U</span><span className="text-[#E63946]">A</span>
           </span>
         </Link>
 
