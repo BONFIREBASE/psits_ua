@@ -43,7 +43,6 @@ export default function COAPage() {
 
   return (
     <div className="pt-32 pb-28 max-w-6xl mx-auto px-6 space-y-14">
-      {/* Editorial Header */}
       <header className="space-y-4 border-b border-white/10 pb-10">
         <p className="font-mono text-xs text-gold tracking-widest uppercase">
           01 / Academic Year 2026–2027 · COA
@@ -57,7 +56,6 @@ export default function COAPage() {
         </p>
       </header>
 
-      {/* Minimalist Segmented Filter Bar with Icons */}
       <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-4">
         {categoryConfig.map(({ label, icon: Icon }) => {
           const isActive = selectedCategory === label
@@ -79,9 +77,7 @@ export default function COAPage() {
         })}
       </div>
 
-      {/* Minimalist Architectural Kanban Columns */}
       <div className="grid lg:grid-cols-2 gap-8 items-start">
-        {/* Term 1 Column */}
         <div className="space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
             <div className="flex items-center gap-2.5">
@@ -108,7 +104,6 @@ export default function COAPage() {
           </div>
         </div>
 
-        {/* Term 2 Column */}
         <div className="space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
             <div className="flex items-center gap-2.5">
@@ -156,7 +151,6 @@ function ActivityCell({ item }: { item: Activity }) {
           : 'border-white/10 hover:border-white/20'
       }`}
     >
-      {/* Top Metadata Row with Clean Flat Icons */}
       <div className="flex items-center justify-between gap-4">
         <span className="inline-flex items-center gap-1.5 font-mono text-xs text-gold font-bold uppercase tracking-wider">
           <Calendar size={12} className="text-gold/80" />
@@ -168,12 +162,10 @@ function ActivityCell({ item }: { item: Activity }) {
         </span>
       </div>
 
-      {/* Activity Title */}
       <h3 className="font-display font-bold text-white text-base sm:text-lg leading-snug">
         {item.activity}
       </h3>
 
-      {/* Bottom Metadata: Involved + Venue */}
       <div className="pt-2 border-t border-white/5 grid sm:grid-cols-2 gap-2 text-xs text-white/80 font-mono">
         <div className="flex items-center gap-1.5 truncate">
           <Users size={12} className="text-gold/80 shrink-0" />

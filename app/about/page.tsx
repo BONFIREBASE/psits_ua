@@ -10,7 +10,6 @@ export const metadata = {
 export default function CBLPage() {
   return (
     <div className="pt-32 pb-28 max-w-5xl mx-auto px-6 space-y-20">
-      {/* Document Header */}
       <header className="space-y-4 border-b border-white/10 pb-12">
         <p className="font-mono text-xs sm:text-sm text-gold font-bold tracking-widest uppercase">
           University of Antique · College of Computing and Information Sciences
@@ -27,7 +26,6 @@ export default function CBLPage() {
         </p>
       </header>
 
-      {/* Historical Background */}
       <section className="space-y-6">
         <h2 className="font-mono text-xs sm:text-sm text-gold font-bold tracking-widest uppercase">
           Historical Background
@@ -48,7 +46,6 @@ export default function CBLPage() {
         </div>
       </section>
 
-      {/* Preamble */}
       <section className="space-y-6">
         <h2 className="font-mono text-xs sm:text-sm text-gold font-bold tracking-widest uppercase">
           Preamble
@@ -60,7 +57,6 @@ export default function CBLPage() {
         </div>
       </section>
 
-      {/* Codified Articles & By-Laws */}
       <section className="space-y-8">
         <div className="space-y-2">
           <h2 className="font-mono text-xs sm:text-sm text-gold font-bold tracking-widest uppercase">

@@ -42,7 +42,6 @@ export const adviser: Adviser = {
 }
 
 export const officers: Officer[] = [
-  // ── Executive Leadership ──
   {
     name: 'Arvin James Balquin',
     position: 'President',
@@ -56,7 +55,6 @@ export const officers: Officer[] = [
     department: 'BSIT · CCIS',
   },
 
-  // ── Secretariat & Finance ──
   {
     name: 'Kimberly Ann Erispe',
     position: 'Secretary',
@@ -94,7 +92,6 @@ export const officers: Officer[] = [
     department: 'BSIT · CCIS',
   },
 
-  // ── Operations & PR ──
   {
     name: 'Louise Jan Carlo Tabaldo',
     position: 'Public Information Officer 1 (P.I.O.)',
@@ -120,7 +117,6 @@ export const officers: Officer[] = [
     department: 'BSIT · CCIS',
   },
 
-  // ── Year Level Representatives ──
   {
     name: 'Christine Sumande',
     position: '1st Year Representative',
@@ -147,8 +143,6 @@ export const officers: Officer[] = [
   },
 ]
 
-// ── PUBMAT Team ──
-
 export type PubmatMember = {
   name: string
   role:
@@ -161,14 +155,12 @@ export type PubmatMember = {
 }
 
 export const pubmatTeam: PubmatMember[] = [
-  // ── Writers ──
   {
     name: 'Ma. Echel Vicencio',
     role: 'Writer',
     isLead: true,
   },
 
-  // ── Graphic Designers ──
   {
     name: 'Aizelle Binoy',
     role: 'Graphic Designer',
@@ -195,7 +187,6 @@ export const pubmatTeam: PubmatMember[] = [
     isLead: false,
   },
 
-  // ── Photography & Multimedia ──
   {
     name: 'Elijah Arevalo',
     role: 'Photographer',

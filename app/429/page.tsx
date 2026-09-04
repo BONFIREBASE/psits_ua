@@ -9,14 +9,12 @@ export const metadata = {
 export default function TooManyRequestsPage() {
   return (
     <div className="fixed inset-0 z-[60] bg-[#0D1117] flex items-center justify-center px-6 overflow-hidden select-none">
-      {/* Ambient glowing aura */}
       <div
         aria-hidden="true"
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#FF6F00]/[0.04] rounded-full blur-[160px] pointer-events-none"
       />
 
       <div className="relative z-10 max-w-md w-full text-center space-y-8">
-        {/* Eyebrow badge */}
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#FF6F00]/20 bg-[#FF6F00]/5 backdrop-blur-md">
           <Activity size={12} className="text-[#FFA726]" />
           <span className="font-mono text-[10px] uppercase tracking-[0.25em] font-bold text-[#FFA726]">
@@ -24,7 +22,6 @@ export default function TooManyRequestsPage() {
           </span>
         </div>
 
-        {/* Large aesthetic error code */}
         <div className="space-y-3">
           <h1 className="font-display font-black text-7xl sm:text-8xl md:text-9xl text-white tracking-tight leading-none">
             4<span className="animate-orange-gradient">2</span>9
@@ -37,7 +34,6 @@ export default function TooManyRequestsPage() {
           </p>
         </div>
 
-        {/* Action controls: Icon-only Return Home & Retry */}
         <div className="pt-2 flex items-center justify-center gap-3">
           <Link
             href="/"

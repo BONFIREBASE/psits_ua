@@ -11,7 +11,6 @@ import {
   Layers,
   ArrowUpRight,
   Radio,
-  Send,
   type LucideIcon,
 } from 'lucide-react'
 import UseAnimations from 'react-useanimations'
@@ -52,7 +51,6 @@ export default function ProjectsPage() {
 
   return (
     <div className="pt-32 pb-28 max-w-6xl mx-auto px-6 space-y-12">
-      {/* Editorial Header */}
       <header className="space-y-4 border-b border-white/10 pb-10">
         <p className="font-mono text-xs text-gold tracking-widest uppercase">
           04 / Student Innovations · Showcase
@@ -67,9 +65,7 @@ export default function ProjectsPage() {
         </p>
       </header>
 
-      {/* Control Bar: Categories & Search */}
       <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-        {/* Segmented Filter */}
         <div className="flex flex-wrap items-center gap-2 p-1.5 bg-surface border border-white/10 rounded-xl">
           {categories.map(({ label, icon: Icon }) => {
             const isActive = selectedCategory === label
@@ -91,7 +87,6 @@ export default function ProjectsPage() {
           })}
         </div>
 
-        {/* Search Bar */}
         <div className="relative min-w-[260px] md:w-72">
           <Search
             size={16}
@@ -116,7 +111,6 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* Projects Grid */}
       {filteredProjects.length === 0 ? (
         <div className="text-center py-20 bg-surface border border-white/5 rounded-2xl p-8">
           <p className="text-gold font-display font-bold text-lg mb-2">
@@ -144,7 +138,6 @@ export default function ProjectsPage() {
               className="group bg-surface border border-white/5 hover:border-gold/30 rounded-2xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,166,35,0.08)]"
             >
               <div className="space-y-4">
-                {/* Visual Thumbnail */}
                 {project.imageUrl && (
                   <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-[#0a0e17] border border-white/10 mb-2">
                     <Image
@@ -157,7 +150,6 @@ export default function ProjectsPage() {
                   </div>
                 )}
 
-                {/* Meta header */}
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-mono uppercase tracking-wider text-gold bg-gold/10 px-2.5 py-1 rounded-md border border-gold/20">
                     {project.category}
@@ -167,7 +159,6 @@ export default function ProjectsPage() {
                   </span>
                 </div>
 
-                {/* Title */}
                 <div>
                   <h3 className="font-display font-bold text-xl sm:text-2xl text-white group-hover:text-gold transition-colors">
                     {project.title}
@@ -177,12 +168,10 @@ export default function ProjectsPage() {
                   </p>
                 </div>
 
-                {/* Description */}
                 <p className="text-muted text-sm leading-relaxed">
                   {project.description}
                 </p>
 
-                {/* Problem Statement Box */}
                 {project.problemStatement && (
                   <div className="p-3 bg-base/60 border-l-2 border-gold/50 rounded-r-lg">
                     <p className="text-xs text-white/80 leading-relaxed italic">
@@ -194,7 +183,6 @@ export default function ProjectsPage() {
                   </div>
                 )}
 
-                {/* Tags */}
                 <div className="flex flex-wrap gap-1.5 pt-2">
                   {project.tags.map((tag) => (
                     <span
@@ -207,7 +195,6 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
-              {/* Actions & Links */}
               <div className="pt-6 mt-6 border-t border-white/5 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   {project.githubUrl && (
@@ -251,31 +238,27 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Student Submission Banner */}
-      <section className="bg-surface border border-white/10 rounded-2xl p-8 sm:p-10 relative overflow-hidden">
-        <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-gold/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="max-w-2xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gold/30 bg-gold/10 text-gold text-xs font-mono">
-            <Sparkles size={12} />
+      <section className="border border-white/10 bg-surface/30 rounded-2xl p-8 sm:p-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div className="max-w-xl space-y-2.5">
+          <p className="font-mono text-xs text-gold uppercase tracking-[0.2em] font-bold">
             Showcase Your Work
-          </div>
-          <h2 className="font-display font-bold text-2xl sm:text-3xl text-white">
+          </p>
+          <h2 className="font-display font-black text-2xl sm:text-3xl text-white tracking-tight leading-tight">
             Built something impactful for UA or Antique?
           </h2>
-          <p className="text-muted text-sm leading-relaxed">
-            We feature approved BSIT capstones, community open-source utilities,
-            and competition prototypes built by CCIS students and alumni.
+          <p className="text-white/60 text-sm leading-relaxed font-normal">
+            We feature approved BSIT capstones, community open-source utilities, and competition prototypes built by CCIS students and alumni.
           </p>
-          <div className="pt-2">
-            <a
-              href="mailto:psits-ua@antiquespride.edu.ph?subject=Project%20Showcase%20Submission%20-%20PSITS%20Portal"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-[#F5A623] via-[#FFBF52] to-[#E09010] text-[#0B0F17] font-bold text-xs tracking-wide shadow-[0_0_20px_rgba(245,166,35,0.3)] hover:shadow-[0_0_30px_rgba(245,166,35,0.5)] transition-all cursor-pointer"
-            >
-              <Send size={14} />
-              Submit Project for Review
-              <ArrowUpRight size={14} />
-            </a>
-          </div>
+        </div>
+
+        <div className="shrink-0">
+          <a
+            href="mailto:psits-ua@antiquespride.edu.ph?subject=Project%20Showcase%20Submission%20-%20PSITS%20Portal"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gold text-[#0D1117] font-mono font-bold text-xs uppercase tracking-wider hover:bg-white transition-all duration-200 active:scale-95 shadow-sm"
+          >
+            <span>Submit Project for Review</span>
+            <ArrowUpRight size={14} />
+          </a>
         </div>
       </section>
     </div>

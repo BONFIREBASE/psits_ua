@@ -21,7 +21,6 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
     setActiveIndex(((index % count) + count) % count)
   }, [count])
 
-  // Auto-play: advance every 5s, reset timer on manual interaction
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = setInterval(() => {
@@ -45,10 +44,8 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
       onMouseEnter={() => { if (timerRef.current) clearInterval(timerRef.current) }}
       onMouseLeave={resetTimer}
     >
-      {/* ─── 3D Fluid Carousel Viewport ─── */}
       <div className="relative flex items-center justify-center h-[420px] sm:h-[480px] md:h-[530px] lg:h-[560px] overflow-visible">
         {dispatches.map((dispatch, index) => {
-          // Circular relative offset: 0 = center, -1 = left, 1 = right
           let offset = (index - activeIndex) % count
           if (offset < -Math.floor(count / 2)) offset += count
           if (offset > Math.floor(count / 2)) offset -= count
@@ -57,7 +54,6 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
           const isLeft = offset === -1
           const isRight = offset === 1
 
-          // Smooth geometric positioning
           const xPercent = isCenter ? 0 : isLeft ? -56 : isRight ? 56 : 0
           const scale = isCenter ? 1 : isLeft || isRight ? 0.83 : 0.6
           const opacity = isCenter ? 1 : isLeft || isRight ? 0.42 : 0
@@ -96,9 +92,7 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
         })}
       </div>
 
-      {/* ─── Minimal Navigation: Dots always, Arrows mobile-only ─── */}
       <div className="flex items-center justify-center gap-5 mt-6">
-        {/* Prev — mobile only */}
         <button
           onClick={() => navigate((activeIndex - 1 + count) % count)}
           className="md:hidden p-2.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 transition-all duration-200 active:scale-95"
@@ -107,7 +101,6 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
           <ChevronLeft size={18} style={{ color: '#F5A623' }} />
         </button>
 
-        {/* Dots — responsive pill indicator */}
         <div className="flex items-center gap-2.5">
           {dispatches.map((_, i) => (
             <button
@@ -129,7 +122,6 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
           ))}
         </div>
 
-        {/* Next — mobile only */}
         <button
           onClick={() => navigate((activeIndex + 1) % count)}
           className="md:hidden p-2.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 transition-all duration-200 active:scale-95"

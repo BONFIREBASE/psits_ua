@@ -12,7 +12,6 @@ export default function ConstitutionViewer() {
 
   return (
     <div className="space-y-12">
-      {/* Minimalist Key Metric Track */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 pt-4 pb-8 border-y border-white/10">
         <div>
           <p className="font-mono text-xs text-gold font-bold tracking-wider uppercase mb-1">Fee</p>
@@ -40,7 +39,6 @@ export default function ConstitutionViewer() {
         </div>
       </div>
 
-      {/* Editorial Hairline Accordion */}
       <div className="divide-y divide-white/10 border-y border-white/10">
         {constitutionData.articles.map((item: ConstitutionArticle, index: number) => {
           const isOpen = openArticle === item.id

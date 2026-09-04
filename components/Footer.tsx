@@ -56,7 +56,6 @@ export default function Footer() {
 
   return (
     <footer className="relative border-t border-white/5 bg-surface mt-24 overflow-hidden">
-      {/* Subtle CCIS Seal Watermark Backdrop */}
       <div
         aria-hidden="true"
         className="absolute -right-20 sm:-right-16 md:-right-10 lg:-right-6 top-1/3 -translate-y-1/2 pointer-events-none select-none opacity-[0.04] md:opacity-[0.06]"
@@ -70,9 +69,7 @@ export default function Footer() {
         />
       </div>
 
-      {/* Upper Section: Navigation & Connect Columns (Minimalist, Left-Aligned) */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 pt-12 sm:pt-16 pb-6 flex flex-wrap items-start justify-start gap-14 sm:gap-24">
-        {/* Governance / Navigation Links */}
         <div className="flex flex-col gap-2">
           <p className="text-[11px] font-mono font-medium text-white/40 uppercase tracking-[0.2em] mb-1">
             Governance & Chapter
@@ -88,7 +85,6 @@ export default function Footer() {
           ))}
         </div>
 
-        {/* Connect Column (Interactive Animated Vector Icons) */}
         <div className="flex flex-col gap-3">
           <p className="text-[11px] font-mono font-medium text-white/40 uppercase tracking-[0.2em] mb-1">
             Connect
@@ -140,10 +136,8 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* Institutional Strip & Dynamic Logo Carousel */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
         <div className="flex items-center gap-3">
-          {/* Animated Carousel Logo Container (CCIS & UA) */}
           <div className="relative w-5 h-5 flex-shrink-0 flex items-center justify-center">
             <AnimatePresence mode="wait">
               <motion.div
@@ -165,7 +159,6 @@ export default function Footer() {
             </AnimatePresence>
           </div>
 
-          {/* Static Institutional Text */}
           <span className="font-medium text-white/70 whitespace-nowrap">
             College of Computing and Information Sciences — University of Antique
           </span>
@@ -188,7 +181,6 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* ─── Liquid Glass Pro Bono Snackbar (Bottom-Right) ─── */}
       <AnimatePresence>
         {isProBonoOpen && (
           <motion.div
@@ -200,21 +192,17 @@ export default function Footer() {
             aria-live="polite"
             className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 z-50 sm:w-92 sm:max-w-md rounded-2xl p-4 sm:p-5 overflow-hidden backdrop-blur-2xl bg-[#0D1117]/70 border border-white/15 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.22),0_20px_50px_rgba(0,0,0,0.75)]"
           >
-            {/* Liquid Specular Glare Overlay */}
             <div
               aria-hidden="true"
               className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/[0.09] via-transparent to-white/[0.02]"
             />
 
-            {/* Subtle Ambient Orange Glow Orb */}
             <div
               aria-hidden="true"
               className="absolute -top-8 -right-8 w-24 h-24 bg-[#FF6F00]/15 rounded-full blur-2xl pointer-events-none"
             />
 
-            {/* Content Container */}
             <div className="relative z-10 space-y-3">
-              {/* Header: Studio Title + Location + Dismiss */}
               <div className="flex items-center justify-between">
                 <div className="flex items-baseline gap-2">
                   <h4 className="font-display font-black text-sm text-white tracking-tight">
@@ -235,12 +223,10 @@ export default function Footer() {
                 </button>
               </div>
 
-              {/* Message */}
               <p className="text-white/80 text-xs leading-relaxed font-normal">
                 Engineered with pride in Antique by <span className="text-white font-medium">Bonfire Base Studio</span> to give PSITS-UA and CCIS an official, modern platform celebrating student tech innovation.
               </p>
 
-              {/* Slogan & Glass Pill Link */}
               <div className="pt-2.5 border-t border-white/10 flex items-center justify-between">
                 <span className="font-mono text-[10px] text-[#FFA726]/85 italic">
                   &ldquo;Ignite Ideas, Survive the Future&rdquo;

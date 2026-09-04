@@ -23,7 +23,6 @@ export const metadata = {
     'Official directory of PSITS-UA Executive Officers and Faculty Adviser for Academic Year 2026–2027.',
 }
 
-/* ── Helpers ── */
 function getInitials(name: string) {
   return name
     .split(' ')
@@ -70,7 +69,6 @@ function Avatar({
   )
 }
 
-/* ── Main Page ── */
 export default function OfficersPage() {
   const executives = officers.filter((o) => o.roleGroup === 'Executive')
   const secretariat = officers.filter(
@@ -91,7 +89,6 @@ export default function OfficersPage() {
 
   return (
     <div className="pt-32 pb-28 max-w-7xl mx-auto px-6">
-      {/* ━━━ Header ━━━ */}
       <header className="space-y-4 pb-16 text-center">
         <p className="font-mono text-xs sm:text-sm text-gold font-bold tracking-widest uppercase">
           Leadership Directory · A.Y. 2026–2027
@@ -106,12 +103,8 @@ export default function OfficersPage() {
         </p>
       </header>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          ADVISER — Cinematic Banner
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section className="mb-16">
         <div className="relative overflow-hidden border border-gold/20 bg-gradient-to-br from-navy/60 via-surface/80 to-canvas p-8 sm:p-12 md:p-16">
-          {/* Decorative corner accent */}
           <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-gold/5 to-transparent pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-gold/3 to-transparent pointer-events-none" />
 
@@ -143,9 +136,6 @@ export default function OfficersPage() {
         </div>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          EXECUTIVE — Two Large Feature Cards
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section className="mb-16">
         <SectionLabel icon={<Award size={13} />} text="Executive Leadership" />
 
@@ -155,7 +145,6 @@ export default function OfficersPage() {
               key={officer.name}
               className="group relative border border-white/8 hover:border-gold/30 bg-gradient-to-br from-surface/90 to-canvas p-6 sm:p-8 transition-all duration-500 hover:shadow-[0_0_48px_rgba(245,166,35,0.06)]"
             >
-              {/* Rank indicator */}
               <div className="absolute top-4 right-4 font-mono text-[10px] text-white/15 font-bold">
                 0{i + 1}
               </div>
@@ -175,16 +164,12 @@ export default function OfficersPage() {
                 </div>
               </div>
 
-              {/* Bottom accent line */}
               <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-gold/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             </div>
           ))}
         </div>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          BENTO — Secretariat & Finance
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section className="mb-16">
         <SectionLabel
           icon={<ShieldCheck size={13} />}
@@ -192,7 +177,6 @@ export default function OfficersPage() {
           sub="Administration"
         />
 
-        {/* Paired layout: Secretary pair | Treasurer pair | Auditor pair */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {secretariat.map((officer) => (
             <OfficerCard key={officer.name} officer={officer} />
@@ -200,9 +184,6 @@ export default function OfficersPage() {
         </div>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          BENTO — Operations & PR
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section className="mb-16">
         <SectionLabel
           icon={<BookOpen size={13} />}
@@ -217,9 +198,6 @@ export default function OfficersPage() {
         </div>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          YEAR REPS — Compact Row
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section className="mb-20">
         <SectionLabel
           icon={<Users size={13} />}
@@ -234,11 +212,7 @@ export default function OfficersPage() {
         </div>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          PUBMAT — Creative Team
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section>
-        {/* PUBMAT Header — Minimalist Masthead */}
         <div className="text-center mb-6 space-y-3">
           <div className="flex items-center justify-center gap-3 font-mono text-xs text-gold uppercase tracking-[0.2em]">
             <span className="w-8 h-px bg-gold/30" />
@@ -253,13 +227,11 @@ export default function OfficersPage() {
             The writers, designers, photographers, videographers, and editors defining how PSITS-UA is seen and remembered.
           </p>
 
-          {/* Gold accent line directly connecting to Team Leads below */}
           <div className="pt-4 flex justify-center">
             <div className="w-px h-12 bg-gradient-to-b from-gold/50 via-gold/25 to-white/10" />
           </div>
         </div>
 
-        {/* PUBMAT Leads — Featured */}
         <div className="mb-8">
           <SectionLabel icon={<Award size={13} />} text="Team Leads" />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
@@ -287,7 +259,6 @@ export default function OfficersPage() {
           </div>
         </div>
 
-        {/* Writers */}
         {writers.filter((m) => !m.isLead).length > 0 && (
           <div className="mb-8">
             <SectionLabel icon={<PenLine size={13} />} text="Writers" />
@@ -301,7 +272,6 @@ export default function OfficersPage() {
           </div>
         )}
 
-        {/* Graphic Designers */}
         {designers.filter((m) => !m.isLead).length > 0 && (
           <div className="mb-8">
             <SectionLabel icon={<Palette size={13} />} text="Graphic Designers" />
@@ -315,7 +285,6 @@ export default function OfficersPage() {
           </div>
         )}
 
-        {/* Photographers / Videographers / Editors */}
         {photographers.filter((m) => !m.isLead).length > 0 && (
           <div>
             <SectionLabel
@@ -336,9 +305,6 @@ export default function OfficersPage() {
   )
 }
 
-/* ─────────────────────────────────────────────
-   Section Label
-   ───────────────────────────────────────────── */
 function SectionLabel({
   icon,
   text,
@@ -363,9 +329,6 @@ function SectionLabel({
   )
 }
 
-/* ─────────────────────────────────────────────
-   Officer Card
-   ───────────────────────────────────────────── */
 function OfficerCard({
   officer,
   compact = false,
@@ -375,7 +338,6 @@ function OfficerCard({
 }) {
   return (
     <div className="group relative border border-white/6 hover:border-white/15 bg-surface/40 hover:bg-surface/70 transition-all duration-300 overflow-hidden">
-      {/* Hover glow */}
       <div className="absolute inset-0 bg-gradient-to-br from-gold/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
       <div className={`relative ${compact ? 'p-4' : 'p-4 sm:p-5'} flex items-center gap-3`}>
@@ -406,9 +368,6 @@ function OfficerCard({
   )
 }
 
-/* ─────────────────────────────────────────────
-   PUBMAT Card
-   ───────────────────────────────────────────── */
 function PubmatCard({
   member,
   compact = false,
@@ -418,7 +377,6 @@ function PubmatCard({
 }) {
   return (
     <div className="group relative border border-white/6 hover:border-white/15 bg-surface/40 hover:bg-surface/70 transition-all duration-300 overflow-hidden">
-      {/* Hover glow */}
       <div className="absolute inset-0 bg-gradient-to-br from-gold/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
       <div
@@ -450,4 +408,3 @@ function PubmatCard({
     </div>
   )
 }
-

@@ -13,10 +13,6 @@ export interface LordIconProps {
   className?: string
 }
 
-/**
- * SSR-safe client wrapper for Lordicon animated icons.
- * Dynamically registers the custom element in the browser.
- */
 export default function LordIcon({
   src,
   trigger = 'hover',
@@ -32,12 +28,10 @@ export default function LordIcon({
         try {
           defineElement()
         } catch {
-          // Already defined
         }
         setIsMounted(true)
       })
       .catch(() => {
-        // Fallback or ignore if SSR
       })
   }, [])
 

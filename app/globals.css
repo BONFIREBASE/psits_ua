@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* ── Colors ── */
   --color-canvas: #0D1117;
   --color-surface: #121929;
   --color-navy: #1B2A6B;
@@ -10,17 +9,14 @@
   --color-text: #E8E8E8;
   --color-muted: #7A8394;
 
-  /* ── Fonts ── */
   --font-display: var(--font-syne), sans-serif;
   --font-body: var(--font-inter), sans-serif;
 
-  /* ── Font sizes ── */
   --font-size-hero: clamp(2.5rem, 6vw, 5rem);
   --font-size-h1: clamp(2rem, 4vw, 3.5rem);
   --font-size-h2: clamp(1.5rem, 3vw, 2.5rem);
   --font-size-h3: 1.25rem;
 
-  /* ── Border radius ── */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -73,7 +69,6 @@
     color: var(--color-canvas);
   }
 
-  /* Gold underline accent used on section headings */
   .gold-underline {
     position: relative;
     display: inline-block;
@@ -90,7 +85,6 @@
     border-radius: 2px;
   }
 
-  /* Subtle gold border on interactive cards */
   .card-hover {
     transition: border-color 0.2s ease, transform 0.2s ease;
   }
@@ -100,7 +94,6 @@
     transform: translateY(-2px);
   }
 
-  /* ── Premium Animated Orange Gradient (Bonfire Base Signature) ── */
   @keyframes orange-gradient-flow {
     0% {
       background-position: 0% 50%;
@@ -129,7 +122,6 @@
     animation: orange-gradient-flow 3.5s ease-in-out infinite;
   }
 
-  /* ── Minimalist Scrollbar ── */
   .scrollbar-minimal {
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.12) transparent;
@@ -152,9 +144,6 @@
     background: rgba(245,166,35,0.35);
   }
 
-  /* ── Org Chart Utilities ── */
-
-  /* Vertical connector line (centered) */
   .org-connector-v {
     position: relative;
   }
@@ -169,7 +158,6 @@
     background: linear-gradient(to bottom, rgba(245,166,35,0.5), rgba(245,166,35,0.15));
   }
 
-  /* Horizontal branch line spanning across children */
   .org-branch-line {
     position: relative;
   }
@@ -183,7 +171,6 @@
     background: linear-gradient(to right, transparent, rgba(245,166,35,0.3) 20%, rgba(245,166,35,0.3) 80%, transparent);
   }
 
-  /* Drop connector from branch line to each child */
   .org-drop {
     position: relative;
   }
@@ -198,7 +185,6 @@
     background: rgba(245,166,35,0.3);
   }
 
-  /* Card node base */
   .org-node {
     border: 1px solid rgba(255,255,255,0.08);
     background: rgba(18,25,41,0.6);
@@ -211,7 +197,6 @@
     box-shadow: 0 8px 32px rgba(245,166,35,0.08);
   }
 
-  /* Featured / top-tier node */
   .org-node-featured {
     border: 1px solid rgba(245,166,35,0.3);
     background: linear-gradient(135deg, rgba(18,25,41,0.8), rgba(27,42,107,0.2));
@@ -225,7 +210,6 @@
     box-shadow: 0 0 60px rgba(245,166,35,0.12), 0 8px 32px rgba(0,0,0,0.3);
   }
 
-  /* Tier label divider */
   .org-tier-label {
     display: flex;
     align-items: center;
@@ -240,7 +224,6 @@
     background: linear-gradient(to right, transparent, rgba(245,166,35,0.2), transparent);
   }
 
-  /* Hide connectors on mobile */
   @media (max-width: 639px) {
     .org-connector-v::after,
     .org-branch-line::before,

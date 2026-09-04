@@ -22,7 +22,6 @@ export interface SocialDispatch {
 }
 
 export const socialDispatches: SocialDispatch[] = [
-  // ── 1. bUtlAk 2026 Orientation ──
   {
     id: 'fb-1B2Gumht2T',
     imageUrl: '/assets/butlak.jpg',
@@ -49,7 +48,6 @@ export const socialDispatches: SocialDispatch[] = [
     featured: true,
   },
 
-  // ── 2. Pubmat Team Recruitment ──
   {
     id: 'fb-pubmat-recruitment',
     imageUrl: '/assets/publication_recruitment.jpg',
@@ -70,7 +68,6 @@ export const socialDispatches: SocialDispatch[] = [
     featured: true,
   },
 
-  // ── 3. Sugalaw PSITS Photobooth ──
   {
     id: 'fb-photobooth',
     imageUrl: '/assets/photobooth.jpg',
@@ -91,5 +88,4 @@ export const socialDispatches: SocialDispatch[] = [
   },
 ]
 
-// Keep backward compat
 export const spotlightDispatch = socialDispatches[0]

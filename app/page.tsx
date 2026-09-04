@@ -26,9 +26,7 @@ export default function HomePage() {
   }, [])
   return (
     <>
-      {/* Hero */}
       <section className="relative min-h-[92vh] flex flex-col items-center justify-center pt-28 pb-12 overflow-hidden bg-base">
-        {/* Background Cover Image with Cinematic Vignette */}
         <div className="absolute inset-0 pointer-events-none z-0">
           <Image
             src="/assets/cover.jpg"
@@ -38,7 +36,6 @@ export default function HomePage() {
             priority
             sizes="100vw"
           />
-          {/* Ambient Glows & Vignettes ensuring high text contrast */}
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[550px] bg-navy/50 rounded-full blur-[160px]" />
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-gold/10 rounded-full blur-[130px]" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#0D1117]/60 via-[#0D1117]/75 to-[#0D1117]" />
@@ -51,7 +48,6 @@ export default function HomePage() {
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col items-center"
           >
-            {/* Pill Eyebrow Badge (Cycles every 3 seconds) */}
             <div className="inline-flex items-center justify-center min-w-[260px] sm:min-w-[290px] h-9 px-5 rounded-full border border-white/15 bg-white/[0.06] backdrop-blur-md mb-8 shadow-sm overflow-hidden">
               <AnimatePresence mode="wait">
                 <motion.span
@@ -71,19 +67,16 @@ export default function HomePage() {
               </AnimatePresence>
             </div>
 
-            {/* Giant Title: PSITS (White) U (Yellow) A (Red) */}
             <h1 className="font-display font-black text-6xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight leading-none mb-6 select-none">
               <span className="text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">PSITS </span>
               <span className="text-[#F5A623] drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">U</span>
               <span className="text-[#E63946] drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">A</span>
             </h1>
 
-            {/* Sub-line 1: Chapter Designation */}
             <p className="text-white/90 text-base sm:text-lg md:text-xl mb-6 font-normal tracking-wide max-w-3xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
               Philippine Society of Information Technology Students — University of Antique
             </p>
 
-            {/* Sub-line 2: Core Mission Tagline */}
             <p className="text-white font-bold text-2xl sm:text-3xl md:text-4xl max-w-3xl mx-auto leading-snug drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
               Empowering Future IT Leaders Through Innovation and Collaboration.
             </p>
@@ -91,10 +84,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Minimalist Stats Strip */}
       <section className="relative max-w-4xl mx-auto px-6 py-14">
         <div className="grid grid-cols-3 divide-x divide-white/10 items-center">
-          {/* Stat 1: 200+ Active Members */}
           <div className="text-center px-4 sm:px-8">
             <p className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-white tracking-tight mb-1">
               200+
@@ -104,7 +95,6 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Stat 2: 5+ Events per Year */}
           <div className="text-center px-4 sm:px-8">
             <p className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-white tracking-tight mb-1">
               5+
@@ -114,7 +104,6 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Stat 3: 2018 Est. Year */}
           <div className="text-center px-4 sm:px-8">
             <p className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-white tracking-tight mb-1">
               2018
@@ -126,10 +115,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─── Leadership / Dean's Message (2-Column Editorial) ─── */}
       <section className="relative max-w-5xl mx-auto px-6 py-20">
         <div className="grid md:grid-cols-12 gap-10 md:gap-14 items-center">
-          {/* Left Column: Pure Minimalist Portrait with Smooth Fade */}
           <div className="md:col-span-5 flex justify-center">
             <div
               className="relative w-72 sm:w-80 md:w-[380px] h-[420px] sm:h-[460px] md:h-[500px] select-none"
@@ -150,7 +137,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right Column: Verified Message & Official Attribution */}
           <div className="md:col-span-7 space-y-6">
             <div className="space-y-2">
               <span className="font-mono text-xs text-gold uppercase tracking-[0.25em] font-bold block">
@@ -183,7 +169,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Latest Official Social Dispatches */}
       <section className="py-24 overflow-hidden">
         <div className="max-w-4xl mx-auto px-6 mb-12">
           <SectionHeader
@@ -195,10 +180,8 @@ export default function HomePage() {
         <DispatchCarousel dispatches={socialDispatches} />
       </section>
 
-      {/* ─── Minimalist Institutional CTA ─── */}
       <section className="relative max-w-6xl mx-auto px-6 pb-24">
         <div className="relative min-h-[360px] md:min-h-[400px] flex items-center rounded-2xl overflow-hidden border border-white/10 bg-[#0a0e17]">
-          {/* Background Cover Image with Heavy Left Mask */}
           <div className="absolute inset-0 z-0">
             <Image
               src="/assets/cover.jpg"
@@ -208,28 +191,22 @@ export default function HomePage() {
               sizes="(max-width: 768px) 100vw, 1200px"
               priority
             />
-            {/* Solid mask on left side to completely conceal background graphics/text */}
             <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#0a0e17] from-35% via-[#0a0e17]/95 via-55% to-transparent" />
           </div>
 
-          {/* Minimalist Content Layer */}
           <div className="relative z-10 p-8 sm:p-12 md:p-14 max-w-xl">
-            {/* Subtle Eyebrow */}
             <p className="text-[11px] font-mono tracking-[0.25em] uppercase text-gold font-bold mb-3">
               Join the Chapter
             </p>
 
-            {/* Clean Headline */}
             <h2 className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-white leading-tight tracking-tight mb-3.5">
               Shape the future of tech with PSITS-UA.
             </h2>
 
-            {/* Concise Subtitle */}
             <p className="text-white/70 text-xs sm:text-sm leading-relaxed mb-7 max-w-md font-normal">
               Connect with student developers, designers, and tech innovators across the University of Antique.
             </p>
 
-            {/* Streamlined Actions */}
             <div className="flex items-center gap-5">
               <a
                 href="https://docs.google.com/forms/d/e/1FAIpQLSd005fH-_fxNnf3qREIODWMGWVGi4K0svkFO3cA2qr0Nswc0w/viewform"

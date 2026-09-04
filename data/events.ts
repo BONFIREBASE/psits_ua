@@ -10,7 +10,6 @@ export type Activity = {
 }
 
 export const calendarActivities: Activity[] = [
-  // ── 1st Semester (2026) ──
   {
     id: 'coa-1',
     month: 'August 2026',
@@ -92,7 +91,6 @@ export const calendarActivities: Activity[] = [
     featured: false,
   },
 
-  // ── 2nd Semester (2027) ──
   {
     id: 'coa-9',
     month: 'January 2027',
