@@ -100,6 +100,35 @@
     transform: translateY(-2px);
   }
 
+  /* ── Premium Animated Orange Gradient (Bonfire Base Signature) ── */
+  @keyframes orange-gradient-flow {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .animate-orange-gradient {
+    background: linear-gradient(
+      110deg,
+      #FF4E00 0%,
+      #FF8C00 25%,
+      #FFA726 50%,
+      #FF6F00 75%,
+      #FF3D00 100%
+    );
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: orange-gradient-flow 3.5s ease-in-out infinite;
+  }
+
   /* ── Minimalist Scrollbar ── */
   .scrollbar-minimal {
     scrollbar-width: thin;
@@ -121,5 +150,102 @@
 
   .scrollbar-minimal::-webkit-scrollbar-thumb:hover {
     background: rgba(245,166,35,0.35);
+  }
+
+  /* ── Org Chart Utilities ── */
+
+  /* Vertical connector line (centered) */
+  .org-connector-v {
+    position: relative;
+  }
+  .org-connector-v::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -32px;
+    transform: translateX(-50%);
+    width: 1px;
+    height: 32px;
+    background: linear-gradient(to bottom, rgba(245,166,35,0.5), rgba(245,166,35,0.15));
+  }
+
+  /* Horizontal branch line spanning across children */
+  .org-branch-line {
+    position: relative;
+  }
+  .org-branch-line::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(245,166,35,0.3) 20%, rgba(245,166,35,0.3) 80%, transparent);
+  }
+
+  /* Drop connector from branch line to each child */
+  .org-drop {
+    position: relative;
+  }
+  .org-drop::before {
+    content: '';
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1px;
+    height: 20px;
+    background: rgba(245,166,35,0.3);
+  }
+
+  /* Card node base */
+  .org-node {
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(18,25,41,0.6);
+    backdrop-filter: blur(8px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .org-node:hover {
+    border-color: rgba(245,166,35,0.4);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(245,166,35,0.08);
+  }
+
+  /* Featured / top-tier node */
+  .org-node-featured {
+    border: 1px solid rgba(245,166,35,0.3);
+    background: linear-gradient(135deg, rgba(18,25,41,0.8), rgba(27,42,107,0.2));
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 40px rgba(245,166,35,0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .org-node-featured:hover {
+    border-color: rgba(245,166,35,0.5);
+    transform: translateY(-3px);
+    box-shadow: 0 0 60px rgba(245,166,35,0.12), 0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  /* Tier label divider */
+  .org-tier-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+  .org-tier-label::before,
+  .org-tier-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(245,166,35,0.2), transparent);
+  }
+
+  /* Hide connectors on mobile */
+  @media (max-width: 639px) {
+    .org-connector-v::after,
+    .org-branch-line::before,
+    .org-drop::before {
+      display: none;
+    }
   }
 }

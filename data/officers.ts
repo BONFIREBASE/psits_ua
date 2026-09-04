@@ -4,6 +4,7 @@ export type Adviser = {
   title: string
   department: string
   institution: string
+  image?: string
 }
 
 export type Officer = {
@@ -11,6 +12,25 @@ export type Officer = {
   position: string
   roleGroup: 'Executive' | 'Secretariat & Finance' | 'Operations & PR' | 'Year Representatives'
   department: string
+  image?: string
+}
+
+export type Dean = {
+  name: string
+  credentials: string
+  title: string
+  college: string
+  institution: string
+  image?: string
+}
+
+export const dean: Dean = {
+  name: 'Dr. John C. Amar',
+  credentials: 'DM',
+  title: 'Dean',
+  college: 'College of Computing and Information Sciences',
+  institution: 'University of Antique — Main Campus',
+  image: '/assets/dean.png',
 }
 
 export const adviser: Adviser = {
@@ -124,5 +144,91 @@ export const officers: Officer[] = [
     position: '4th Year Representative',
     roleGroup: 'Year Representatives',
     department: 'BSIT · 4th Year',
+  },
+]
+
+// ── PUBMAT Team ──
+
+export type PubmatMember = {
+  name: string
+  role:
+    | 'Writer'
+    | 'Graphic Designer'
+    | 'Photographer'
+    | 'Photographer / Videographer / Editor'
+  isLead: boolean
+  image?: string
+}
+
+export const pubmatTeam: PubmatMember[] = [
+  // ── Writers ──
+  {
+    name: 'Ma. Echel Vicencio',
+    role: 'Writer',
+    isLead: true,
+  },
+
+  // ── Graphic Designers ──
+  {
+    name: 'Aizelle Binoy',
+    role: 'Graphic Designer',
+    isLead: true,
+  },
+  {
+    name: 'Arvin James Balquin',
+    role: 'Graphic Designer',
+    isLead: false,
+  },
+  {
+    name: 'Blessy Bielle P. Odango',
+    role: 'Graphic Designer',
+    isLead: false,
+  },
+  {
+    name: 'Mark Gelo S. Wieldt',
+    role: 'Graphic Designer',
+    isLead: false,
+  },
+  {
+    name: 'Rheinheart Masuay',
+    role: 'Graphic Designer',
+    isLead: false,
+  },
+
+  // ── Photography & Multimedia ──
+  {
+    name: 'Elijah Arevalo',
+    role: 'Photographer',
+    isLead: true,
+  },
+  {
+    name: 'Li Joshua Ramos',
+    role: 'Photographer',
+    isLead: false,
+  },
+  {
+    name: 'Jairoh Noe Bachicha Bremon',
+    role: 'Photographer',
+    isLead: false,
+  },
+  {
+    name: 'Dainielle Zyd Samalague',
+    role: 'Photographer',
+    isLead: false,
+  },
+  {
+    name: 'Clarence Morales',
+    role: 'Photographer',
+    isLead: false,
+  },
+  {
+    name: 'Precious Rhyza S. Ricasio',
+    role: 'Photographer / Videographer / Editor',
+    isLead: false,
+  },
+  {
+    name: 'Ellen June Cardinal',
+    role: 'Photographer',
+    isLead: false,
   },
 ]

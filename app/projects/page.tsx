@@ -11,8 +11,6 @@ import {
   Layers,
   ArrowUpRight,
   Radio,
-  Clock,
-  CheckCircle2,
   Send,
   type LucideIcon,
 } from 'lucide-react'
@@ -22,7 +20,6 @@ import {
   projectsData,
   Project,
   ProjectCategory,
-  ProjectStatus,
 } from '@/data/projects'
 
 const categories: { label: ProjectCategory; icon: LucideIcon }[] = [
@@ -52,32 +49,6 @@ export default function ProjectsPage() {
 
     return matchesCategory && matchesSearch
   })
-
-  const getStatusBadge = (status: ProjectStatus) => {
-    switch (status) {
-      case 'Active':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Active
-          </span>
-        )
-      case 'In Development':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-gold/10 text-gold border border-gold/25">
-            <Clock size={11} />
-            In Dev
-          </span>
-        )
-      case 'Completed':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-white/5 text-muted border border-white/10">
-            <CheckCircle2 size={11} />
-            Completed
-          </span>
-        )
-    }
-  }
 
   return (
     <div className="pt-32 pb-28 max-w-6xl mx-auto px-6 space-y-12">
@@ -187,16 +158,13 @@ export default function ProjectsPage() {
                 )}
 
                 {/* Meta header */}
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono uppercase tracking-wider text-gold bg-gold/10 px-2.5 py-1 rounded-md border border-gold/20">
-                      {project.category}
-                    </span>
-                    <span className="text-[11px] font-mono text-muted">
-                      {project.year}
-                    </span>
-                  </div>
-                  {getStatusBadge(project.status)}
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-gold bg-gold/10 px-2.5 py-1 rounded-md border border-gold/20">
+                    {project.category}
+                  </span>
+                  <span className="text-[11px] font-mono text-muted">
+                    {project.year}
+                  </span>
                 </div>
 
                 {/* Title */}

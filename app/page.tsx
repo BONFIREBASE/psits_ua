@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Quote } from 'lucide-react'
 import SectionHeader from '@/components/SectionHeader'
 import DispatchCarousel from '@/components/DispatchCarousel'
 import { socialDispatches } from '@/data/announcements'
+import { dean } from '@/data/officers'
 
 const heroPhrases = [
   { text: 'Welcome to the Future', isItalic: false, isUpper: true },
@@ -113,41 +114,71 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Stat 3: 2018 (Alternates every 3s to "jo ano jo ako pa din ba jo?") */}
-          <div className="text-center px-4 sm:px-8 min-h-[64px] sm:min-h-[76px] flex flex-col justify-center overflow-hidden">
-            <AnimatePresence mode="wait">
-              {phraseIndex === 0 ? (
-                <motion.div
-                  key="stat-est"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  <p className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-white tracking-tight mb-1">
-                    2018
-                  </p>
-                  <p className="text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.2em] text-gold/80 font-semibold">
-                    Est. Year
-                  </p>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="stat-jo"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  <p className="font-display font-bold text-xs sm:text-sm md:text-base text-gold italic leading-snug mb-1">
-                    &ldquo;jo ano jo ako pa din ba jo?&rdquo;
-                  </p>
-                  <p className="text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.2em] text-white/50 font-medium">
-                    Est. 2018
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+          {/* Stat 3: 2018 Est. Year */}
+          <div className="text-center px-4 sm:px-8">
+            <p className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-white tracking-tight mb-1">
+              2018
+            </p>
+            <p className="text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.2em] text-gold/80 font-semibold">
+              Est. Year
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Leadership / Dean's Message (2-Column Editorial) ─── */}
+      <section className="relative max-w-5xl mx-auto px-6 py-20">
+        <div className="grid md:grid-cols-12 gap-10 md:gap-14 items-center">
+          {/* Left Column: Pure Minimalist Portrait with Smooth Fade */}
+          <div className="md:col-span-5 flex justify-center">
+            <div
+              className="relative w-72 sm:w-80 md:w-[380px] h-[420px] sm:h-[460px] md:h-[500px] select-none"
+              style={{
+                maskImage:
+                  'linear-gradient(to bottom, rgba(0,0,0,1) 62%, rgba(0,0,0,0) 98%)',
+                WebkitMaskImage:
+                  'linear-gradient(to bottom, rgba(0,0,0,1) 62%, rgba(0,0,0,0) 98%)',
+              }}
+            >
+              <Image
+                src="/assets/dean.png"
+                alt={`${dean.name} — ${dean.title}, ${dean.college}`}
+                fill
+                className="object-contain object-bottom drop-shadow-[0_24px_48px_rgba(0,0,0,0.95)] pointer-events-none"
+                priority
+              />
+            </div>
+          </div>
+
+          {/* Right Column: Verified Message & Official Attribution */}
+          <div className="md:col-span-7 space-y-6">
+            <div className="space-y-2">
+              <span className="font-mono text-xs text-gold uppercase tracking-[0.25em] font-bold block">
+                Leadership
+              </span>
+              <h2 className="font-display font-black text-3xl sm:text-4xl md:text-5xl text-white tracking-tight uppercase">
+                Dean&apos;s <span className="text-gold">Message</span>
+              </h2>
+            </div>
+
+            <blockquote className="relative">
+              <Quote size={28} className="text-gold/35 mb-3" />
+              <p className="font-display font-medium text-base sm:text-lg md:text-xl text-white/90 leading-relaxed italic">
+                &ldquo;One of my developmental goals is all about digital and smart campus transformation. I think it&apos;s good that the University of Antique has started the implementation of the AIMS. With this, there is a need to continue the implementation of the AIMS system of the university.&rdquo;
+              </p>
+            </blockquote>
+
+            <div className="pt-4 border-t border-white/10 space-y-1">
+              <h3 className="font-display font-black text-xl sm:text-2xl text-white tracking-tight">
+                {dean.name}
+              </h3>
+              <p className="font-mono text-xs sm:text-[13px] text-gold/90 uppercase tracking-widest font-semibold">
+                Dean · College of Computing and Information Sciences
+              </p>
+              <p className="font-mono text-[10px] text-white/40 uppercase tracking-wider">
+                {dean.institution}
+              </p>
+            </div>
           </div>
         </div>
       </section>
