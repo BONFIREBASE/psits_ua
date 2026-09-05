@@ -6,6 +6,7 @@ export interface SocialDispatch {
   category: 'Event Recap' | 'Campus Event' | 'Recruitment' | 'Official Advisory'
   title: string
   highlightQuote?: string
+  quoteAuthor?: string
   excerpt: string
   fullContent: string
   involvedColleges?: string[]
@@ -23,6 +24,48 @@ export interface SocialDispatch {
 
 export const socialDispatches: SocialDispatch[] = [
   {
+    id: 'fb-1DGqiMHKhc',
+    imageUrl: '/assets/suicide_prevention.jpg',
+    date: 'September 5, 2026',
+    category: 'Official Advisory',
+    title: 'Suicide Prevention Month: You Are Not a Burden',
+    highlightQuote: 'The Lord is near to the brokenhearted. — Psalm 34:18',
+    excerpt:
+      'Before you scroll past this — read this one line first: You Are Not a Burden. September is Suicide Prevention Month, and if no one has told you today, let this be your reminder: You are not alone. Reach out, speak up, stay alive.',
+    fullContent: `Before you scroll past this — read this one line first: You Are Not a Burden.
+
+September is Suicide Prevention Month, and if no one has told you today, let this be your reminder:
+• You are not alone. Reach out, speak up, stay alive.
+• It's okay to not be okay. It's not okay to stay silent.
+• Your story isn't over yet.
+
+"The Lord is near to the brokenhearted." — Psalm 34:18
+
+September is recognized as Suicide Awareness Month. If you or someone you know is carrying a heavy burden, compassionate support is always available:
+
+Emergency Support & Crisis Hotlines:
+• National Center for Mental Health (DOH): 1553 (Toll-Free) | (02) 989-8727 | 0917-899-8727 | 0908-639-2672
+• Hopeline PH: (02) 8804-4673 | 0917-558-4673 | 0918-873-4673
+• Municipal Health Office (San Jose): 036-641-0791 | mhosanjose06@gmail.com
+• University of Antique Guidance Unit: guidance@antiquespride.edu.ph
+
+You are not alone. You are loved. You are valued. And you matter.`,
+    credits: {
+      writer: 'Ma. Echel Vicencio',
+      pubmat: 'Aizelle Binoy',
+    },
+    postUrl: 'https://www.facebook.com/share/p/1DGqiMHKhc/',
+    tags: [
+      '#SuicidePreventionMonth',
+      '#StartTheConversation',
+      '#ChangingTheNarrativeOnSuicide',
+      '#MentalHealthAwareness',
+      '#PSITSUA',
+    ],
+    featured: true,
+  },
+
+  {
     id: 'fb-1B2Gumht2T',
     imageUrl: '/assets/butlak.jpg',
     date: 'September 2, 2026',
@@ -30,6 +73,7 @@ export const socialDispatches: SocialDispatch[] = [
     category: 'Event Recap',
     title: 'bUtlAk 2026: Second Batch Annual Student Orientation Program',
     highlightQuote: 'Hanggang saan mo lalakarin ang pangarap mo?',
+    quoteAuthor: 'Student Affairs and Services (SAS) Head',
     excerpt:
       'New kasUbAy students filled the University of Antique (UA) Tripunan Hall as bUtlAk 2026 held its second batch of the annual student orientation program, warmly welcoming freshmen across participating colleges.',
     fullContent:

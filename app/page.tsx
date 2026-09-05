@@ -88,7 +88,7 @@ export default function HomePage() {
         <div className="grid grid-cols-3 divide-x divide-white/10 items-center">
           <div className="text-center px-4 sm:px-8">
             <p className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-white tracking-tight mb-1">
-              200+
+              600+
             </p>
             <p className="text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.2em] text-gold/80 font-semibold">
               Active Members

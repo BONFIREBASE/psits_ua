@@ -79,9 +79,8 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
                 if (isLeft) navigate((activeIndex - 1 + count) % count)
                 if (isRight) navigate((activeIndex + 1) % count)
               }}
-              className={`absolute w-[90%] sm:w-[64%] md:w-[54%] lg:w-[50%] max-w-[480px] select-none ${
-                !isCenter ? 'cursor-pointer pointer-events-auto' : ''
-              }`}
+              className={`absolute w-[90%] sm:w-[64%] md:w-[54%] lg:w-[50%] max-w-[480px] select-none ${!isCenter ? 'cursor-pointer pointer-events-auto' : ''
+                }`}
               style={{
                 willChange: 'transform, opacity, filter',
               }}
@@ -96,7 +95,7 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
         <button
           onClick={() => navigate((activeIndex - 1 + count) % count)}
           className="md:hidden p-2.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 transition-all duration-200 active:scale-95"
-          aria-label="Previous dispatch"
+          aria-label="Previous announcement"
         >
           <ChevronLeft size={18} style={{ color: '#F5A623' }} />
         </button>
@@ -106,7 +105,7 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
             <button
               key={i}
               onClick={() => navigate(i)}
-              aria-label={`Go to dispatch ${i + 1}`}
+              aria-label={`Go to announcement ${i + 1}`}
               className="transition-all duration-300 p-1"
             >
               <div
@@ -125,7 +124,7 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
         <button
           onClick={() => navigate((activeIndex + 1) % count)}
           className="md:hidden p-2.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 transition-all duration-200 active:scale-95"
-          aria-label="Next dispatch"
+          aria-label="Next announcement"
         >
           <ChevronRight size={18} style={{ color: '#F5A623' }} />
         </button>
