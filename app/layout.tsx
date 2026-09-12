@@ -1,20 +1,25 @@
 import type { Metadata } from "next";
-import { Syne, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import LayoutShell from "@/components/LayoutShell";
 
-const syne = Syne({
-  subsets: ["latin"],
+const syne = localFont({
+  src: "../public/assets/font/Syne/Syne-VariableFont_wght.ttf",
   variable: "--font-syne",
-  weight: ["400", "600", "700", "800"],
+  display: "swap",
 });
 
-const inter = Inter({
-  subsets: ["latin"],
+const inter = localFont({
+  src: "../public/assets/font/Inter/Inter-VariableFont_opsz,wght.ttf",
   variable: "--font-inter",
-  weight: ["400", "500", "600"],
+  display: "swap",
+});
+
+const architectsDaughter = localFont({
+  src: "../public/assets/font/Architects_Daughter/ArchitectsDaughter-Regular.ttf",
+  variable: "--font-handwriting",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -39,11 +44,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${syne.variable} ${inter.variable}`}>
+    <html
+      lang="en"
+      className={`${syne.variable} ${inter.variable} ${architectsDaughter.variable}`}
+    >
       <body className="bg-base text-text font-body">
-        <Navbar />
-        <main>{children}</main>
-        <Footer />
+        <LayoutShell>{children}</LayoutShell>
         <Analytics />
       </body>
     </html>

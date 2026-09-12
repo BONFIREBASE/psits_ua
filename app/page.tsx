@@ -1,29 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { ArrowUpRight, Quote } from 'lucide-react'
 import SectionHeader from '@/components/SectionHeader'
 import DispatchCarousel from '@/components/DispatchCarousel'
 import { socialDispatches } from '@/data/announcements'
 import { dean } from '@/data/officers'
 
-const heroPhrases = [
-  { text: 'Welcome to the Future', isItalic: false, isUpper: true },
-  { text: '"saan ba ako nag kulang?"', isItalic: true, isUpper: false },
-]
-
 export default function HomePage() {
-  const [phraseIndex, setPhraseIndex] = useState(0)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPhraseIndex((prev) => (prev + 1) % heroPhrases.length)
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [])
   return (
     <>
       <section className="relative min-h-[92vh] flex flex-col items-center justify-center pt-28 pb-12 overflow-hidden bg-base">
@@ -48,23 +34,10 @@ export default function HomePage() {
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col items-center"
           >
-            <div className="inline-flex items-center justify-center min-w-[260px] sm:min-w-[290px] h-9 px-5 rounded-full border border-white/15 bg-white/[0.06] backdrop-blur-md mb-8 shadow-sm overflow-hidden">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={phraseIndex}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                  className={`text-white/90 text-xs sm:text-sm ${
-                    heroPhrases[phraseIndex].isItalic
-                      ? 'italic font-medium text-gold tracking-wide'
-                      : 'font-semibold tracking-[0.25em] uppercase'
-                  }`}
-                >
-                  {heroPhrases[phraseIndex].text}
-                </motion.span>
-              </AnimatePresence>
+            <div className="inline-flex items-center justify-center h-9 px-5 rounded-full border border-white/15 bg-white/[0.06] backdrop-blur-md mb-8 shadow-sm">
+              <span className="text-white/90 text-xs sm:text-sm font-medium tracking-wide">
+                &quot;Transforming Lives, Building Communities&quot;
+              </span>
             </div>
 
             <h1 className="font-display font-black text-6xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight leading-none mb-6 select-none">
@@ -78,7 +51,7 @@ export default function HomePage() {
             </p>
 
             <p className="text-white font-bold text-2xl sm:text-3xl md:text-4xl max-w-3xl mx-auto leading-snug drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
-              Empowering Future IT Leaders Through Innovation and Collaboration.
+              Empowering Future IT Students Through Innovation and Collaboration.
             </p>
           </motion.div>
         </div>
