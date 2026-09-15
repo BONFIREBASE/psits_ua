@@ -196,7 +196,7 @@ export default function HomePage() {
                 className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-mono text-white/60 hover:text-white transition-colors"
               >
                 <span>View Projects</span>
-                <span className="text-gold">→</span>
+                <span className="text-gold"></span>
               </Link>
             </div>
           </div>

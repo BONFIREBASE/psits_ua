@@ -32,20 +32,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored) as AuthUser
-        if (parsed.email?.endsWith(ALLOWED_DOMAIN)) {
-          setUser(parsed)
-        } else {
-          sessionStorage.removeItem(STORAGE_KEY)
+    const timer = setTimeout(() => {
+      try {
+        const stored = sessionStorage.getItem(STORAGE_KEY)
+        if (stored) {
+          const parsed = JSON.parse(stored) as AuthUser
+          if (parsed.email?.endsWith(ALLOWED_DOMAIN)) {
+            setUser(parsed)
+          } else {
+            sessionStorage.removeItem(STORAGE_KEY)
+          }
         }
+      } catch {
+        sessionStorage.removeItem(STORAGE_KEY)
+      } finally {
+        setIsLoading(false)
       }
-    } catch {
-      sessionStorage.removeItem(STORAGE_KEY)
-    }
-    setIsLoading(false)
+    }, 0)
+
+    return () => clearTimeout(timer)
   }, [])
 
   const login = useCallback(async (email: string): Promise<{ success: boolean; error?: string }> => {
