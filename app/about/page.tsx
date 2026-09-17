@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation'
 import ConstitutionViewer from '@/components/ConstitutionViewer'
 import { constitutionData } from '@/data/constitution'
 
@@ -7,7 +8,14 @@ export const metadata = {
     'Official Constitution and By-Laws of the Philippine Society of Information Technology Students — University of Antique.',
 }
 
+// Temporary access restriction: set to false to restore CBL view
+const IS_CBL_DISABLED = true
+
 export default function CBLPage() {
+  if (IS_CBL_DISABLED) {
+    notFound()
+  }
+
   return (
     <div className="pt-32 pb-28 max-w-5xl mx-auto px-6 space-y-20">
       <header className="space-y-4 border-b border-white/10 pb-12">
