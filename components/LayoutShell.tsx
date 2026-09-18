@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import MaintenanceWrapper from '@/components/MaintenanceWrapper'
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -13,10 +14,10 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   }
 
   return (
-    <>
+    <MaintenanceWrapper>
       <Navbar />
       <main>{children}</main>
       <Footer />
-    </>
+    </MaintenanceWrapper>
   )
 }
