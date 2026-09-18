@@ -39,6 +39,20 @@ export default function BackupManagementPage() {
   } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
 
+  if (user && user.role !== 'admin') {
+    return (
+      <div className="p-8 max-w-md mx-auto text-center space-y-4 pt-24">
+        <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto">
+          <ShieldCheck size={28} />
+        </div>
+        <h2 className="font-display font-bold text-xl text-white">Access Restricted</h2>
+        <p className="text-xs text-white/50 leading-relaxed">
+          System backup and database restore operations are restricted exclusively to the Super Administrator.
+        </p>
+      </div>
+    )
+  }
+
   // Assemble full backup payload
   function generateBackupObject() {
     return {

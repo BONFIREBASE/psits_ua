@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { AuthProvider, useAuth } from './_context/auth-context'
 import { ToastProvider } from './_components/Toast'
@@ -30,8 +30,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 function RedirectToLogin() {
   const router = useRouter()
-  router.replace('/management')
-  return null
+  useEffect(() => {
+    router.replace('/management')
+  }, [router])
+  return <ManagementShellSkeleton />
 }
 
 function AdminShell({ children }: { children: React.ReactNode }) {

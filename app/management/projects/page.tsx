@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import Image from 'next/image'
 import {
   Code2,
@@ -16,6 +16,8 @@ import {
   Users,
   Calendar,
   Layers,
+  Check,
+  Clock,
 } from 'lucide-react'
 
 function GithubIcon({ size = 12 }: { size?: number }) {
@@ -37,6 +39,8 @@ import FileUpload from '../_components/FileUpload'
 import StatusBadge from '../_components/StatusBadge'
 import EmptyState from '../_components/EmptyState'
 import { useToast } from '../_components/Toast'
+import { getProjects } from '@/lib/supabase'
+import { createProjectAction, deleteProjectAction, approveProjectAction } from './actions'
 
 const categoryOptions = [
   { value: 'Campus Utility', label: 'Campus Utility' },
@@ -47,6 +51,7 @@ const categoryOptions = [
 
 const statusOptions = [
   { value: 'Active', label: 'Active / Live' },
+  { value: 'Pending', label: 'Pending Approval' },
   { value: 'In Development', label: 'In Development' },
   { value: 'Completed', label: 'Completed' },
 ]
@@ -56,7 +61,63 @@ export default function ProjectsManagementPage() {
   const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<ProjectCategory>('All')
-  const [statusFilter, setStatusFilter] = useState<'All' | ProjectStatus>('All')
+  const [statusFilter, setStatusFilter] = useState<'All' | ProjectStatus | 'Pending'>('All')
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const dbProjects = await getProjects()
+        if (dbProjects && dbProjects.length > 0) {
+          const mapped: Project[] = dbProjects.map((p) => {
+            const matchedInitial = initialProjects.find(
+              (init) =>
+                init.title.toLowerCase().trim() === p.title.toLowerCase().trim() ||
+                init.id === p.id
+            )
+            const teamTag = p.tags?.find((t) => t.toLowerCase().startsWith('by:'))
+            const teamName =
+              teamTag ? teamTag.replace(/^by:\s*/i, '') : matchedInitial?.team || 'PSITS-UA Student Developers'
+            return {
+              id: p.id,
+              title: p.title,
+              category: (p.category as Project['category']) || matchedInitial?.category || 'Campus Utility',
+              description: p.description,
+              problemStatement: matchedInitial?.problemStatement,
+              tags: p.tags && p.tags.length > 0 ? p.tags : matchedInitial?.tags || [],
+              team: teamName,
+              year: matchedInitial?.year || '2026',
+              status: (p.status as ProjectStatus) || 'Active',
+              featured: matchedInitial?.featured ?? false,
+              imageUrl: p.image_url || matchedInitial?.imageUrl || undefined,
+              liveUrl: p.demo_url || matchedInitial?.liveUrl || undefined,
+              githubUrl: p.github_url || matchedInitial?.githubUrl || undefined,
+            }
+          })
+
+          const merged = [...mapped]
+          for (const init of initialProjects) {
+            if (!merged.some((p) => p.title.toLowerCase().trim() === init.title.toLowerCase().trim())) {
+              merged.unshift(init)
+            }
+          }
+          setProjects(merged)
+        }
+      } catch {}
+    }
+    load()
+  }, [])
+
+  async function handleApprove(id: string) {
+    const res = await approveProjectAction(id)
+    if (res.success) {
+      setProjects((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, status: 'Active' } : p))
+      )
+      toast('Project approved and published to public showcase!', 'success')
+    } else {
+      toast(res.error || 'Failed to approve project', 'error')
+    }
+  }
 
   // Modals & confirmation
   const [showAddModal, setShowAddModal] = useState(false)
@@ -75,6 +136,7 @@ export default function ProjectsManagementPage() {
   const [formLiveUrl, setFormLiveUrl] = useState('')
   const [formGithubUrl, setFormGithubUrl] = useState('')
   const [formFeatured, setFormFeatured] = useState(false)
+  const [formImage, setFormImage] = useState<File | null>(null)
   const [formImagePreview, setFormImagePreview] = useState<string | null>(null)
 
   // Filtered list
@@ -94,6 +156,7 @@ export default function ProjectsManagementPage() {
   const activeCount = projects.filter((p) => p.status === 'Active').length
   const inDevCount = projects.filter((p) => p.status === 'In Development').length
   const featuredCount = projects.filter((p) => p.featured).length
+  const pendingCount = projects.filter((p) => p.status === 'Pending').length
 
   function openAddModal() {
     setFormTitle('')
@@ -127,10 +190,26 @@ export default function ProjectsManagementPage() {
     setFormImagePreview(project.imageUrl || null)
   }
 
-  function handleSaveNew(e: FormEvent) {
+  async function handleSaveNew(e: FormEvent) {
     e.preventDefault()
     if (!formTitle.trim() || !formDescription.trim()) {
       toast('Please provide project title and description.')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('title', formTitle.trim())
+    formData.append('category', formCategory)
+    formData.append('description', formDescription.trim())
+    formData.append('tags', formTags)
+    formData.append('status', formStatus)
+    formData.append('demoUrl', formLiveUrl.trim())
+    formData.append('githubUrl', formGithubUrl.trim())
+    if (formImage) formData.append('thumbnail', formImage)
+
+    const res = await createProjectAction(formData)
+    if (!res.success) {
+      toast(res.error || 'Failed to save project')
       return
     }
 
@@ -140,7 +219,7 @@ export default function ProjectsManagementPage() {
       .filter(Boolean)
 
     const newProject: Project = {
-      id: `proj-${Date.now()}`,
+      id: (res.data as { id: string })?.id || `proj-${Date.now()}`,
       title: formTitle.trim(),
       category: formCategory,
       description: formDescription.trim(),
@@ -150,15 +229,14 @@ export default function ProjectsManagementPage() {
       year: formYear.trim() || '2026',
       status: formStatus,
       featured: formFeatured,
-      imageUrl: formImagePreview || undefined,
+      imageUrl: (res.data as { image_url?: string })?.image_url || formImagePreview || undefined,
       liveUrl: formLiveUrl.trim() || undefined,
       githubUrl: formGithubUrl.trim() || undefined,
     }
 
     setProjects([newProject, ...projects])
     setShowAddModal(false)
-    toast('Project added to showcase. (Placeholder)')
-    console.log('[Management] Created project:', newProject)
+    toast('Project saved to Supabase & image uploaded to R2!')
   }
 
   function handleSaveEdit(e: FormEvent) {
@@ -192,10 +270,16 @@ export default function ProjectsManagementPage() {
     console.log('[Management] Updated project:', updated)
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
+    const proj = projects.find((p) => p.id === id)
     setProjects(projects.filter((p) => p.id !== id))
     setDeleteConfirmId(null)
-    toast('Project removed from showcase. (Placeholder)')
+    try {
+      await deleteProjectAction(id, proj?.imageUrl)
+      toast('Project removed from Supabase and Cloudflare R2.')
+    } catch {
+      toast('Project removed from view.')
+    }
   }
 
   function toggleFeatured(id: string) {
@@ -227,13 +311,28 @@ export default function ProjectsManagementPage() {
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="bg-white/[0.02] border border-white/6 rounded-xl p-4">
           <span className="text-[11px] text-white/35 font-mono uppercase tracking-wider block">
             Total Projects
           </span>
           <span className="font-display font-black text-2xl text-white mt-1 block">
             {totalCount}
+          </span>
+        </div>
+        <div
+          onClick={() => setStatusFilter('Pending')}
+          className={`cursor-pointer rounded-xl p-4 border transition-all ${
+            pendingCount > 0
+              ? 'bg-amber-500/[0.08] border-amber-500/40 hover:bg-amber-500/15'
+              : 'bg-white/[0.02] border-white/6'
+          }`}
+        >
+          <span className="text-[11px] text-amber-300/80 font-mono uppercase tracking-wider block flex items-center gap-1.5">
+            <Clock size={12} className="text-amber-400" /> Pending Review
+          </span>
+          <span className="font-display font-black text-2xl text-amber-400 mt-1 block">
+            {pendingCount}
           </span>
         </div>
         <div className="bg-white/[0.02] border border-white/6 rounded-xl p-4">
@@ -254,7 +353,7 @@ export default function ProjectsManagementPage() {
         </div>
         <div className="bg-white/[0.02] border border-white/6 rounded-xl p-4">
           <span className="text-[11px] text-white/35 font-mono uppercase tracking-wider block">
-            Featured Highlights
+            Featured
           </span>
           <span className="font-display font-black text-2xl text-gold mt-1 block">
             {featuredCount}
@@ -280,17 +379,24 @@ export default function ProjectsManagementPage() {
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-            {(['All', 'Active', 'In Development', 'Completed'] as const).map((stat) => (
+            {(['All', 'Pending', 'Active', 'In Development', 'Completed'] as const).map((stat) => (
               <button
                 key={stat}
                 onClick={() => setStatusFilter(stat)}
-                className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ${
+                className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
                   statusFilter === stat
-                    ? 'bg-gold/15 text-gold border border-gold/30'
+                    ? stat === 'Pending'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'bg-gold/15 text-gold border border-gold/30'
                     : 'text-white/40 hover:text-white/80 hover:bg-white/[0.04] border border-transparent'
                 }`}
               >
-                {stat}
+                <span>{stat}</span>
+                {stat === 'Pending' && pendingCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-amber-500 text-[#0a0e17] text-[10px] font-bold flex items-center justify-center">
+                    {pendingCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -341,8 +447,43 @@ export default function ProjectsManagementPage() {
             return (
               <div
                 key={proj.id}
-                className="group bg-[#0d121f] border border-white/6 hover:border-white/12 rounded-xl overflow-hidden transition-all duration-200 flex flex-col justify-between"
+                className={`group bg-[#0d121f] border rounded-xl overflow-hidden transition-all duration-200 flex flex-col justify-between ${
+                  proj.status === 'Pending'
+                    ? 'border-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.1)]'
+                    : 'border-white/6 hover:border-white/12'
+                }`}
               >
+                {/* Pending Submission Header Banner */}
+                {proj.status === 'Pending' && (
+                  <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2.5 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <Clock size={13} className="text-amber-400" />
+                      <span className="text-[11px] font-mono uppercase tracking-wider text-amber-300 font-bold">
+                        Pending Officer Review
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleApprove(proj.id)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold transition-all shadow-sm cursor-pointer"
+                        title="Approve & Publish to Public Showcase"
+                      >
+                        <Check size={13} />
+                        <span>Approve & Publish</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirmId(proj.id)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-[11px] font-medium transition-all cursor-pointer"
+                        title="Decline submission"
+                      >
+                        <X size={13} />
+                        <span>Decline</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* Image Banner / Preview */}
                 {proj.imageUrl ? (
                   <div className="relative h-44 w-full bg-white/[0.02] overflow-hidden border-b border-white/6">
@@ -477,6 +618,17 @@ export default function ProjectsManagementPage() {
                         </div>
                       ) : (
                         <>
+                          {proj.status === 'Pending' && (
+                            <button
+                              type="button"
+                              onClick={() => handleApprove(proj.id)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition-colors text-xs font-semibold cursor-pointer"
+                              title="Approve & Publish to Public Showcase"
+                            >
+                              <Check size={13} />
+                              <span>Approve</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => openEditModal(proj)}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors"
@@ -645,6 +797,7 @@ export default function ProjectsManagementPage() {
                     accept="image/*"
                     preview={formImagePreview}
                     onChange={(file: File | null) => {
+                      setFormImage(file)
                       if (file) {
                         setFormImagePreview(URL.createObjectURL(file))
                       } else {

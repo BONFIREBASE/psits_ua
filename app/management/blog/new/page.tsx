@@ -2,17 +2,21 @@
 
 import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Eye, Save, Bold, Italic, Heading, List, Link2, Quote } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Eye, Save, Bold, Italic, Heading, List, Link2, Quote, Loader2 } from 'lucide-react'
 import FormField, { inputStyles, textareaStyles } from '../../_components/FormField'
 import Select from '../../_components/Select'
 import FileUpload from '../../_components/FileUpload'
 import { useToast } from '../../_components/Toast'
+import { createBlogPost } from '../actions'
 
 const categories = ['Event Recap', 'Campus Event', 'Recruitment', 'Official Advisory'] as const
 
 export default function NewBlogPostPage() {
+  const router = useRouter()
   const { toast } = useToast()
   const [showPreview, setShowPreview] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [form, setForm] = useState({
     title: '',
@@ -64,15 +68,38 @@ export default function NewBlogPostPage() {
     update('fullContent', newContent)
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    const payload = {
-      ...form,
-      tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
-      thumbnailFileName: thumbnail?.name || null,
+    setIsSubmitting(true)
+    try {
+      const formData = new FormData()
+      formData.append('title', form.title)
+      formData.append('category', form.category)
+      formData.append('date', form.date)
+      formData.append('excerpt', form.excerpt)
+      formData.append('fullContent', form.fullContent)
+      formData.append('highlightQuote', form.highlightQuote)
+      formData.append('quoteAuthor', form.quoteAuthor)
+      formData.append('postUrl', form.postUrl)
+      formData.append('tags', form.tags)
+      formData.append('featured', String(form.featured))
+      if (thumbnail) {
+        formData.append('thumbnail', thumbnail)
+      }
+
+      const res = await createBlogPost(formData)
+      if (!res.success) {
+        toast(res.error || 'Failed to publish post')
+        return
+      }
+
+      toast('Blog post published to database and Cloudflare R2!')
+      router.push('/management/blog')
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Error publishing post')
+    } finally {
+      setIsSubmitting(false)
     }
-    console.log('[Management] New blog post payload:', payload)
-    toast('Blog post created successfully. (Placeholder — no backend yet)')
   }
 
   return (
@@ -287,10 +314,20 @@ export default function NewBlogPostPage() {
           <div className="flex items-center gap-3 pt-4 border-t border-white/6">
             <button
               type="submit"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Save size={15} />
-              <span>Publish Post</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  <span>Uploading to R2 & DB...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={15} />
+                  <span>Publish Post</span>
+                </>
+              )}
             </button>
             <Link
               href="/management/blog"

@@ -1,6 +1,6 @@
 export type ProjectCategory = 'All' | 'Capstone' | 'Open Source' | 'Campus Utility' | 'Hackathon'
 
-export type ProjectStatus = 'Active' | 'In Development' | 'Completed'
+export type ProjectStatus = 'Active' | 'In Development' | 'Completed' | 'Pending'
 
 export interface Project {
   id: string

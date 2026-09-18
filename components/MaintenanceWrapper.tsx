@@ -33,7 +33,18 @@ function subscribeSecondTimer(callback: () => void) {
 function getIsBypassed() {
   if (typeof window === 'undefined') return false
   const params = new URLSearchParams(window.location.search)
-  return params.get('bypass') === 'true'
+  if (params.get('bypass') === 'true') return true
+
+  // Auto-bypass on Vercel preview deployments (dev branch)
+  const host = window.location.hostname
+  const isVercelPreview =
+    host.includes('-git-') ||
+    host.includes('preview') ||
+    (host.endsWith('.vercel.app') &&
+      !host.startsWith('psitsua.vercel.app') &&
+      !host.startsWith('psits-ua.vercel.app'))
+
+  return isVercelPreview
 }
 
 function subscribeBypass(callback: () => void) {

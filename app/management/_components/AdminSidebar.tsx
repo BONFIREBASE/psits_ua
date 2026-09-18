@@ -22,23 +22,36 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../_context/auth-context'
 
-const navItems = [
+interface NavItem {
+  href: string
+  label: string
+  icon: typeof LayoutDashboard
+  roles?: ('admin' | 'officer')[]
+}
+
+const navItems: NavItem[] = [
   { href: '/management/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/management/blog', label: 'Blog / Dispatches', icon: FileEdit },
   { href: '/management/officers', label: 'Officers', icon: Users },
   { href: '/management/events', label: 'Events & Calendar', icon: CalendarDays },
   { href: '/management/projects', label: 'Projects Showcase', icon: Code2 },
-  { href: '/management/audit', label: 'Audit Reports', icon: ClipboardCheck },
   { href: '/management/attendance', label: 'Attendance', icon: ClipboardList },
-  { href: '/management/treasury', label: 'Treasury', icon: Landmark },
   { href: '/management/documents', label: 'Documents', icon: FolderOpen },
-  { href: '/management/backup', label: 'Data & Backup', icon: HardDriveDownload },
+  { href: '/management/treasury', label: 'Treasury', icon: Landmark, roles: ['admin'] },
+  { href: '/management/audit', label: 'Audit Reports', icon: ClipboardCheck, roles: ['admin'] },
+  { href: '/management/backup', label: 'Data & Backup', icon: HardDriveDownload, roles: ['admin'] },
 ]
 
 export default function AdminSidebar() {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
+
+  const allowedNavItems = navItems.filter((item) => {
+    if (!item.roles) return true
+    if (!user) return true
+    return item.roles.includes(user.role)
+  })
 
   return (
     <aside
@@ -76,7 +89,7 @@ export default function AdminSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto scrollbar-minimal">
-        {navItems.map((item) => {
+        {allowedNavItems.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(item.href + '/')
 
@@ -124,11 +137,27 @@ export default function AdminSidebar() {
       {/* Footer: User + Collapse */}
       <div className="border-t border-white/6 p-2 space-y-1 flex-shrink-0">
         {!collapsed && user && (
-          <div className="px-3 py-2">
-            <p className="text-[11px] text-white/30 font-mono uppercase tracking-wider truncate">
-              Signed in as
+          <div className="px-3 py-2 space-y-1">
+            <div className="flex items-center justify-between">
+              <span
+                className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                  user.role === 'admin'
+                    ? 'bg-gold/15 text-gold border border-gold/25'
+                    : 'bg-sky-400/15 text-sky-400 border border-sky-400/25'
+                }`}
+              >
+                {user.role === 'admin' ? 'Super Admin' : 'Officer'}
+              </span>
+            </div>
+            <p className="text-xs text-white/90 font-semibold truncate">
+              {user.displayName}
             </p>
-            <p className="text-xs text-white/60 font-medium truncate mt-0.5">
+            {user.position && (
+              <p className="text-[10px] text-white/45 truncate">
+                {user.position}
+              </p>
+            )}
+            <p className="text-[10px] text-white/30 font-mono truncate">
               {user.email}
             </p>
           </div>
@@ -173,6 +202,12 @@ export function MobileSidebar({
   const pathname = usePathname()
   const { user, logout } = useAuth()
 
+  const allowedNavItems = navItems.filter((item) => {
+    if (!item.roles) return true
+    if (!user) return true
+    return item.roles.includes(user.role)
+  })
+
   return (
     <AnimatePresence>
       {open && (
@@ -210,7 +245,7 @@ export function MobileSidebar({
 
             {/* Nav */}
             <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-              {navItems.map((item) => {
+              {allowedNavItems.map((item) => {
                 const isActive =
                   pathname === item.href || pathname.startsWith(item.href + '/')
 
@@ -238,18 +273,27 @@ export function MobileSidebar({
             {/* Footer */}
             <div className="border-t border-white/6 p-3 space-y-2">
               {user && (
-                <div className="px-1">
-                  <p className="text-[10px] text-white/30 font-mono uppercase tracking-wider">
-                    Signed in
+                <div className="px-1 space-y-0.5">
+                  <span
+                    className={`inline-block text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                      user.role === 'admin'
+                        ? 'bg-gold/15 text-gold border border-gold/25'
+                        : 'bg-sky-400/15 text-sky-400 border border-sky-400/25'
+                    }`}
+                  >
+                    {user.role === 'admin' ? 'Super Admin' : 'Officer'}
+                  </span>
+                  <p className="text-xs text-white/90 font-semibold truncate">
+                    {user.displayName}
                   </p>
-                  <p className="text-xs text-white/60 font-medium truncate mt-0.5">
+                  <p className="text-[10px] text-white/40 font-mono truncate">
                     {user.email}
                   </p>
                 </div>
               )}
               <button
                 onClick={() => { logout(); onClose() }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg w-full text-white/35 hover:text-red-400 hover:bg-red-500/[0.06] transition-all duration-200 text-[13px] font-medium"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg w-full text-white/35 hover:text-red-400 hover:bg-red-500/[0.06] transition-all duration-200 text-[13px] font-medium"
               >
                 <LogOut size={16} />
                 <span>Sign Out</span>

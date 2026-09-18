@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -8,8 +9,24 @@ import SectionHeader from '@/components/SectionHeader'
 import DispatchCarousel from '@/components/DispatchCarousel'
 import { socialDispatches } from '@/data/announcements'
 import { dean } from '@/data/officers'
+import { getPosts, postRowToSocialDispatch } from '@/lib/supabase'
 
 export default function HomePage() {
+  const [dispatches, setDispatches] = useState(socialDispatches)
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const posts = await getPosts()
+        if (posts && posts.length > 0) {
+          setDispatches(posts.map(postRowToSocialDispatch))
+        }
+      } catch {
+        // Fall back cleanly to static data
+      }
+    }
+    load()
+  }, [])
   return (
     <>
       <section className="relative min-h-[92vh] flex flex-col items-center justify-center pt-28 pb-12 overflow-hidden bg-base">
@@ -150,7 +167,7 @@ export default function HomePage() {
             subtitle="Stay in the loop with official event recaps, department event, and student spotlights."
           />
         </div>
-        <DispatchCarousel dispatches={socialDispatches} />
+        <DispatchCarousel dispatches={dispatches} />
       </section>
 
       <section className="relative max-w-6xl mx-auto px-6 pb-24">

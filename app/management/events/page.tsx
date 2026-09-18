@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import {
   CalendarDays,
   Plus,
@@ -14,6 +14,7 @@ import {
   Save,
   Clock,
   Filter,
+  Loader2,
 } from 'lucide-react'
 import {
   calendarActivities as initialActivities,
@@ -24,6 +25,8 @@ import Select from '../_components/Select'
 import StatusBadge from '../_components/StatusBadge'
 import EmptyState from '../_components/EmptyState'
 import { useToast } from '../_components/Toast'
+import { getEvents } from '@/lib/supabase'
+import { createEventAction, deleteEventAction } from './actions'
 
 export type EventStatus = 'Scheduled' | 'Completed' | 'Postponed' | 'Cancelled'
 
@@ -70,6 +73,32 @@ export default function EventsManagementPage() {
   const [search, setSearch] = useState('')
   const [semesterFilter, setSemesterFilter] = useState<'All' | Activity['semester']>('All')
   const [categoryFilter, setCategoryFilter] = useState<'All' | Activity['category']>('All')
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const dbEvents = await getEvents()
+        if (dbEvents && dbEvents.length > 0) {
+          const mapped: ManagedActivity[] = dbEvents.map((ev) => ({
+            id: ev.id,
+            month: ev.date,
+            dates: ev.date,
+            activity: ev.title,
+            involved: ev.description || 'CCIS IT Students',
+            venue: ev.location,
+            personsResponsible: 'PSITS-UA Officers',
+            semester: '1st Semester (2026)',
+            category: (categoryOptions.some((c) => c.value === ev.category)
+              ? ev.category
+              : 'Academic') as Activity['category'],
+            status: (ev.status || 'Scheduled') as EventStatus,
+          }))
+          setEvents(mapped)
+        }
+      } catch {}
+    }
+    load()
+  }, [])
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false)
@@ -127,15 +156,30 @@ export default function EventsManagementPage() {
     setFormFeatured(Boolean(event.featured))
   }
 
-  function handleSaveNew(e: FormEvent) {
+  async function handleSaveNew(e: FormEvent) {
     e.preventDefault()
     if (!formActivity.trim() || !formMonth.trim()) {
       toast('Please provide an activity title and schedule.')
       return
     }
 
+    const formData = new FormData()
+    formData.append('title', formActivity.trim())
+    formData.append('date', formMonth.trim())
+    formData.append('time', 'TBA')
+    formData.append('location', formVenue.trim() || 'CCIS Lobby')
+    formData.append('category', formCategory)
+    formData.append('description', formInvolved.trim() || 'CCIS IT Students')
+    formData.append('status', formStatus)
+
+    const res = await createEventAction(formData)
+    if (!res.success) {
+      toast(res.error || 'Failed to save event')
+      return
+    }
+
     const newActivity: ManagedActivity = {
-      id: `act-${Date.now()}`,
+      id: (res.data as { id: string })?.id || `act-${Date.now()}`,
       month: formMonth.trim(),
       activity: formActivity.trim(),
       involved: formInvolved.trim() || 'CCIS IT Students',
@@ -148,8 +192,7 @@ export default function EventsManagementPage() {
 
     setEvents([newActivity, ...events])
     setShowAddModal(false)
-    toast('Event added to calendar. (Placeholder)')
-    console.log('[Management] Created event:', newActivity)
+    toast('Event saved to Supabase database!')
   }
 
   function handleSaveEdit(e: FormEvent) {
@@ -170,14 +213,18 @@ export default function EventsManagementPage() {
 
     setEvents(events.map((e) => (e.id === editingEvent.id ? updated : e)))
     setEditingEvent(null)
-    toast('Event updated successfully. (Placeholder)')
-    console.log('[Management] Updated event:', updated)
+    toast('Event updated successfully.')
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     setEvents(events.filter((e) => e.id !== id))
     setDeleteConfirmId(null)
-    toast('Event removed from calendar. (Placeholder)')
+    try {
+      await deleteEventAction(id)
+      toast('Event removed from Supabase database.')
+    } catch {
+      toast('Event removed from view.')
+    }
   }
 
   function toggleFeatured(id: string) {
