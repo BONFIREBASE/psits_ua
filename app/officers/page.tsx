@@ -2,6 +2,7 @@ import Image from 'next/image'
 import {
   adviser,
   officers as initialOfficers,
+  pubmatTeam as initialPubmat,
   Officer,
 } from '@/data/officers'
 import {
@@ -10,6 +11,7 @@ import {
   Users,
   Award,
   BookOpen,
+  Palette,
 } from 'lucide-react'
 import { getOfficers } from '@/lib/supabase'
 
@@ -67,9 +69,27 @@ function Avatar({
 
 export default async function OfficersPage() {
   const dbOfficers = await getOfficers()
+
+  const pubmatMembers: Officer[] =
+    dbOfficers && dbOfficers.length > 0
+      ? dbOfficers.filter((o) => o.is_pubmat).map((o) => ({
+          name: o.name,
+          position: o.pubmat_role || o.position,
+          roleGroup: 'Operations & PR' as Officer['roleGroup'],
+          department: o.year_section || 'Pubmat Creative Team',
+          image: o.image_url || undefined,
+        }))
+      : initialPubmat.map((p) => ({
+          name: p.name,
+          position: p.role,
+          roleGroup: 'Operations & PR' as Officer['roleGroup'],
+          department: 'Pubmat Creative Team',
+          image: p.image || undefined,
+        }))
+
   const officersList: Officer[] =
     dbOfficers && dbOfficers.length > 0
-      ? dbOfficers.map((o) => ({
+      ? dbOfficers.filter((o) => !o.is_pubmat).map((o) => ({
           name: o.name,
           position: o.position,
           roleGroup: o.role_group as Officer['roleGroup'],
@@ -201,7 +221,7 @@ export default async function OfficersPage() {
       </section>
 
       {/* Year Level Representatives */}
-      <section>
+      <section className="mb-20">
         <SectionLabel
           icon={<Users size={13} />}
           text="Year Level Representatives"
@@ -214,6 +234,23 @@ export default async function OfficersPage() {
           ))}
         </div>
       </section>
+
+      {/* Pubmat Creative Team */}
+      {pubmatMembers.length > 0 && (
+        <section>
+          <SectionLabel
+            icon={<Palette size={13} />}
+            text="Pubmat Creative Team"
+            sub="Design, Media & Visual Communications"
+          />
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {pubmatMembers.map((officer) => (
+              <OfficerCard key={officer.name} officer={officer} compact />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

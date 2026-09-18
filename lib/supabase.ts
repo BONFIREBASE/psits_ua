@@ -29,6 +29,7 @@ export interface PostRow {
   post_url: string | null;
   tags: string[];
   featured: boolean;
+  credits?: Record<string, string> | null;
   created_at: string;
   updated_at: string;
 }
@@ -48,6 +49,7 @@ export async function getPosts(): Promise<PostRow[]> {
 }
 
 export function postRowToSocialDispatch(row: PostRow) {
+  const rowCredits = (row.credits as Record<string, string>) || {};
   return {
     id: row.id,
     imageUrl: row.image_url || undefined,
@@ -62,7 +64,12 @@ export function postRowToSocialDispatch(row: PostRow) {
     tags: row.tags || [],
     featured: row.featured,
     credits: {
-      writer: row.quote_author || undefined,
+      writer: rowCredits.writer || row.quote_author || undefined,
+      photographer: rowCredits.photographer || undefined,
+      pubmat: rowCredits.pubmat || undefined,
+      videographer: rowCredits.videographer || undefined,
+      prepared_by: rowCredits.prepared_by || rowCredits.preparedby || undefined,
+      ...rowCredits,
     },
   };
 }
@@ -232,6 +239,20 @@ export async function getOfficers(): Promise<OfficerRow[]> {
   }
 }
 
+export async function getPubmatMembers(): Promise<OfficerRow[]> {
+  try {
+    const { data, error } = await supabase
+      .from('officers')
+      .select('*')
+      .eq('is_pubmat', true)
+      .order('name', { ascending: true });
+    if (error) return [];
+    return (data as OfficerRow[]) || [];
+  } catch {
+    return [];
+  }
+}
+
 export async function findOfficerByEmail(email: string): Promise<OfficerRow | null> {
   try {
     const trimmed = email.trim().toLowerCase();
@@ -297,6 +318,53 @@ export async function getAuditReports(): Promise<AuditReportRow[]> {
       .order('created_at', { ascending: false });
     if (error) return [];
     return (data as AuditReportRow[]) || [];
+  } catch {
+    return [];
+  }
+}
+
+/* ─── 9. Banners ─── */
+
+export interface BannerRow {
+  id: string;
+  title: string;
+  subtitle: string;
+  type: 'announcement' | 'meeting' | 'recruitment' | 'forms' | 'general';
+  image_url: string | null;
+  link_url: string | null;
+  link_text: string | null;
+  secondary_link_url?: string | null;
+  secondary_link_text?: string | null;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getBanners(): Promise<BannerRow[]> {
+  try {
+    const { data, error } = await supabase
+      .from('banners')
+      .select('*')
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: false });
+    if (error) return [];
+    return (data as BannerRow[]) || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getActiveBanners(): Promise<BannerRow[]> {
+  try {
+    const { data, error } = await supabase
+      .from('banners')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: false });
+    if (error) return [];
+    return (data as BannerRow[]) || [];
   } catch {
     return [];
   }

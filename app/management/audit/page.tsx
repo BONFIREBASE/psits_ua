@@ -78,7 +78,7 @@ export default function AuditManagementPage() {
         return
       }
 
-      toast('Audit report & clearance uploaded to Cloudflare R2 & saved to Supabase!')
+      toast('Audit report saved successfully!')
       resetForm()
       await load()
     } catch {
@@ -119,11 +119,11 @@ export default function AuditManagementPage() {
           <div className="flex items-center gap-2.5">
             <h1 className="font-display font-black text-2xl text-white tracking-tight">Audit Reports</h1>
             <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-              Live Cloud DB & R2
+              Live Database
             </span>
           </div>
           <p className="text-sm text-white/35 mt-1">
-            Official semester audits, inventory reviews, and signed clearances hosted on Cloudflare R2.
+            Official semester audits, inventory reviews, and signed clearances stored securely in cloud storage.
           </p>
         </div>
         <button
@@ -190,7 +190,7 @@ export default function AuditManagementPage() {
               />
             </FormField>
 
-            <FormField label="Signed Audit Document (PDF)" hint="Stored securely in Cloudflare R2">
+            <FormField label="Signed Audit Document (PDF)" hint="Stored securely in cloud storage">
               <FileUpload
                 accept=".pdf,.doc,.docx"
                 label="Choose signed audit PDF"
@@ -221,7 +221,7 @@ export default function AuditManagementPage() {
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50"
               >
                 {submitting ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                <span>{submitting ? 'Uploading to R2...' : 'Save Audit'}</span>
+                <span>{submitting ? 'Saving Audit...' : 'Save Audit'}</span>
               </button>
               <button
                 type="button"
@@ -272,7 +272,7 @@ export default function AuditManagementPage() {
                   <StatusBadge status={(rep.status as any) || 'Draft'} />
                   {rep.file_url && (
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                      R2 Stored
+                      Attached
                     </span>
                   )}
                 </div>
@@ -292,7 +292,7 @@ export default function AuditManagementPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 rounded-lg text-white/30 hover:text-gold hover:bg-white/[0.04] transition-colors"
-                    title="Download Audit PDF from Cloudflare R2"
+                    title="Download Audit PDF"
                   >
                     <ExternalLink size={14} />
                   </a>

@@ -17,7 +17,7 @@ import FileUpload from '../_components/FileUpload'
 import StatusBadge from '../_components/StatusBadge'
 import EmptyState from '../_components/EmptyState'
 import { useToast } from '../_components/Toast'
-import { getTreasuryRecords, type TreasuryRow } from '@/lib/supabase'
+import { getTreasuryRecords, supabase, type TreasuryRow } from '@/lib/supabase'
 import { createTreasuryRecord, deleteTreasuryRecord } from './actions'
 
 export default function TreasuryManagementPage() {
@@ -49,6 +49,21 @@ export default function TreasuryManagementPage() {
 
   useEffect(() => {
     load()
+
+    const channel = supabase
+      .channel('treasury-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'treasury_records' },
+        () => {
+          load()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   function update(field: string, value: string) {
@@ -78,7 +93,7 @@ export default function TreasuryManagementPage() {
         return
       }
 
-      toast('Treasury record & receipt uploaded to Cloudflare R2 & saved to Supabase!')
+      toast('Treasury record saved successfully!')
       resetForm()
       await load()
     } catch {
@@ -119,11 +134,11 @@ export default function TreasuryManagementPage() {
           <div className="flex items-center gap-2.5">
             <h1 className="font-display font-black text-2xl text-white tracking-tight">Treasury</h1>
             <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-              Live Cloud DB & R2
+              Live Database
             </span>
           </div>
           <p className="text-sm text-white/35 mt-1">
-            Financial reports, disbursement logs, and receipt proofs saved to Cloudflare R2.
+            Financial reports, disbursement logs, and receipt proofs saved to cloud storage.
           </p>
         </div>
         <button
@@ -203,7 +218,7 @@ export default function TreasuryManagementPage() {
               />
             </FormField>
 
-            <FormField label="Receipt / Statement File (PDF / Images)" hint="Uploads securely to Cloudflare R2">
+            <FormField label="Receipt / Statement File (PDF / Images)" hint="Uploads securely to cloud storage">
               <FileUpload
                 accept=".pdf,.png,.jpg,.jpeg"
                 label="Choose PDF report or receipt image"
@@ -221,7 +236,7 @@ export default function TreasuryManagementPage() {
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50"
               >
                 {submitting ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                <span>{submitting ? 'Uploading to R2...' : 'Save Report'}</span>
+                <span>{submitting ? 'Saving Record...' : 'Save Report'}</span>
               </button>
               <button
                 type="button"
@@ -274,7 +289,7 @@ export default function TreasuryManagementPage() {
                   <StatusBadge status={rep.status} />
                   {rep.file_url && (
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                      R2 Stored
+                      Attached
                     </span>
                   )}
                 </div>
@@ -294,7 +309,7 @@ export default function TreasuryManagementPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 rounded-lg text-white/30 hover:text-gold hover:bg-white/[0.04] transition-colors"
-                    title="View Attachment in Cloudflare R2"
+                    title="View Attachment"
                   >
                     <ExternalLink size={14} />
                   </a>

@@ -1,82 +1,80 @@
-import { notFound } from 'next/navigation'
-import ConstitutionViewer from '@/components/ConstitutionViewer'
-import { constitutionData } from '@/data/constitution'
+import SectionHeader from '@/components/SectionHeader'
+import ArchiveStack from '@/components/ArchiveStack'
+import { archivePhotos } from '@/data/archive'
 
 export const metadata = {
-  title: 'Constitution and By-Laws (CBL) | PSITS-UA',
+  title: 'About PSITS-UA | History & Archive',
   description:
-    'Official Constitution and By-Laws of the Philippine Society of Information Technology Students — University of Antique.',
+    'Discover the history of PSITS-UA — established in 1993 at the University of Antique — and explore the PSITS Archive.',
 }
 
-// Temporary access restriction: set to false to restore CBL view
-const IS_CBL_DISABLED = true
-
-export default function CBLPage() {
-  if (IS_CBL_DISABLED) {
-    notFound()
-  }
-
+export default function AboutPage() {
   return (
-    <div className="pt-32 pb-28 max-w-5xl mx-auto px-6 space-y-20">
-      <header className="space-y-4 border-b border-white/10 pb-12">
-        <p className="font-mono text-xs sm:text-sm text-gold font-bold tracking-widest uppercase">
-          University of Antique · College of Computing and Information Sciences
-        </p>
-        <h1 className="font-display font-black text-3xl sm:text-5xl md:text-6xl text-white tracking-tight uppercase leading-[1.08]">
-          PSITS-UA <br />
-          <span className="text-white">Constitution and </span>
-          <span className="text-gold">By-Laws (CBL)</span>
-        </h1>
-        <p className="text-white/90 text-base sm:text-lg max-w-2xl pt-2 leading-relaxed font-normal">
-          The official governing constitution, membership policies, officer
-          duties, and operational guidelines of the Philippine Society of
-          Information Technology Students — University of Antique Chapter.
-        </p>
-      </header>
+    <main className="min-h-screen bg-canvas text-text">
 
-      <section className="space-y-6">
-        <h2 className="font-mono text-xs sm:text-sm text-gold font-bold tracking-widest uppercase">
-          Historical Background
-        </h2>
-        <div className="bg-surface border border-white/10 rounded-xl p-6 sm:p-8 space-y-4 shadow-sm">
-          <p className="text-white text-base sm:text-lg leading-relaxed font-normal">
-            The <strong className="text-gold font-bold">University of Antique Computer Society</strong> was
-            founded through the efforts of <strong className="text-white font-bold">Mrs. Nelly E. Mistio</strong> and
-            was approved by the College President of the <strong className="text-white font-bold">Polytechnic State College of Antique (PSCA)</strong> on{' '}
-            <strong className="text-gold font-bold">January 8, 1993</strong>. It was then classified as an Interest Group.
-          </p>
-          <p className="text-white/90 text-base sm:text-lg leading-relaxed font-normal">
-            With the approval of the majority of its members, the Computer Society remained an organization exclusive to students under Computer Studies.
-            The organization was formally amended to the <strong className="text-white font-bold">Philippine Society of Information Technology Students – UA (PSITS-UA)</strong> and
-            made exclusive to Information Technology students only. The amendment was made effective during Academic Year{' '}
-            <strong className="text-gold font-bold">2016–2017</strong> with the approval of its officers and members.
-          </p>
+      {/* ── Section 1: Our Story ────────────────────────────────────────── */}
+      <section className="relative min-h-[75vh] flex flex-col justify-center pt-32 pb-20 px-6 overflow-hidden">
+        {/* Background glow — mirrors home hero */}
+        <div className="pointer-events-none absolute inset-0 z-0">
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[450px] bg-navy/40 rounded-full blur-[140px]" />
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-gold/8 rounded-full blur-[120px]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0D1117]/40 via-transparent to-canvas" />
+        </div>
+
+        <div className="relative z-10 max-w-4xl mx-auto">
+          <SectionHeader
+            eyebrow="Est. January 8, 1993 · University of Antique"
+            title="Our Story"
+            subtitle="Rooted in student leadership, computing excellence, and over three decades of heritage."
+          />
+
+          <div className="mt-8 space-y-6 max-w-3xl">
+            <p className="text-white/85 text-base sm:text-lg leading-relaxed font-normal">
+              On <span className="text-white font-semibold">January 8, 1993</span>, through the initiative
+              and efforts of <span className="text-gold font-medium">Mrs. Nelly E. Mistio</span>, the organization was
+              officially approved by the College President of the{' '}
+              <span className="text-white font-semibold">Polytechnic State College of Antique (PSCA)</span>.
+              Originally chartered as the <span className="text-white font-medium">Computer Society</span>,
+              it was established as an interest group exclusive to students under the College of Computer Studies,
+              fostering technical camaraderie in Western Visayas long before the modern digital era.
+            </p>
+
+            <p className="text-white/65 text-base leading-relaxed">
+              As academic programs advanced and PSCA evolved into the University of Antique, the organization
+              adapted to the shifting technological landscape. During Academic Year{' '}
+              <span className="text-white font-medium">2016–2017</span>, through a landmark constitutional
+              amendment ratified by its officers and member body, the society was officially renamed the{' '}
+              <span className="text-white font-semibold">
+                Philippine Society of Information Technology Students – UA Chapter (PSITS-UA)
+              </span>
+              , establishing mandatory, unified representation for all Information Technology majors.
+            </p>
+
+            <p className="text-white/65 text-base leading-relaxed">
+              Under Article II of its Constitution and By-Laws, PSITS-UA is chartered not solely to cultivate
+              industry-ready computing skills, but to create a dedicated pool of IT enthusiasts who extend
+              technology services to the university, champion ethical leadership, and serve as catalysts for
+              community growth. Today, as the premier student organization of the College of Computing and
+              Information Sciences (CCIS), PSITS-UA continues to uphold this constitutional heritage across
+              every batch of IT scholars.
+            </p>
+          </div>
         </div>
       </section>
 
-      <section className="space-y-6">
-        <h2 className="font-mono text-xs sm:text-sm text-gold font-bold tracking-widest uppercase">
-          Preamble
-        </h2>
-        <div className="border-l-3 border-gold pl-6 sm:pl-8 py-3 bg-surface/40 rounded-r-xl">
-          <blockquote className="text-white font-normal text-lg sm:text-xl md:text-2xl leading-relaxed italic drop-shadow-sm">
-            &ldquo;{constitutionData.preamble.text}&rdquo;
-          </blockquote>
-        </div>
-      </section>
-
-      <section className="space-y-8">
-        <div className="space-y-2">
-          <h2 className="font-mono text-xs sm:text-sm text-gold font-bold tracking-widest uppercase">
-            Codified Articles & By-Laws
-          </h2>
-          <p className="text-white/80 text-sm sm:text-base font-normal">
-            Click on any article to view its official sections and provisions.
-          </p>
+      {/* ── Section 2: PSITS Archive ────────────────────────────────────── */}
+      <section className="px-6 pb-36 max-w-6xl mx-auto">
+        <div className="mb-14">
+          <SectionHeader
+            eyebrow="Through the Years"
+            title="PSITS Archive"
+            subtitle="A look back at the people and moments that shaped PSITS-UA."
+          />
         </div>
 
-        <ConstitutionViewer />
+        {/* Minimalist Tactile Memory Photo Stack */}
+        <ArchiveStack photos={archivePhotos} />
       </section>
-    </div>
+    </main>
   )
 }

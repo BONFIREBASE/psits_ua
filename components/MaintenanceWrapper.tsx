@@ -4,10 +4,6 @@ import { useEffect, useRef, useSyncExternalStore } from 'react'
 import Image from 'next/image'
 import type { AnimationItem } from 'lottie-web'
 
-function emptySubscribe() {
-  return () => {}
-}
-
 // Target lift-off timestamp: Monday, September 21, 2026 at 00:00:00 PHT (UTC+8)
 const LIFT_OFF_DATE_STRING = '2026-09-21T00:00:00+08:00'
 const LIFT_OFF_TIMESTAMP = new Date(LIFT_OFF_DATE_STRING).getTime()
@@ -32,19 +28,22 @@ function subscribeSecondTimer(callback: () => void) {
 
 function getIsBypassed() {
   if (typeof window === 'undefined') return false
+  if (process.env.NODE_ENV === 'development') return true
   const params = new URLSearchParams(window.location.search)
   if (params.get('bypass') === 'true') return true
 
-  // Auto-bypass on Vercel preview deployments (dev branch)
+
   const host = window.location.hostname
-  const isVercelPreview =
+  const isLocalOrPreview =
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
     host.includes('-git-') ||
     host.includes('preview') ||
     (host.endsWith('.vercel.app') &&
       !host.startsWith('psitsua.vercel.app') &&
       !host.startsWith('psits-ua.vercel.app'))
 
-  return isVercelPreview
+  return isLocalOrPreview
 }
 
 function subscribeBypass(callback: () => void) {
@@ -57,12 +56,6 @@ export default function MaintenanceWrapper({
 }: {
   children: React.ReactNode
 }) {
-  const mounted = useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false
-  )
-
   const timeSnapshot = useSyncExternalStore(
     subscribeSecondTimer,
     getTimeSnapshot,
@@ -75,14 +68,14 @@ export default function MaintenanceWrapper({
   const bypassed = useSyncExternalStore(
     subscribeBypass,
     getIsBypassed,
-    () => false
+    () => process.env.NODE_ENV === 'development'
   )
 
   const lottieContainerRef = useRef<HTMLDivElement>(null)
 
   // Load Minimalist Lottie Animation
   useEffect(() => {
-    if (!mounted || isPassed || bypassed) return
+    if (isPassed || bypassed) return
 
     let animInstance: AnimationItem | null = null
     let isCancelled = false
@@ -116,17 +109,9 @@ export default function MaintenanceWrapper({
       isCancelled = true
       if (animInstance) animInstance.destroy()
     }
-  }, [mounted, isPassed, bypassed])
+  }, [isPassed, bypassed])
 
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-[#070a12] flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
-      </div>
-    )
-  }
-
-  // Once Monday September 21, 2026 arrives (or with ?bypass=true), reveal the application
+  // Once Monday September 21, 2026 arrives (or in dev/preview/with ?bypass=true), reveal the application
   if (isPassed || bypassed) {
     return <>{children}</>
   }
@@ -144,6 +129,7 @@ export default function MaintenanceWrapper({
             src="/assets/logo/PSITS logo.png"
             alt="PSITS-UA Logo"
             fill
+            sizes="(max-width: 640px) 56px, 64px"
             className="object-contain"
             priority
           />

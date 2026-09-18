@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
-import { X, ArrowUpRight, MapPin, Calendar, Quote, PenTool, Camera, Palette, Clock } from 'lucide-react'
+import { X, ArrowUpRight, MapPin, Calendar, Quote, PenTool, Camera, Palette, Clock, Video, FileText } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SocialDispatch } from '@/data/announcements'
 
@@ -298,6 +298,24 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
                               <span className="flex items-center gap-1.5">
                                 <Palette size={13} style={{ color: '#F5A623' }} />
                                 Pubmat: <strong className="text-white">{dispatch.credits.pubmat}</strong>
+                              </span>
+                            </>
+                          )}
+                          {dispatch.credits.videographer && (
+                            <>
+                              {(dispatch.credits.writer || dispatch.credits.photographer || dispatch.credits.pubmat) && <span className="text-white/20">·</span>}
+                              <span className="flex items-center gap-1.5">
+                                <Video size={13} style={{ color: '#F5A623' }} />
+                                Videographer: <strong className="text-white">{dispatch.credits.videographer}</strong>
+                              </span>
+                            </>
+                          )}
+                          {dispatch.credits.prepared_by && (
+                            <>
+                              {(dispatch.credits.writer || dispatch.credits.photographer || dispatch.credits.pubmat || dispatch.credits.videographer) && <span className="text-white/20">·</span>}
+                              <span className="flex items-center gap-1.5">
+                                <FileText size={13} style={{ color: '#F5A623' }} />
+                                Prepared by: <strong className="text-white">{dispatch.credits.prepared_by}</strong>
                               </span>
                             </>
                           )}

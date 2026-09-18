@@ -2,37 +2,73 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { ArrowUpRight, Quote } from 'lucide-react'
+import { Quote } from 'lucide-react'
 import SectionHeader from '@/components/SectionHeader'
 import DispatchCarousel from '@/components/DispatchCarousel'
+import BannerStack from '@/components/BannerStack'
 import { socialDispatches } from '@/data/announcements'
 import { dean } from '@/data/officers'
-import { getPosts, postRowToSocialDispatch } from '@/lib/supabase'
+import { getPosts, postRowToSocialDispatch, getActiveBanners, supabase, type BannerRow } from '@/lib/supabase'
+import coverImage from '@/public/assets/cover.jpg'
 
 export default function HomePage() {
   const [dispatches, setDispatches] = useState(socialDispatches)
+  const [activeBanners, setActiveBanners] = useState<BannerRow[]>([])
 
   useEffect(() => {
     async function load() {
       try {
-        const posts = await getPosts()
+        const [posts, banners] = await Promise.all([
+          getPosts(),
+          getActiveBanners(),
+        ])
         if (posts && posts.length > 0) {
           setDispatches(posts.map(postRowToSocialDispatch))
+        }
+        if (banners && banners.length > 0) {
+          setActiveBanners(banners)
         }
       } catch {
         // Fall back cleanly to static data
       }
     }
     load()
+
+    const channel = supabase
+      .channel('homepage-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'posts' },
+        async () => {
+          const posts = await getPosts()
+          if (posts && posts.length > 0) {
+            setDispatches(posts.map(postRowToSocialDispatch))
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'banners' },
+        async () => {
+          const banners = await getActiveBanners()
+          if (banners && banners.length > 0) {
+            setActiveBanners(banners)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
   return (
     <>
       <section className="relative min-h-[92vh] flex flex-col items-center justify-center pt-28 pb-12 overflow-hidden bg-base">
         <div className="absolute inset-0 pointer-events-none z-0">
           <Image
-            src="/assets/cover.jpg"
+            src={coverImage}
             alt="University of Antique College of Computing Studies"
             fill
             className="object-cover object-center opacity-35 sm:opacity-45"
@@ -96,7 +132,7 @@ export default function HomePage() {
 
           <div className="text-center px-4 sm:px-8">
             <p className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-white tracking-tight mb-1">
-              2018
+              1993
             </p>
             <p className="text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.2em] text-gold/80 font-semibold">
               Est. Year
@@ -129,9 +165,6 @@ export default function HomePage() {
 
           <div className="md:col-span-7 space-y-6">
             <div className="space-y-2">
-              <span className="font-mono text-xs text-gold uppercase tracking-[0.25em] font-bold block">
-                Leadership
-              </span>
               <h2 className="font-display font-black text-3xl sm:text-4xl md:text-5xl text-white tracking-tight uppercase">
                 Dean&apos;s <span className="text-gold">Message</span>
               </h2>
@@ -170,55 +203,8 @@ export default function HomePage() {
         <DispatchCarousel dispatches={dispatches} />
       </section>
 
-      <section className="relative max-w-6xl mx-auto px-6 pb-24">
-        <div className="relative min-h-[360px] md:min-h-[400px] flex items-center rounded-2xl overflow-hidden border border-white/10 bg-[#0a0e17]">
-          <div className="absolute inset-0 z-0">
-            <Image
-              src="/assets/cover.jpg"
-              alt="University of Antique College of Computing Studies"
-              fill
-              className="object-cover object-right md:object-[80%_center] opacity-60 md:opacity-75"
-              sizes="(max-width: 768px) 100vw, 1200px"
-              priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#0a0e17] from-35% via-[#0a0e17]/95 via-55% to-transparent" />
-          </div>
-
-          <div className="relative z-10 p-8 sm:p-12 md:p-14 max-w-xl">
-            <p className="text-[11px] font-mono tracking-[0.25em] uppercase text-gold font-bold mb-3">
-              Join the Chapter
-            </p>
-
-            <h2 className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-white leading-tight tracking-tight mb-3.5">
-              Shape the future of tech with PSITS-UA.
-            </h2>
-
-            <p className="text-white/70 text-xs sm:text-sm leading-relaxed mb-7 max-w-md font-normal">
-              Connect with student developers, designers, and tech innovators across the University of Antique.
-            </p>
-
-            <div className="flex items-center gap-5">
-              <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSd005fH-_fxNnf3qREIODWMGWVGi4K0svkFO3cA2qr0Nswc0w/viewform"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gold text-[#0D1117] font-mono font-bold text-xs sm:text-sm hover:bg-white transition-all shadow-md active:scale-95"
-              >
-                <span>Join Organization</span>
-                <ArrowUpRight size={15} />
-              </a>
-
-              <Link
-                href="/projects"
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-mono text-white/60 hover:text-white transition-colors"
-              >
-                <span>View Projects</span>
-                <span className="text-gold"></span>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Dynamic Banner Section - Stacked carousel for multiple banners, flat card for single banner */}
+      <BannerStack banners={activeBanners} />
     </>
   )
 }

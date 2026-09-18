@@ -25,7 +25,7 @@ import Select from '../_components/Select'
 import StatusBadge from '../_components/StatusBadge'
 import EmptyState from '../_components/EmptyState'
 import { useToast } from '../_components/Toast'
-import { getEvents } from '@/lib/supabase'
+import { getEvents, supabase } from '@/lib/supabase'
 import { createEventAction, deleteEventAction } from './actions'
 
 export type EventStatus = 'Scheduled' | 'Completed' | 'Postponed' | 'Cancelled'
@@ -64,40 +64,63 @@ const categoryColorMap: Record<Activity['category'], string> = {
 
 export default function EventsManagementPage() {
   const { toast } = useToast()
-  const [events, setEvents] = useState<ManagedActivity[]>(() =>
-    initialActivities.map((act) => ({
-      ...act,
-      status: 'Scheduled',
-    }))
-  )
+  const [events, setEvents] = useState<ManagedActivity[]>([])
   const [search, setSearch] = useState('')
   const [semesterFilter, setSemesterFilter] = useState<'All' | Activity['semester']>('All')
   const [categoryFilter, setCategoryFilter] = useState<'All' | Activity['category']>('All')
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const dbEvents = await getEvents()
-        if (dbEvents && dbEvents.length > 0) {
-          const mapped: ManagedActivity[] = dbEvents.map((ev) => ({
+  async function load() {
+    try {
+      const dbEvents = await getEvents()
+      if (dbEvents && dbEvents.length > 0) {
+        const mapped: ManagedActivity[] = dbEvents.map((ev) => {
+          let involved = 'CCIS IT Students & Officers'
+          if (ev.description && ev.description.includes(' · Involved: ')) {
+            involved = ev.description.split(' · Involved: ')[1]
+          } else if (ev.description) {
+            involved = ev.description
+          }
+          const semester = ev.date.includes('2026')
+            ? '1st Semester (2026)'
+            : '2nd Semester (2027)'
+
+          return {
             id: ev.id,
             month: ev.date,
             dates: ev.date,
             activity: ev.title,
-            involved: ev.description || 'CCIS IT Students',
+            involved,
             venue: ev.location,
             personsResponsible: 'PSITS-UA Officers',
-            semester: '1st Semester (2026)',
+            semester,
             category: (categoryOptions.some((c) => c.value === ev.category)
               ? ev.category
               : 'Academic') as Activity['category'],
-            status: (ev.status || 'Scheduled') as EventStatus,
-          }))
-          setEvents(mapped)
-        }
-      } catch {}
-    }
+            status: (ev.status === 'Upcoming' ? 'Scheduled' : ev.status || 'Scheduled') as EventStatus,
+          }
+        })
+        setEvents(mapped)
+      }
+    } catch {}
+  }
+
+  useEffect(() => {
     load()
+
+    const channel = supabase
+      .channel('events-mgmt-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'events' },
+        () => {
+          load()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   // Modals

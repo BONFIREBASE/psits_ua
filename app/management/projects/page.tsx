@@ -236,7 +236,7 @@ export default function ProjectsManagementPage() {
 
     setProjects([newProject, ...projects])
     setShowAddModal(false)
-    toast('Project saved to Supabase & image uploaded to R2!')
+    toast('Project saved successfully!')
   }
 
   function handleSaveEdit(e: FormEvent) {
@@ -276,7 +276,7 @@ export default function ProjectsManagementPage() {
     setDeleteConfirmId(null)
     try {
       await deleteProjectAction(id, proj?.imageUrl)
-      toast('Project removed from Supabase and Cloudflare R2.')
+      toast('Project removed successfully.')
     } catch {
       toast('Project removed from view.')
     }

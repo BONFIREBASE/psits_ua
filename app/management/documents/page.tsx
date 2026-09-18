@@ -14,6 +14,7 @@ import {
   Trash2,
   Download,
   ExternalLink,
+  Printer,
 } from 'lucide-react'
 import FormField, { inputStyles, textareaStyles } from '../_components/FormField'
 import Select from '../_components/Select'
@@ -21,8 +22,9 @@ import FileUpload from '../_components/FileUpload'
 import StatusBadge from '../_components/StatusBadge'
 import EmptyState from '../_components/EmptyState'
 import { useToast } from '../_components/Toast'
-import { getDocuments, type DocumentRow } from '@/lib/supabase'
+import { getDocuments, supabase, type DocumentRow } from '@/lib/supabase'
 import { createDocument, deleteDocument } from './actions'
+import FormalResolutionDocument, { type ResolutionData } from '@/components/FormalResolutionDocument'
 
 type DocCategory = 'Resolution' | 'Memo' | 'Minutes'
 
@@ -40,6 +42,7 @@ export default function DocumentsManagementPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<DocCategory>('Resolution')
   const [showForm, setShowForm] = useState(false)
+  const [previewResolution, setPreviewResolution] = useState<ResolutionData | null>(null)
 
   const [form, setForm] = useState({
     referenceNo: '',
@@ -62,6 +65,21 @@ export default function DocumentsManagementPage() {
 
   useEffect(() => {
     load()
+
+    const channel = supabase
+      .channel('documents-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'documents' },
+        () => {
+          load()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const filtered = documents.filter((d) => d.category === activeCategory)
@@ -71,6 +89,10 @@ export default function DocumentsManagementPage() {
   }
 
   function handleFile(f: File | null) {
+    if (f && f.size > 20 * 1024 * 1024) {
+      toast('Selected document exceeds the 20MB limit. Please choose a smaller file.')
+      return
+    }
     setFile(f)
     setFilePreview(f ? URL.createObjectURL(f) : null)
   }
@@ -94,7 +116,7 @@ export default function DocumentsManagementPage() {
         return
       }
 
-      toast(`${activeCategory} uploaded to Cloudflare R2 & saved to Supabase!`)
+      toast(`${activeCategory} saved successfully!`)
       resetForm()
       await load()
     } catch {
@@ -143,11 +165,11 @@ export default function DocumentsManagementPage() {
           <div className="flex items-center gap-2.5">
             <h1 className="font-display font-black text-2xl text-white tracking-tight">Documents</h1>
             <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-              Live Cloud DB & R2
+              Live Database
             </span>
           </div>
           <p className="text-sm text-white/35 mt-1">
-            Official resolutions, memorandums, and minutes of meetings stored securely in Cloudflare R2.
+            Official resolutions, memorandums, and minutes of meetings stored securely in cloud storage.
           </p>
         </div>
         <button
@@ -240,7 +262,7 @@ export default function DocumentsManagementPage() {
               />
             </FormField>
 
-            <FormField label="Document File (PDF / DOCX)" hint="Uploads directly to Cloudflare R2 object storage">
+            <FormField label="Document File (PDF / DOCX)" hint="Uploads directly to cloud storage">
               <FileUpload
                 accept=".pdf,.doc,.docx"
                 label="Choose PDF or DOCX file"
@@ -271,7 +293,7 @@ export default function DocumentsManagementPage() {
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50"
               >
                 {submitting ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                <span>{submitting ? 'Uploading to R2...' : 'Save Document'}</span>
+                <span>{submitting ? 'Saving Document...' : 'Save Document'}</span>
               </button>
               <button
                 type="button"
@@ -295,7 +317,7 @@ export default function DocumentsManagementPage() {
         <EmptyState
           icon={<ActiveCategoryIcon size={24} className="text-white/20" />}
           title={`No ${activeCategory.toLowerCase()}s yet`}
-          description={`Upload your first ${activeCategory.toLowerCase()} to get started. Documents will be stored in Cloudflare R2.`}
+          description={`Upload your first ${activeCategory.toLowerCase()} to get started. Documents will be stored securely.`}
           action={
             <button
               onClick={() => setShowForm(true)}
@@ -324,7 +346,7 @@ export default function DocumentsManagementPage() {
                   <StatusBadge status={doc.status} />
                   {doc.file_url && (
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                      R2 Stored
+                      Attached
                     </span>
                   )}
                 </div>
@@ -344,7 +366,7 @@ export default function DocumentsManagementPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 rounded-lg text-white/30 hover:text-gold hover:bg-white/[0.04] transition-colors"
-                    title="Download / View in Cloudflare R2"
+                    title="Download / View Document"
                   >
                     <ExternalLink size={14} />
                   </a>

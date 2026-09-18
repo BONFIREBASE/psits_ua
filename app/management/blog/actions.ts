@@ -15,6 +15,43 @@ function slugify(text: string): string {
   return `${base || 'post'}-${Date.now().toString(36)}`;
 }
 
+function parseCreditsFromFormData(formData: FormData): Record<string, string> | null {
+  const credits: Record<string, string> = {};
+  const creditsRaw = (formData.get('credits') as string)?.trim();
+
+  if (creditsRaw) {
+    try {
+      const parsed = JSON.parse(creditsRaw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((item: { role?: string; name?: string }) => {
+          if (item?.role && item?.name) {
+            const key = item.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
+            credits[key] = item.name.trim();
+          }
+        });
+      } else if (typeof parsed === 'object' && parsed !== null) {
+        Object.entries(parsed).forEach(([k, v]) => {
+          if (typeof v === 'string' && v.trim()) {
+            credits[k.toLowerCase().replace(/[\s-]+/g, '_')] = v.trim();
+          }
+        });
+      }
+    } catch {
+      // Fallback if not valid JSON
+    }
+  }
+
+  const creditWriter = (formData.get('creditWriter') as string)?.trim();
+  const creditPhotographer = (formData.get('creditPhotographer') as string)?.trim();
+  const creditPubmat = (formData.get('creditPubmat') as string)?.trim();
+
+  if (creditWriter && !credits.writer) credits.writer = creditWriter;
+  if (creditPhotographer && !credits.photographer) credits.photographer = creditPhotographer;
+  if (creditPubmat && !credits.pubmat) credits.pubmat = creditPubmat;
+
+  return Object.keys(credits).length > 0 ? credits : null;
+}
+
 export interface ActionResult<T = unknown> {
   success: boolean;
   data?: T;
@@ -30,16 +67,27 @@ export async function createBlogPost(formData: FormData): Promise<ActionResult> 
     const title = (formData.get('title') as string)?.trim();
     const category = (formData.get('category') as string)?.trim() || 'Official Advisory';
     const date = (formData.get('date') as string)?.trim() || new Date().toISOString().split('T')[0];
-    const excerpt = (formData.get('excerpt') as string)?.trim();
     const fullContent = (formData.get('fullContent') as string)?.trim();
+    const rawExcerpt = (formData.get('excerpt') as string)?.trim();
+    // Auto-generate clean excerpt from full content (first 160 chars) if not explicitly provided
+    const excerpt =
+      rawExcerpt ||
+      (fullContent
+        ? (fullContent.length > 160
+            ? fullContent.slice(0, 157).replace(/[\r\n#*`>-]+/g, ' ').trim() + '...'
+            : fullContent.replace(/[\r\n#*`>-]+/g, ' ').trim())
+        : '');
+
     const highlightQuote = (formData.get('highlightQuote') as string)?.trim() || null;
     const quoteAuthor = (formData.get('quoteAuthor') as string)?.trim() || null;
     const postUrl = (formData.get('postUrl') as string)?.trim() || null;
     const tagsRaw = (formData.get('tags') as string)?.trim() || '';
-    const featured = formData.get('featured') === 'true';
+    const creditWriter = (formData.get('creditWriter') as string)?.trim() || null;
+    const creditPhotographer = (formData.get('creditPhotographer') as string)?.trim() || null;
+    const creditPubmat = (formData.get('creditPubmat') as string)?.trim() || null;
 
-    if (!title || !excerpt || !fullContent) {
-      return { success: false, error: 'Title, excerpt, and content are required.' };
+    if (!title || !fullContent) {
+      return { success: false, error: 'Title and content are required.' };
     }
 
     const tags = tagsRaw
@@ -66,6 +114,9 @@ export async function createBlogPost(formData: FormData): Promise<ActionResult> 
 
     const slug = slugify(title);
 
+    // Build credits object from dynamic JSON array or fallback fields
+    const credits = parseCreditsFromFormData(formData);
+
     const { data, error } = await supabaseAdmin
       .from('posts')
       .insert({
@@ -80,7 +131,7 @@ export async function createBlogPost(formData: FormData): Promise<ActionResult> 
         quote_author: quoteAuthor,
         post_url: postUrl,
         tags,
-        featured,
+        credits,
       })
       .select()
       .single();
@@ -105,8 +156,104 @@ export async function createBlogPost(formData: FormData): Promise<ActionResult> 
 }
 
 /**
+ * Server Action: Update an existing blog post
+ */
+export async function updateBlogPost(id: string, formData: FormData): Promise<ActionResult> {
+  try {
+    const title = (formData.get('title') as string)?.trim();
+    const category = (formData.get('category') as string)?.trim() || 'Official Advisory';
+    const date = (formData.get('date') as string)?.trim() || new Date().toISOString().split('T')[0];
+    const fullContent = (formData.get('fullContent') as string)?.trim();
+    const rawExcerpt = (formData.get('excerpt') as string)?.trim();
+    const excerpt =
+      rawExcerpt ||
+      (fullContent
+        ? (fullContent.length > 160
+            ? fullContent.slice(0, 157).replace(/[\r\n#*`>-]+/g, ' ').trim() + '...'
+            : fullContent.replace(/[\r\n#*`>-]+/g, ' ').trim())
+        : '');
+    const highlightQuote = (formData.get('highlightQuote') as string)?.trim() || null;
+    const quoteAuthor = (formData.get('quoteAuthor') as string)?.trim() || null;
+    const postUrl = (formData.get('postUrl') as string)?.trim() || null;
+    const tagsRaw = (formData.get('tags') as string)?.trim() || '';
+    const creditWriter = (formData.get('creditWriter') as string)?.trim() || null;
+    const creditPhotographer = (formData.get('creditPhotographer') as string)?.trim() || null;
+    const creditPubmat = (formData.get('creditPubmat') as string)?.trim() || null;
+
+    if (!id || !title || !fullContent) {
+      return { success: false, error: 'Post ID, title, and content are required.' };
+    }
+
+    const tags = tagsRaw
+      ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean)
+      : [];
+
+    let imageUrl: string | undefined = undefined;
+    const thumbnailFile = formData.get('thumbnail') as File | null;
+
+    if (thumbnailFile && thumbnailFile.size > 0) {
+      const sanitizedName = thumbnailFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const r2Key = `blog/${Date.now()}-${sanitizedName}`;
+      const arrayBuffer = await thumbnailFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      const r2Upload = await uploadToR2({
+        key: r2Key,
+        body: buffer,
+        contentType: thumbnailFile.type || 'application/octet-stream',
+      });
+
+      imageUrl = r2Upload.url;
+    }
+
+    // Build credits object from dynamic JSON array or fallback fields
+    const credits = parseCreditsFromFormData(formData);
+
+    const updatePayload: Record<string, any> = {
+      title,
+      category,
+      date,
+      excerpt,
+      full_content: fullContent,
+      highlight_quote: highlightQuote,
+      quote_author: quoteAuthor,
+      post_url: postUrl,
+      tags,
+      credits,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (imageUrl) {
+      updatePayload.image_url = imageUrl;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('posts')
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/');
+    revalidatePath('/management/blog');
+    revalidatePath('/management/dashboard');
+
+    return { success: true, data };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to update post.',
+    };
+  }
+}
+
+/**
  * Server Action: Delete a blog post
- * Removes the row from Supabase and cleans up thumbnail in R2 if applicable.
+ * Removes the row from Supabase and cleans up thumbnail if applicable.
  */
 export async function deleteBlogPost(id: string, imageUrl?: string | null): Promise<ActionResult> {
   try {
@@ -166,7 +313,7 @@ export async function seedInitialPosts(): Promise<ActionResult> {
       quote_author: dispatch.quoteAuthor || null,
       post_url: dispatch.postUrl || null,
       tags: dispatch.tags || [],
-      featured: dispatch.featured || false,
+      credits: dispatch.credits || null,
     }));
 
     const { error } = await supabaseAdmin.from('posts').insert(initialRows);

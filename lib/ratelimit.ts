@@ -47,19 +47,14 @@ if (isUpstashConfigured && redisUrl && redisToken) {
   }
 }
 
-/**
- * Check rate limit for a client identifier (IP address or user ID).
- * Designed with a bulletproof FAIL-OPEN policy:
- * If Upstash keys are absent or the service is unreachable,
- * it returns success: true to guarantee zero disruption to legitimate traffic.
- */
+
 export async function checkRateLimit(
   identifier: string = 'anonymous',
   type: 'auth' | 'cron' = 'auth'
 ): Promise<RateLimitResult> {
   const limiter = type === 'auth' ? authRateLimiter : cronRateLimiter
 
-  // Fail-open: If Upstash is not configured, grant immediate access
+
   if (!limiter) {
     return {
       success: true,

@@ -46,6 +46,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${syne.variable} ${inter.variable} ${architectsDaughter.variable}`}
     >
       <body className="bg-base text-text font-body">

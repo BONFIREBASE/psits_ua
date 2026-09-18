@@ -1,14 +1,17 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Eye, Save, Bold, Italic, Heading, List, Link2, Quote, Loader2 } from 'lucide-react'
+import { ArrowLeft, Eye, Save, Bold, Italic, Heading, List, Link2, Quote, Loader2, X } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import FormField, { inputStyles, textareaStyles } from '../../_components/FormField'
 import Select from '../../_components/Select'
 import FileUpload from '../../_components/FileUpload'
 import { useToast } from '../../_components/Toast'
 import { createBlogPost } from '../actions'
+import { getOfficers, type OfficerRow } from '@/lib/supabase'
 
 const categories = ['Event Recap', 'Campus Event', 'Recruitment', 'Official Advisory'] as const
 
@@ -17,6 +20,8 @@ export default function NewBlogPostPage() {
   const { toast } = useToast()
   const [showPreview, setShowPreview] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [pubmatMembers, setPubmatMembers] = useState<OfficerRow[]>([])
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true)
 
   const [form, setForm] = useState({
     title: '',
@@ -28,11 +33,40 @@ export default function NewBlogPostPage() {
     quoteAuthor: '',
     postUrl: '',
     tags: '',
-    featured: false,
   })
 
+  const [credits, setCredits] = useState<Array<{ role: string; name: string }>>([])
   const [thumbnail, setThumbnail] = useState<File | null>(null)
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
+
+  // Load all officers (including pubmat members)
+  useEffect(() => {
+    async function loadMembers() {
+      try {
+        const members = await getOfficers() // Get ALL officers + pubmat
+        setPubmatMembers(members)
+      } catch (error) {
+        console.error('Failed to load members:', error)
+      } finally {
+        setIsLoadingMembers(false)
+      }
+    }
+    loadMembers()
+  }, [])
+
+  function addCredit() {
+    setCredits([...credits, { role: '', name: '' }])
+  }
+
+  function removeCredit(index: number) {
+    setCredits(credits.filter((_, i) => i !== index))
+  }
+
+  function updateCredit(index: number, field: 'role' | 'name', value: string) {
+    const updated = [...credits]
+    updated[index][field] = value
+    setCredits(updated)
+  }
 
   function update(field: string, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -66,6 +100,13 @@ export default function NewBlogPostPage() {
 
     const newContent = form.fullContent.substring(0, start) + insert + form.fullContent.substring(end)
     update('fullContent', newContent)
+    
+    // Refocus textarea after state update
+    setTimeout(() => {
+      textarea.focus()
+      const newPos = start + insert.length
+      textarea.setSelectionRange(newPos, newPos)
+    }, 0)
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -82,7 +123,7 @@ export default function NewBlogPostPage() {
       formData.append('quoteAuthor', form.quoteAuthor)
       formData.append('postUrl', form.postUrl)
       formData.append('tags', form.tags)
-      formData.append('featured', String(form.featured))
+      formData.append('credits', JSON.stringify(credits))
       if (thumbnail) {
         formData.append('thumbnail', thumbnail)
       }
@@ -93,7 +134,7 @@ export default function NewBlogPostPage() {
         return
       }
 
-      toast('Blog post published to database and Cloudflare R2!')
+      toast('Blog post published successfully!')
       router.push('/management/blog')
     } catch (err: unknown) {
       toast(err instanceof Error ? err.message : 'Error publishing post')
@@ -140,7 +181,7 @@ export default function NewBlogPostPage() {
       </div>
 
       {showPreview ? (
-        <PreviewPanel form={form} thumbnailPreview={thumbnailPreview} />
+        <PreviewPanel form={form} thumbnailPreview={thumbnailPreview} credits={credits} />
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Title */}
@@ -189,19 +230,6 @@ export default function NewBlogPostPage() {
               preview={thumbnailPreview}
               onChange={handleThumbnail}
               maxSizeMB={5}
-            />
-          </FormField>
-
-          {/* Excerpt */}
-          <FormField label="Excerpt" htmlFor="blog-excerpt" required hint="A short summary displayed in cards and previews.">
-            <textarea
-              id="blog-excerpt"
-              value={form.excerpt}
-              onChange={(e) => update('excerpt', e.target.value)}
-              placeholder="Brief summary of the post..."
-              className={textareaStyles}
-              rows={3}
-              required
             />
           </FormField>
 
@@ -289,26 +317,68 @@ export default function NewBlogPostPage() {
             />
           </FormField>
 
-          {/* Featured Toggle */}
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <div
-              className={`
-                w-10 h-5 rounded-full relative transition-colors duration-200
-                ${form.featured ? 'bg-gold/40' : 'bg-white/10'}
-              `}
-              onClick={() => update('featured', !form.featured)}
-            >
-              <div
-                className={`
-                  absolute top-0.5 w-4 h-4 rounded-full transition-all duration-200
-                  ${form.featured ? 'left-[22px] bg-gold' : 'left-0.5 bg-white/40'}
-                `}
-              />
+          {/* Credits Section */}
+          <div className="space-y-4 pt-4 border-t border-white/10">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-mono uppercase tracking-wider text-white/70">
+                Content Credits (Optional)
+              </label>
+              <button
+                type="button"
+                onClick={addCredit}
+                className="text-xs text-gold hover:text-gold-light font-mono"
+              >
+                + Add Credit
+              </button>
             </div>
-            <span className="text-sm text-white/60 group-hover:text-white/80 transition-colors">
-              Featured post
-            </span>
-          </label>
+            
+            {credits.map((credit, index) => (
+              <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+                <FormField label="Role">
+                  <Select
+                    id={`credit-role-${index}`}
+                    value={credit.role}
+                    onChange={(val) => updateCredit(index, 'role', val)}
+                    placeholder="Select role"
+                    options={[
+                      { value: 'Pubmat', label: 'Pubmat' },
+                      { value: 'Writer', label: 'Writer' },
+                      { value: 'Videographer', label: 'Videographer' },
+                      { value: 'Photographer', label: 'Photographer' },
+                      { value: 'Prepared by', label: 'Prepared by' },
+                    ]}
+                  />
+                </FormField>
+
+                <FormField label="Name">
+                  <Select
+                    id={`credit-name-${index}`}
+                    value={credit.name}
+                    onChange={(val) => updateCredit(index, 'name', val)}
+                    placeholder="Select member"
+                    options={pubmatMembers.map(m => ({ value: m.name, label: m.name }))}
+                  />
+                </FormField>
+
+                <button
+                  type="button"
+                  onClick={() => removeCredit(index)}
+                  className="mb-2 p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                  title="Remove credit"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+            
+            {credits.length === 0 && (
+              <p className="text-xs text-white/40 text-center py-4">No credits added yet. Click &quot;+ Add Credit&quot; to add team members.</p>
+            )}
+            
+            {isLoadingMembers && (
+              <p className="text-xs text-white/40 font-mono">Loading team members...</p>
+            )}
+          </div>
 
           {/* Submit */}
           <div className="flex items-center gap-3 pt-4 border-t border-white/6">
@@ -320,7 +390,7 @@ export default function NewBlogPostPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 size={15} className="animate-spin" />
-                  <span>Uploading to R2 & DB...</span>
+                  <span>Publishing Post...</span>
                 </>
               ) : (
                 <>
@@ -347,6 +417,7 @@ export default function NewBlogPostPage() {
 function PreviewPanel({
   form,
   thumbnailPreview,
+  credits,
 }: {
   form: {
     title: string
@@ -359,6 +430,7 @@ function PreviewPanel({
     tags: string
   }
   thumbnailPreview: string | null
+  credits: Array<{ role: string; name: string }>
 }) {
   return (
     <div className="border border-white/8 rounded-xl overflow-hidden bg-white/[0.02]">
@@ -394,11 +466,6 @@ function PreviewPanel({
           {form.title || 'Untitled Post'}
         </h2>
 
-        {/* Excerpt */}
-        {form.excerpt && (
-          <p className="text-sm text-white/60 leading-relaxed">{form.excerpt}</p>
-        )}
-
         {/* Quote */}
         {form.highlightQuote && (
           <blockquote className="border-l-2 border-gold/30 pl-4 py-2">
@@ -415,8 +482,36 @@ function PreviewPanel({
 
         {/* Content */}
         {form.fullContent && (
-          <div className="text-sm text-white/55 leading-relaxed whitespace-pre-wrap">
-            {form.fullContent}
+          <div className="prose prose-invert prose-sm max-w-none">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                h1: ({ children }) => <h1 className="text-2xl font-display font-bold text-white mt-6 mb-3">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-xl font-display font-bold text-white mt-5 mb-2.5">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-lg font-display font-bold text-white mt-4 mb-2">{children}</h3>,
+                p: ({ children }) => <p className="text-sm text-white/70 leading-relaxed mb-3">{children}</p>,
+                strong: ({ children }) => <strong className="text-white font-bold">{children}</strong>,
+                em: ({ children }) => <em className="text-white/80 italic">{children}</em>,
+                ul: ({ children }) => <ul className="list-disc list-inside text-sm text-white/70 space-y-1 mb-3">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-white/70 space-y-1 mb-3">{children}</ol>,
+                li: ({ children }) => <li className="text-sm text-white/70">{children}</li>,
+                blockquote: ({ children }) => (
+                  <blockquote className="border-l-4 border-gold/40 pl-4 py-2 my-4 bg-gold/5 rounded-r">
+                    <div className="text-sm text-white/75 italic">{children}</div>
+                  </blockquote>
+                ),
+                a: ({ href, children }) => (
+                  <a href={href} className="text-gold hover:text-gold-light underline" target="_blank" rel="noopener noreferrer">
+                    {children}
+                  </a>
+                ),
+                code: ({ children }) => (
+                  <code className="px-1.5 py-0.5 rounded bg-white/10 text-gold text-xs font-mono">{children}</code>
+                ),
+              }}
+            >
+              {form.fullContent}
+            </ReactMarkdown>
           </div>
         )}
 
@@ -431,6 +526,21 @@ function PreviewPanel({
                 {tag.trim()}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Credits */}
+        {credits && credits.length > 0 && (
+          <div className="pt-4 border-t border-white/10">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-white/40 mb-2">Credits</p>
+            <div className="flex flex-wrap gap-3 text-xs">
+              {credits.filter(c => c.role && c.name).map((c, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <span className="text-white/40">{c.role}:</span>
+                  <span className="text-white/70">{c.name}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

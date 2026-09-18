@@ -3,6 +3,7 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import coverImage from '@/public/assets/cover.jpg'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   AlertCircle,
@@ -10,6 +11,8 @@ import {
   Lock,
   KeyRound,
   X,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react'
 import { useAuth } from './_context/auth-context'
 import { LoginCardSkeleton } from './_components/SkeletonPreloader'
@@ -47,6 +50,7 @@ export default function ManagementLoginPage() {
     setAdminPassword('')
     setTurnstileToken(null)
     setResetKey((k) => k + 1)
+    setIsSubmitting(false)
   }
 
   // If already authenticated or loading, render skeleton
@@ -117,9 +121,20 @@ export default function ManagementLoginPage() {
 
   return (
     <div className="min-h-dvh w-full bg-[#0a0e17] flex flex-col justify-between items-center px-4 py-6 sm:py-10 relative overflow-x-hidden overflow-y-auto selection:bg-gold/20 selection:text-white">
-      {/* Ambient background lighting */}
-      <div className="fixed top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] sm:w-[700px] h-[350px] sm:h-[450px] bg-navy/20 rounded-full blur-[180px] pointer-events-none" />
-      <div className="fixed bottom-1/4 left-1/3 w-[300px] sm:w-[350px] h-[300px] sm:h-[350px] bg-gold/[0.04] rounded-full blur-[150px] pointer-events-none" />
+      {/* Cover Image Background Layer */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <Image
+          src={coverImage}
+          alt="University of Antique"
+          fill
+          className="object-cover object-center opacity-35 sm:opacity-45"
+          priority
+          sizes="100vw"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0e17]/75 via-[#0a0e17]/85 to-[#0a0e17]/95 backdrop-blur-[2px]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] sm:w-[700px] h-[350px] sm:h-[450px] bg-navy/20 rounded-full blur-[180px]" />
+        <div className="absolute bottom-1/4 left-1/3 w-[300px] sm:w-[350px] h-[300px] sm:h-[350px] bg-gold/[0.04] rounded-full blur-[150px]" />
+      </div>
 
       {/* Top spacer for clean vertical centering */}
       <div className="w-full flex-1 min-h-[16px] max-h-[64px]" />
@@ -284,8 +299,14 @@ export default function ManagementLoginPage() {
                   <TurnstileWidget
                     action="admin-login"
                     resetKey={resetKey}
-                    onVerify={(token) => setTurnstileToken(token)}
+                    onVerify={(token) => {
+                      setTurnstileToken(token)
+                      setError(null)
+                    }}
                     onExpire={() => setTurnstileToken(null)}
+                    onError={() => {
+                      setError('Security challenge blocked or failed. If using Brave Shields, please allow challenges or retry.')
+                    }}
                   />
                 </div>
 
@@ -308,16 +329,15 @@ export default function ManagementLoginPage() {
         </div>
 
         {/* Minimalist Footer with Discreet Admin Trigger */}
-        <div className="flex items-center justify-between px-2 mt-3 text-[10px] text-white/25 font-mono">
-          <span>PSITS · University of Antique</span>
+        <div className="flex items-center justify-end px-2 mt-3">
           <button
             type="button"
             onClick={() => switchMode(mode === 'admin' ? 'sso' : 'admin')}
             title="System Console"
-            className="p-1.5 rounded-lg text-white/10 hover:text-gold/90 hover:bg-white/[0.04] transition-all"
+            className="p-1.5 rounded-lg text-white/20 hover:text-gold hover:bg-white/[0.06] transition-all"
             aria-label="Admin Access"
           >
-            <Lock size={11} />
+            <Lock size={12} />
           </button>
         </div>
       </motion.div>

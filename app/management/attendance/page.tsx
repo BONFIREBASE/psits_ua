@@ -27,6 +27,7 @@ import FormField, { inputStyles } from '../_components/FormField'
 import Select from '../_components/Select'
 import EmptyState from '../_components/EmptyState'
 import { useToast } from '../_components/Toast'
+import { supabase } from '@/lib/supabase'
 import {
   MeetingStore,
   QRStore,
@@ -205,10 +206,27 @@ function MeetingsTab() {
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    async function initMeetings() {
+      await MeetingStore.syncWithSupabase()
       refreshMeetings()
-    }, 0)
-    return () => clearTimeout(timer)
+    }
+    initMeetings()
+
+    const channel = supabase
+      .channel('attendance-meetings-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'attendance_meetings' },
+        async () => {
+          await MeetingStore.syncWithSupabase()
+          refreshMeetings()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [refreshMeetings])
 
   const filtered = meetings.filter((m) =>

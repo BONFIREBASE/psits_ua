@@ -13,10 +13,11 @@ import { X, ArrowUpRight } from 'lucide-react'
 
 const navLinks = [
   { href: '/', label: 'Home' },
-  { href: '/about', label: 'Constitution & By-Laws' },
   { href: '/officers', label: 'Leadership Directory' },
   { href: '/events', label: 'Calendar of Activities' },
   { href: '/projects', label: 'Student Projects' },
+  { href: '/submission', label: 'Polo Shirt Contest' },
+  { href: '/management', label: 'Management' },
 ]
 
 const footerLogos = [

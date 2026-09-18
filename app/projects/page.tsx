@@ -634,7 +634,7 @@ export default function ProjectsPage() {
                   {/* Screenshot / Thumbnail Upload */}
                   <div>
                     <label className="block text-xs font-mono uppercase tracking-wider text-white/70 mb-1.5">
-                      Project Banner / Screenshot (Cloudflare R2, Max 5MB)
+                      Project Banner / Screenshot (Max 5MB)
                     </label>
                     <div className="flex items-center gap-4">
                       {thumbnailPreview ? (
@@ -675,61 +675,62 @@ export default function ProjectsPage() {
                       )}
                     </div>
                   </div>
-
-                  {/* Cloudflare Turnstile Bot Protection */}
-                  <div className="pt-2 border-t border-white/10">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-mono text-white/50 flex items-center gap-1">
-                        <ShieldCheck size={13} className="text-gold" /> Bot Challenge Protection
-                      </span>
-                      {turnstileToken ? (
-                        <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                          <CheckCircle2 size={12} /> Verified
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-mono text-amber-400">Required</span>
-                      )}
-                    </div>
-                    <TurnstileWidget
-                      ref={turnstileRef}
-                      action="project-submit"
-                      onVerify={(token) => {
-                        setTurnstileToken(token)
-                        setSubmitError(null)
-                      }}
-                      onExpire={() => setTurnstileToken(null)}
-                      onError={() => setSubmitError('Turnstile challenge failed. Please retry.')}
-                    />
-                  </div>
                 </div>
 
-                {/* Modal Footer */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-[#0a0e17]/60">
+                {/* Modal Footer with Seamless Managed Turnstile Verification */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-6 py-4 border-t border-white/10 bg-[#0a0e17]/60">
                   <button
                     type="button"
                     disabled={submitting}
                     onClick={() => setShowSubmitModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-mono text-white/50 hover:text-white transition-colors disabled:opacity-40"
+                    className="px-4 py-2 rounded-xl text-xs font-mono text-white/50 hover:text-white transition-colors disabled:opacity-40 order-2 sm:order-1 text-center"
                   >
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    disabled={submitting || !turnstileToken}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md cursor-pointer"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        <span>Uploading & Submitting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus size={14} />
-                        <span>Submit Project</span>
-                      </>
+
+                  <div className="flex items-center justify-end gap-3 order-1 sm:order-2">
+                    {/* Turnstile Container - Stays active in DOM for automated Cloudflare managed check */}
+                    <div className={turnstileToken ? 'hidden' : 'block'}>
+                      <TurnstileWidget
+                        ref={turnstileRef}
+                        action="project-submit"
+                        className="scale-[0.9] origin-right"
+                        onVerify={(token) => {
+                          setTurnstileToken(token)
+                          setSubmitError(null)
+                        }}
+                        onExpire={() => setTurnstileToken(null)}
+                        onError={() => setSubmitError('Turnstile verification failed. Please try again.')}
+                      />
+                    </div>
+
+                    {/* Once managed check verifies, replace with prominent Submit button */}
+                    {turnstileToken && (
+                      <div className="flex items-center gap-2.5 animate-in fade-in zoom-in-95 duration-200">
+                        <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                          <CheckCircle2 size={12} />
+                          <span>Verified</span>
+                        </span>
+                        <button
+                          type="submit"
+                          disabled={submitting}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md cursor-pointer"
+                        >
+                          {submitting ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              <span>Uploading & Submitting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus size={14} />
+                              <span>Submit Project</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 </div>
               </form>
             )}

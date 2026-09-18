@@ -14,6 +14,9 @@ export interface SocialDispatch {
     writer?: string
     photographer?: string
     pubmat?: string
+    videographer?: string
+    prepared_by?: string
+    [key: string]: string | undefined
   }
   postUrl: string
   applyUrl?: string

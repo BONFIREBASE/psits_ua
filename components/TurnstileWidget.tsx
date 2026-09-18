@@ -41,6 +41,7 @@ interface TurnstileWidgetProps {
   action?: string
   className?: string
   resetKey?: number | string
+  size?: 'normal' | 'compact' | 'flexible'
 }
 
 const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
@@ -52,12 +53,25 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
       action = 'login',
       className = '',
       resetKey,
+      size = 'normal',
     },
     ref
   ) {
     const containerRef = useRef<HTMLDivElement>(null)
     const widgetIdRef = useRef<string | null>(null)
     const [scriptLoaded, setScriptLoaded] = useState(false)
+    const [hasError, setHasError] = useState(false)
+
+    // Store callbacks in refs to prevent re-rendering/destroying widget on parent keystrokes
+    const onVerifyRef = useRef(onVerify)
+    const onExpireRef = useRef(onExpire)
+    const onErrorRef = useRef(onError)
+
+    useEffect(() => {
+      onVerifyRef.current = onVerify
+      onExpireRef.current = onExpire
+      onErrorRef.current = onError
+    })
 
     // User's registered Turnstile Site Key with fallback
     const siteKey =
@@ -78,7 +92,7 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
 
     // Respond to external resetKey triggers
     useEffect(() => {
-      if (resetKey && widgetIdRef.current && window.turnstile) {
+      if (resetKey !== undefined && widgetIdRef.current && window.turnstile) {
         try {
           window.turnstile.reset(widgetIdRef.current)
         } catch {}
@@ -111,7 +125,7 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
         setScriptLoaded(true)
       }
 
-      // Safety fallback check in case script was cached
+      // Safety polling check in case script was already in cache
       const interval = setInterval(() => {
         if (window.turnstile) {
           setScriptLoaded(true)
@@ -122,7 +136,7 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
       return () => clearInterval(interval)
     }, [])
 
-    // 2. Render Turnstile widget when script is ready
+    // 2. Render Turnstile widget once when ready (STABLE: does NOT re-run on callback changes)
     useEffect(() => {
       if (!scriptLoaded || !containerRef.current || !window.turnstile) return
 
@@ -134,25 +148,35 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
         widgetIdRef.current = null
       }
 
+      // Clean container DOM to prevent duplicate iframe glitches
+      if (containerRef.current) {
+        containerRef.current.innerHTML = ''
+      }
+
       try {
+        setHasError(false)
         const id = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
           theme: 'dark',
-          size: 'flexible',
+          size,
           action,
           callback: (token: string) => {
-            onVerify(token)
+            setHasError(false)
+            onVerifyRef.current(token)
           },
           'expired-callback': () => {
-            if (onExpire) onExpire()
+            onExpireRef.current?.()
           },
           'error-callback': (err: string) => {
-            if (onError) onError(err)
+            console.warn('[Cloudflare Turnstile] Challenge error:', err)
+            setHasError(true)
+            onErrorRef.current?.(err)
           },
         })
         widgetIdRef.current = id
       } catch (err) {
         console.warn('Turnstile render error:', err)
+        setHasError(true)
       }
 
       return () => {
@@ -163,13 +187,34 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
           widgetIdRef.current = null
         }
       }
-    }, [scriptLoaded, siteKey, action, onVerify, onExpire, onError])
+    }, [scriptLoaded, siteKey, action, size])
 
     return (
-      <div
-        ref={containerRef}
-        className={`min-h-[65px] flex items-center justify-center overflow-hidden rounded-xl ${className}`}
-      />
+      <div className={`flex flex-col items-center justify-center ${className}`}>
+        <div
+          ref={containerRef}
+          className="min-h-[65px] min-w-[300px] flex items-center justify-center overflow-hidden rounded-xl"
+        />
+        {hasError && (
+          <div className="mt-2 text-center">
+            <p className="text-[11px] font-mono text-amber-400 mb-1.5">
+              Verification failed or blocked by browser shields.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (widgetIdRef.current && window.turnstile) {
+                  window.turnstile.reset(widgetIdRef.current)
+                  setHasError(false)
+                }
+              }}
+              className="text-[10px] font-mono text-gold hover:underline"
+            >
+              Click to retry challenge
+            </button>
+          </div>
+        )}
+      </div>
     )
   }
 )

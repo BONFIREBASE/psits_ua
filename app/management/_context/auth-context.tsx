@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { supabase, findOfficerByEmail } from '@/lib/supabase'
+import { createSessionAction, validateSessionAction, destroySessionAction, verifyAdminPasswordAction } from '@/lib/session'
 
 export type UserRole = 'admin' | 'officer'
 
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType | null>(null)
 const ALLOWED_DOMAIN = '@antiquespride.edu.ph'
 const ADMIN_EMAIL = 'psits-ua@antiquespride.edu.ph'
 const STORAGE_KEY = 'psits_mgmt_session'
+const TOKEN_KEY = 'psits_mgmt_token'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -67,13 +69,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null
   }, [])
 
-  // Initialize session from sessionStorage or Supabase Auth
+  // Initialize session from server-backed session token or OAuth
   useEffect(() => {
     let mounted = true
 
     async function initSession() {
       try {
-        // 1. Check local session cache
+        // 1. Validate server-side session token
+        const token = sessionStorage.getItem(TOKEN_KEY)
+        if (token) {
+          const { valid, user: sessionUser } = await validateSessionAction(token)
+          if (valid && sessionUser) {
+            if (mounted) setUser(sessionUser)
+            setIsLoading(false)
+            return
+          } else {
+            // Token expired or invalid on server
+            sessionStorage.removeItem(TOKEN_KEY)
+            sessionStorage.removeItem(STORAGE_KEY)
+          }
+        }
+
+        // 2. Check cached fallback
         const stored = sessionStorage.getItem(STORAGE_KEY)
         if (stored) {
           const parsed = JSON.parse(stored) as AuthUser
@@ -84,22 +101,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // 2. Check active Supabase session (e.g. from Google OAuth callback)
+        // 3. Check active Supabase session (OAuth redirect)
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user?.email) {
           const resolved = await resolveUserSession(session.user.email)
           if (resolved) {
+            const sessionRes = await createSessionAction(resolved)
+            if (sessionRes.token) {
+              sessionStorage.setItem(TOKEN_KEY, sessionRes.token)
+            }
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
             if (mounted) setUser(resolved)
           } else {
-            // Unauthorized domain or unregistered email
             await supabase.auth.signOut()
+            sessionStorage.removeItem(TOKEN_KEY)
             sessionStorage.removeItem(STORAGE_KEY)
             if (mounted) setUser(null)
           }
         }
       } catch (err) {
         console.error('Session initialization error:', err)
+        sessionStorage.removeItem(TOKEN_KEY)
         sessionStorage.removeItem(STORAGE_KEY)
       } finally {
         if (mounted) setIsLoading(false)
@@ -108,20 +130,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initSession()
 
-    // 3. Listen for OAuth redirects & auth state changes
+    // 4. Listen for OAuth redirects & auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session?.user?.email) {
           const resolved = await resolveUserSession(session.user.email)
           if (resolved) {
+            const sessionRes = await createSessionAction(resolved)
+            if (sessionRes.token) {
+              sessionStorage.setItem(TOKEN_KEY, sessionRes.token)
+            }
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
             setUser(resolved)
           } else {
             await supabase.auth.signOut()
+            sessionStorage.removeItem(TOKEN_KEY)
             sessionStorage.removeItem(STORAGE_KEY)
             setUser(null)
           }
         } else if (event === 'SIGNED_OUT') {
+          sessionStorage.removeItem(TOKEN_KEY)
           sessionStorage.removeItem(STORAGE_KEY)
           setUser(null)
         }
@@ -146,8 +174,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
         })
 
-        // Fallback for offline or static default credential
-        const isCredentialValid = !error && data?.user || (password === 'PSITS-UA@_2026')
+        // Verify via Supabase Auth or secure server-side environment password
+        let isCredentialValid = !error && !!data?.user
+        if (!isCredentialValid) {
+          const serverAuth = await verifyAdminPasswordAction(password)
+          isCredentialValid = serverAuth.success
+        }
 
         if (!isCredentialValid) {
           return { success: false, error: 'Invalid administrator password.' }
@@ -158,6 +190,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: 'PSITS-UA Super Admin',
           role: 'admin',
           position: 'System Administrator',
+        }
+
+        // Create server-side session token
+        const sessionRes = await createSessionAction(adminUser)
+        if (sessionRes.token) {
+          sessionStorage.setItem(TOKEN_KEY, sessionRes.token)
         }
 
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(adminUser))
@@ -183,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         provider: 'google',
         options: {
           queryParams: {
-            hd: 'antiquespride.edu.ph', // Enforce Google Hosted Domain
+            hd: 'antiquespride.edu.ph',
           },
           redirectTo: redirectUrl,
         },
@@ -220,7 +258,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Admin shortcut if email is admin
         if (trimmed === ADMIN_EMAIL) {
           return {
             success: false,
@@ -228,7 +265,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Verify that the email is assigned to an officer in Supabase
         const officer = await findOfficerByEmail(trimmed)
         if (!officer) {
           return {
@@ -243,6 +279,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: 'officer',
           position: officer.position,
           avatarUrl: officer.image_url || undefined,
+        }
+
+        // Create server-side session token
+        const sessionRes = await createSessionAction(officerUser)
+        if (sessionRes.token) {
+          sessionStorage.setItem(TOKEN_KEY, sessionRes.token)
         }
 
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(officerUser))
@@ -272,11 +314,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loginWithAdminPassword, loginWithOfficerEmail]
   )
 
-  // ─── Logout ───
+  // ─── Proper Session-Based Logout ───
   const logout = useCallback(async () => {
+    try {
+      const token = sessionStorage.getItem(TOKEN_KEY)
+      if (token) {
+        // Destroy the server-side session in Supabase immediately
+        await destroySessionAction(token)
+      }
+    } catch (err) {
+      console.error('Session destruction error:', err)
+    }
+
     try {
       await supabase.auth.signOut()
     } catch {}
+
+    sessionStorage.removeItem(TOKEN_KEY)
     sessionStorage.removeItem(STORAGE_KEY)
     setUser(null)
   }, [])
