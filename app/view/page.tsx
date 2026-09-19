@@ -269,10 +269,21 @@ function DesignCard({
   isVoting: boolean;
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const hasVotedForThis = userVote === entry.id;
 
+  const handleVoteClick = () => {
+    if (hasVotedForThis) return;
+    setShowConfirm(true);
+  };
+
+  const handleConfirm = () => {
+    setShowConfirm(false);
+    onVote(entry.id);
+  };
+
   return (
-    <div className={`group bg-surface-theme/90 border ${hasVotedForThis ? 'border-gold/50' : 'border-border-theme'} rounded-2xl overflow-hidden hover:border-gold/30 transition-all duration-300 backdrop-blur-xl shadow-lg ${hasVotedForThis ? 'ring-2 ring-gold/20' : ''}`}>
+    <div className={`group bg-surface-theme/90 dark:bg-surface-theme/90 border ${hasVotedForThis ? 'border-gold/50' : 'border-border-theme'} rounded-2xl overflow-hidden hover:border-gold/30 transition-all duration-300 backdrop-blur-xl shadow-lg ${hasVotedForThis ? 'ring-2 ring-gold/20' : ''}`}>
       {/* Image */}
       <div
         className="relative aspect-[3/4] bg-canvas-theme/80 cursor-pointer overflow-hidden"
@@ -333,51 +344,70 @@ function DesignCard({
           </p>
         )}
 
-        {/* Vote Button */}
-        <div className="pt-2">
+        {/* Vote Button Section */}
+        <div className="pt-2 space-y-2">
           {!votingOpen ? (
-            <div className="w-full py-2.5 px-3 rounded-xl bg-canvas-theme/80 text-muted-foreground-theme/50 text-xs text-center border border-border-theme select-none font-mono">
+            <div className="w-full py-2.5 px-3 rounded-xl bg-canvas-theme/80 dark:bg-canvas-theme text-muted-foreground-theme/50 text-xs text-center border border-border-theme select-none font-mono">
               <Clock className="w-3 h-3 inline-block mr-1 -mt-0.5" />
               Voting opens Oct 5
             </div>
           ) : !user ? (
             <Link
               href="/submission"
-              className="w-full py-2.5 px-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-canvas-theme/80 hover:bg-canvas-theme text-muted-foreground-theme hover:text-foreground-theme transition-colors border border-border-theme flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 px-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-canvas-theme/80 dark:bg-canvas-theme hover:bg-surface-theme dark:hover:bg-surface-theme text-muted-foreground-theme hover:text-foreground-theme transition-colors border border-border-theme flex items-center justify-center gap-1.5"
             >
               <LogIn className="w-3.5 h-3.5" />
               Sign In to Vote
             </Link>
           ) : hasVotedForThis ? (
-            <div className="w-full py-2.5 px-3 rounded-xl bg-gold/15 text-gold text-xs text-center border border-gold/30 select-none font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5">
+            <div className="w-full py-2.5 px-3 rounded-xl bg-gold/15 dark:bg-gold/15 text-gold dark:text-gold text-xs text-center border border-gold/30 select-none font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />
               You Voted This
             </div>
-          ) : userVote ? (
-            <button
-              disabled={isVoting}
-              onClick={() => onVote(entry.id)}
-              className="w-full py-2.5 px-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-canvas-theme/80 hover:bg-gold/15 text-muted-foreground-theme hover:text-gold transition-colors border border-border-theme hover:border-gold/30 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isVoting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Vote className="w-3.5 h-3.5" />
-              )}
-              Change Vote
-            </button>
+          ) : showConfirm ? (
+            // Inline confirmation
+            <div className="bg-gold/10 dark:bg-gold/10 border border-gold/30 rounded-xl p-3 space-y-2">
+              <p className="text-xs text-foreground-theme font-medium text-center">
+                {userVote ? "Change your vote?" : "Confirm your vote?"}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  disabled={isVoting}
+                  className="flex-1 py-2 px-2 rounded-lg bg-canvas-theme dark:bg-canvas-theme hover:bg-surface-theme dark:hover:bg-surface-theme text-foreground-theme text-xs font-medium transition-colors border border-border-theme disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  disabled={isVoting}
+                  className="flex-1 py-2 px-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isVoting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Yes
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           ) : (
             <button
               disabled={isVoting}
-              onClick={() => onVote(entry.id)}
-              className="w-full py-2.5 px-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-gold/15 hover:bg-gold/25 text-gold transition-colors cursor-pointer border border-gold/20 hover:border-gold/40 flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(245,166,35,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleVoteClick}
+              className="w-full py-2.5 px-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-gold/15 dark:bg-gold/15 hover:bg-gold/25 dark:hover:bg-gold/25 text-gold dark:text-gold transition-colors cursor-pointer border border-gold/20 hover:border-gold/40 flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(245,166,35,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isVoting ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Vote className="w-3.5 h-3.5" />
+                <>
+                  <Vote className="w-3.5 h-3.5" />
+                  {userVote ? "Change Vote" : "Vote for this"}
+                </>
               )}
-              Vote for this Design
             </button>
           )}
         </div>
@@ -404,10 +434,6 @@ export default function ViewGalleryPage() {
   const [voteStatus, setVoteStatus] = useState<VoteStatus | null>(null);
   const [isVoting, setIsVoting] = useState(false);
   const [voteMessage, setVoteMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [showVoteConfirm, setShowVoteConfirm] = useState<{
-    submissionId: string;
-    title: string;
-  } | null>(null);
 
   // Fetch user session
   useEffect(() => {
@@ -518,20 +544,8 @@ export default function ViewGalleryPage() {
 
   // Handle vote
   const handleVote = async (submissionId: string) => {
-    const design = entries.find((e) => e.id === submissionId);
-    if (!design) return;
+    if (!sessionToken) return;
 
-    // Show confirmation dialog
-    setShowVoteConfirm({
-      submissionId,
-      title: design.title || design.student_name,
-    });
-  };
-
-  const confirmVote = async () => {
-    if (!showVoteConfirm || !sessionToken) return;
-
-    const { submissionId } = showVoteConfirm;
     setIsVoting(true);
     setVoteMessage(null);
 
@@ -565,7 +579,6 @@ export default function ViewGalleryPage() {
       setVoteMessage({ type: "error", text: "An unexpected error occurred." });
     } finally {
       setIsVoting(false);
-      setShowVoteConfirm(null);
     }
   };
 
@@ -597,8 +610,8 @@ export default function ViewGalleryPage() {
             <div
               className={`p-4 rounded-xl backdrop-blur-xl shadow-lg border ${
                 voteMessage.type === "success"
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-300"
-                  : "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-300"
+                  ? "bg-emerald-500/10 dark:bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                  : "bg-rose-500/10 dark:bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300"
               } flex items-start gap-3`}
             >
               {voteMessage.type === "success" ? (
@@ -615,63 +628,6 @@ export default function ViewGalleryPage() {
               >
                 <X className="w-4 h-4" />
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* Vote Confirmation Dialog */}
-        {showVoteConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-surface-theme/95 border border-border-theme rounded-2xl p-8 max-w-md w-full backdrop-blur-xl shadow-2xl">
-              <div className="text-center mb-6">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gold/15 border border-gold/30 mb-4">
-                  <Vote className="w-7 h-7 text-gold" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground-theme font-display mb-2">
-                  Confirm Your Vote
-                </h3>
-                <p className="text-sm text-muted-foreground-theme leading-relaxed">
-                  {voteStatus?.hasVoted
-                    ? `Change your vote to "${showVoteConfirm.title}"?`
-                    : `Cast your vote for "${showVoteConfirm.title}"?`}
-                </p>
-                {voteStatus?.hasVoted ? (
-                  <p className="text-xs text-muted-foreground-theme/70 mt-2">
-                    This will replace your previous vote.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground-theme/70 mt-2">
-                    You can only vote once for your favorite design.
-                  </p>
-                )}
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowVoteConfirm(null)}
-                  disabled={isVoting}
-                  className="flex-1 py-3 px-4 rounded-xl bg-canvas-theme hover:bg-canvas-theme/80 text-foreground-theme text-sm font-medium transition-colors border border-border-theme disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmVote}
-                  disabled={isVoting}
-                  className="flex-1 py-3 px-4 rounded-xl bg-gold hover:bg-gold-light text-[#0D1117] text-sm font-bold transition-colors shadow-[0_0_15px_rgba(245,166,35,0.25)] disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isVoting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Voting...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      Confirm Vote
-                    </>
-                  )}
-                </button>
-              </div>
             </div>
           </div>
         )}

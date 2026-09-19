@@ -17,6 +17,7 @@ import {
   Settings,
   ArrowLeft,
   Eye,
+  Palette,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -161,14 +162,15 @@ function PieChart({ data }: { data: VotingAnalytics[] }) {
         })}
 
         {/* Center circle for donut effect */}
-        <circle cx="100" cy="100" r="50" fill="var(--canvas-theme)" />
+        <circle cx="100" cy="100" r="50" fill="hsl(var(--surface))" />
         
         {/* Center text */}
         <text
           x="100"
           y="95"
           textAnchor="middle"
-          className="text-2xl font-bold fill-current text-foreground-theme"
+          className="text-2xl font-bold fill-foreground-theme"
+          style={{ fill: 'hsl(var(--foreground))' }}
         >
           {total}
         </text>
@@ -176,7 +178,8 @@ function PieChart({ data }: { data: VotingAnalytics[] }) {
           x="100"
           y="110"
           textAnchor="middle"
-          className="text-xs fill-current text-muted-foreground-theme"
+          className="text-xs fill-muted-foreground-theme"
+          style={{ fill: 'hsl(var(--muted-foreground))' }}
         >
           Total Votes
         </text>
@@ -311,38 +314,255 @@ export default function VotingAnalyticsPage() {
     }
   };
 
-  // Export results
-  const handleExport = () => {
+  // Export results to PDF
+  const handleExport = async () => {
     if (!data) return;
 
-    const csvContent = [
-      ["Rank", "Design Title", "Designer", "Course/Year", "Votes", "Percentage"],
-      ...data.analytics.map((item, index) => [
-        index + 1,
-        item.title || "Untitled",
-        item.designer_name,
-        item.designer_course_year || "N/A",
-        item.vote_count,
-        `${item.vote_percentage.toFixed(2)}%`,
-      ]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n");
+    // Create printable HTML content
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>PSITS-UA Polo Shirt Design Contest - Voting Results</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 40px;
+            background: white;
+            color: #000;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #F5A623;
+            padding-bottom: 20px;
+          }
+          .header h1 {
+            font-size: 28px;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+            font-weight: 800;
+          }
+          .header p {
+            color: #666;
+            font-size: 14px;
+          }
+          .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 40px;
+          }
+          .stat-card {
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            padding: 16px;
+            background: #f9f9f9;
+          }
+          .stat-card h3 {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+          }
+          .stat-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+          }
+          th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e5e5;
+          }
+          th {
+            background: #f5f5f5;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #666;
+          }
+          td {
+            font-size: 14px;
+            color: #1a1a1a;
+          }
+          .rank-badge {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #F5A623;
+            color: white;
+            text-align: center;
+            line-height: 28px;
+            font-weight: 700;
+            font-size: 13px;
+          }
+          .top-1 { background: #FFD700; }
+          .top-2 { background: #C0C0C0; }
+          .top-3 { background: #CD7F32; }
+          .vote-bar {
+            height: 24px;
+            background: #F5A623;
+            border-radius: 4px;
+            display: inline-block;
+            min-width: 2px;
+          }
+          .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e5e5;
+            text-align: center;
+            color: #999;
+            font-size: 11px;
+          }
+          @media print {
+            body { padding: 20px; }
+            .stat-card { break-inside: avoid; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🎨 PSITS-UA Polo Shirt Design Contest</h1>
+          <p>Official Voting Results - Generated on ${new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}</p>
+        </div>
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `polo-voting-results-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+        <div class="stats">
+          <div class="stat-card">
+            <h3>Total Votes</h3>
+            <div class="value">${data.summary.total_votes}</div>
+          </div>
+          <div class="stat-card">
+            <h3>Total Designs</h3>
+            <div class="value">${data.summary.total_submissions}</div>
+          </div>
+          <div class="stat-card">
+            <h3>Highest Votes</h3>
+            <div class="value">${data.summary.highest_votes}</div>
+          </div>
+          <div class="stat-card">
+            <h3>Average Votes</h3>
+            <div class="value">${data.summary.average_votes.toFixed(1)}</div>
+          </div>
+        </div>
+
+        <h2 style="margin-bottom: 16px; font-size: 20px; color: #1a1a1a;">📊 Voting Results</h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 60px;">Rank</th>
+              <th>Design Title</th>
+              <th>Designer</th>
+              <th>Course/Year</th>
+              <th style="text-align: right;">Votes</th>
+              <th style="text-align: right;">Percentage</th>
+              <th style="width: 150px;">Distribution</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.analytics.map((item, index) => `
+              <tr>
+                <td>
+                  <span class="rank-badge ${
+                    index === 0 ? 'top-1' : index === 1 ? 'top-2' : index === 2 ? 'top-3' : ''
+                  }">${index + 1}</span>
+                </td>
+                <td style="font-weight: 600;">${item.title || 'Untitled'}</td>
+                <td>${item.designer_name}</td>
+                <td>${item.designer_course_year || 'N/A'}</td>
+                <td style="text-align: right; font-weight: 600;">${item.vote_count}</td>
+                <td style="text-align: right;">${item.vote_percentage.toFixed(1)}%</td>
+                <td>
+                  <div class="vote-bar" style="width: ${item.vote_percentage}%"></div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <p>Philippine Society of Information Technology Students - University of Antique</p>
+          <p>Official Contest Results • Confidential</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Open print dialog for PDF export
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
   };
 
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <RefreshCw className="w-8 h-8 animate-spin text-gold" />
+      <div className="p-4 sm:p-8 space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-2 flex-1">
+            <div className="h-8 w-48 bg-surface-theme animate-pulse rounded-lg" />
+            <div className="h-4 w-64 bg-surface-theme animate-pulse rounded-lg" />
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="h-10 w-24 bg-surface-theme animate-pulse rounded-lg" />
+            <div className="h-10 w-32 bg-surface-theme animate-pulse rounded-lg" />
+            <div className="h-10 w-24 bg-surface-theme animate-pulse rounded-lg" />
+          </div>
+        </div>
+
+        {/* Status Banner Skeleton */}
+        <div className="h-16 bg-surface-theme animate-pulse rounded-xl" />
+
+        {/* Summary Cards Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-32 bg-surface-theme animate-pulse rounded-xl" />
+          ))}
+        </div>
+
+        {/* Chart Skeletons */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+          <div className="h-96 bg-surface-theme animate-pulse rounded-xl" />
+          <div className="h-96 bg-surface-theme animate-pulse rounded-xl" />
+        </div>
+
+        {/* Top Designs Skeleton */}
+        <div className="space-y-4">
+          <div className="h-6 w-32 bg-surface-theme animate-pulse rounded-lg" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-80 bg-surface-theme animate-pulse rounded-xl" />
+            ))}
+          </div>
+        </div>
+
+        {/* Table Skeleton */}
+        <div className="space-y-4">
+          <div className="h-6 w-40 bg-surface-theme animate-pulse rounded-lg" />
+          <div className="h-64 bg-surface-theme animate-pulse rounded-xl" />
         </div>
       </div>
     );
@@ -363,10 +583,10 @@ export default function VotingAnalyticsPage() {
     : "Inactive";
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="w-full sm:w-auto">
           <div className="flex items-center gap-3 mb-2">
             <Link
               href="/management/submissions"
@@ -374,38 +594,38 @@ export default function VotingAnalyticsPage() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <h1 className="text-2xl font-bold text-foreground-theme font-display">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground-theme font-display">
               Voting Analytics
             </h1>
           </div>
-          <p className="text-sm text-muted-foreground-theme">
+          <p className="text-xs sm:text-sm text-muted-foreground-theme">
             Monitor vote counts, view statistics, and manage voting settings
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowConfigModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-canvas-theme hover:bg-surface-theme text-foreground-theme border border-border-theme transition-colors text-sm"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-canvas-theme dark:bg-canvas-theme hover:bg-surface-theme dark:hover:bg-surface-theme text-foreground-theme border border-border-theme transition-colors text-xs sm:text-sm"
           >
             <Settings className="w-4 h-4" />
-            Settings
+            <span className="hidden sm:inline">Settings</span>
           </button>
 
           <button
             onClick={handleExport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] transition-colors text-sm font-medium"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] transition-colors text-xs sm:text-sm font-medium"
           >
             <Download className="w-4 h-4" />
-            Export CSV
+            <span>PDF</span>
           </button>
 
           <button
             onClick={fetchAnalytics}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-canvas-theme hover:bg-surface-theme text-foreground-theme border border-border-theme transition-colors text-sm"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-canvas-theme dark:bg-canvas-theme hover:bg-surface-theme dark:hover:bg-surface-theme text-foreground-theme border border-border-theme transition-colors text-xs sm:text-sm"
           >
             <RefreshCw className="w-4 h-4" />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
@@ -413,15 +633,15 @@ export default function VotingAnalyticsPage() {
       {/* Status Banner */}
       <div className={`p-4 rounded-xl border ${
         data.config.voting_enabled
-          ? "bg-emerald-500/10 border-emerald-500/30"
-          : "bg-orange-500/10 border-orange-500/30"
+          ? "bg-emerald-500/10 dark:bg-emerald-500/10 border-emerald-500/30"
+          : "bg-orange-500/10 dark:bg-orange-500/10 border-orange-500/30"
       }`}>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {data.config.voting_enabled ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
             ) : (
-              <XCircle className="w-5 h-5 text-orange-500" />
+              <XCircle className="w-5 h-5 text-orange-500 shrink-0" />
             )}
             <div>
               <p className="text-sm font-medium text-foreground-theme">
@@ -437,7 +657,7 @@ export default function VotingAnalyticsPage() {
           <Link
             href="/view"
             target="_blank"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-theme hover:bg-canvas-theme text-foreground-theme border border-border-theme transition-colors text-xs"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-theme dark:bg-surface-theme hover:bg-canvas-theme dark:hover:bg-canvas-theme text-foreground-theme border border-border-theme transition-colors text-xs whitespace-nowrap"
           >
             <Eye className="w-3.5 h-3.5" />
             View Gallery
@@ -447,7 +667,7 @@ export default function VotingAnalyticsPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-surface-theme border border-border-theme rounded-xl p-5">
+        <div className="bg-surface-theme dark:bg-surface-theme border border-border-theme rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <Users className="w-5 h-5 text-gold" />
             <span className="text-xs text-muted-foreground-theme font-mono">TOTAL</span>
@@ -458,7 +678,7 @@ export default function VotingAnalyticsPage() {
           <p className="text-xs text-muted-foreground-theme mt-1">Votes Cast</p>
         </div>
 
-        <div className="bg-surface-theme border border-border-theme rounded-xl p-5">
+        <div className="bg-surface-theme dark:bg-surface-theme border border-border-theme rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <Palette className="w-5 h-5 text-blue-500" />
             <span className="text-xs text-muted-foreground-theme font-mono">DESIGNS</span>
@@ -469,7 +689,7 @@ export default function VotingAnalyticsPage() {
           <p className="text-xs text-muted-foreground-theme mt-1">With Votes</p>
         </div>
 
-        <div className="bg-surface-theme border border-border-theme rounded-xl p-5">
+        <div className="bg-surface-theme dark:bg-surface-theme border border-border-theme rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <Award className="w-5 h-5 text-emerald-500" />
             <span className="text-xs text-muted-foreground-theme font-mono">HIGHEST</span>
@@ -480,7 +700,7 @@ export default function VotingAnalyticsPage() {
           <p className="text-xs text-muted-foreground-theme mt-1">Most Votes</p>
         </div>
 
-        <div className="bg-surface-theme border border-border-theme rounded-xl p-5">
+        <div className="bg-surface-theme dark:bg-surface-theme border border-border-theme rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <TrendingUp className="w-5 h-5 text-purple-500" />
             <span className="text-xs text-muted-foreground-theme font-mono">AVERAGE</span>
