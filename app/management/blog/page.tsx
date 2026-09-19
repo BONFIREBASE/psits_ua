@@ -27,6 +27,7 @@ import { socialDispatches, type SocialDispatch } from '@/data/announcements'
 import { getPosts, postRowToSocialDispatch, getOfficers, type OfficerRow } from '@/lib/supabase'
 import { deleteBlogPost, seedInitialPosts, updateBlogPost } from './actions'
 import StatusBadge from '../_components/StatusBadge'
+import { ManagementListSkeleton } from '../_components/SkeletonPreloader'
 import { useToast } from '../_components/Toast'
 import Select from '../_components/Select'
 
@@ -85,6 +86,7 @@ export default function BlogListPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPosts()
     loadMembers()
   }, [])
@@ -272,20 +274,20 @@ export default function BlogListPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="font-display font-black text-2xl text-white tracking-tight">
+            <h1 className="font-display font-black text-2xl text-foreground-theme tracking-tight">
               Blog / Dispatches
             </h1>
             <span
               className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider ${
                 isLiveFromDb
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-                  : 'bg-gold/15 text-gold border border-gold/25'
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 font-bold'
+                  : 'bg-gold/15 text-amber-600 dark:text-gold border border-gold/25 font-bold'
               }`}
             >
               {isLiveFromDb ? 'Live Database' : 'Local Fallback'}
             </span>
           </div>
-          <p className="text-sm text-white/35 mt-1">
+          <p className="text-sm text-muted-foreground-theme mt-1">
             Manage social dispatches, event recaps, and announcements. {stats.total} total posts.
           </p>
         </div>
@@ -294,7 +296,7 @@ export default function BlogListPage() {
             <button
               onClick={handleSeed}
               disabled={isSeeding}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-gold/30 bg-gold/10 hover:bg-gold/15 text-gold text-xs font-semibold transition-all duration-200 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-gold/30 bg-gold/10 hover:bg-gold/15 text-amber-600 dark:text-gold text-xs font-semibold transition-all duration-200 disabled:opacity-50 cursor-pointer"
               title="Sync the current static announcements into database"
             >
               {isSeeding ? (
@@ -307,7 +309,7 @@ export default function BlogListPage() {
           )}
           <Link
             href="/management/blog/new"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit cursor-pointer"
           >
             <Plus size={16} />
             <span>New Post</span>
@@ -318,13 +320,13 @@ export default function BlogListPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground-theme" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search posts..."
-            className="w-full bg-white/[0.04] border border-white/10 rounded-lg pl-9 pr-3.5 py-2.5 text-sm text-white placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20"
+            className="w-full bg-surface-theme border border-border-theme rounded-lg pl-9 pr-3.5 py-2.5 text-sm text-foreground-theme placeholder:text-muted-foreground-theme/50 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20"
           />
         </div>
         <div className="flex gap-1.5 flex-wrap">
@@ -333,10 +335,10 @@ export default function BlogListPage() {
               key={cat}
               onClick={() => setCategoryFilter(cat)}
               className={`
-                px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+                px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer
                 ${categoryFilter === cat
-                  ? 'bg-gold/15 text-gold border border-gold/25'
-                  : 'bg-white/[0.03] text-white/40 border border-white/8 hover:text-white/60 hover:border-white/15'
+                  ? 'bg-gold/15 text-amber-600 dark:text-gold border border-gold/25 font-bold'
+                  : 'bg-surface-theme text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04]'
                 }
               `}
             >
@@ -349,10 +351,7 @@ export default function BlogListPage() {
       {/* Posts List */}
       <div className="space-y-2.5">
         {isLoading ? (
-          <div className="text-center py-16">
-            <Loader2 size={24} className="animate-spin text-gold mx-auto mb-2" />
-            <p className="text-xs text-white/30 font-mono">Loading from database...</p>
-          </div>
+          <ManagementListSkeleton count={4} />
         ) : (
           <>
             {filtered.map((dispatch) => (
@@ -370,7 +369,7 @@ export default function BlogListPage() {
 
             {filtered.length === 0 && (
               <div className="text-center py-16">
-                <p className="text-sm text-white/30">No posts match your filters.</p>
+                <p className="text-sm text-muted-foreground-theme">No posts match your filters.</p>
               </div>
             )}
           </>
@@ -380,17 +379,17 @@ export default function BlogListPage() {
       {/* Interactive Edit Modal */}
       {editingPost && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-[#0d1219] border border-white/15 rounded-2xl shadow-2xl overflow-hidden my-8">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-[#0d1219] border border-border-theme rounded-2xl shadow-2xl overflow-hidden my-8">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0a0e17]/80">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-theme bg-slate-50 dark:bg-[#0a0e17]/80">
               <div className="flex items-center gap-2">
-                <FileEdit size={16} className="text-gold" />
-                <h2 className="font-display font-bold text-white text-base">Edit Post</h2>
+                <FileEdit size={16} className="text-amber-600 dark:text-gold" />
+                <h2 className="font-display font-bold text-foreground-theme text-base">Edit Post</h2>
               </div>
               <button
                 type="button"
                 onClick={handleCloseEdit}
-                className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-1 rounded-lg text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -399,7 +398,7 @@ export default function BlogListPage() {
             {/* Modal Body */}
             <form onSubmit={handleUpdateSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-white/70 mb-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-foreground-theme/80 mb-1.5">
                   Post Title <span className="text-gold">*</span>
                 </label>
                 <input
@@ -407,19 +406,19 @@ export default function BlogListPage() {
                   required
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-gold/50"
+                  className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme focus:outline-none focus:border-gold/50"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono uppercase tracking-wider text-white/70 mb-1.5">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-foreground-theme/80 mb-1.5">
                     Category
                   </label>
                   <select
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full bg-[#121929] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-gold/50"
+                    className="w-full bg-slate-50 dark:bg-[#121929] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme focus:outline-none focus:border-gold/50"
                   >
                     <option value="Official Advisory">Official Advisory</option>
                     <option value="Campus Event">Campus Event</option>
@@ -430,7 +429,7 @@ export default function BlogListPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase tracking-wider text-white/70 mb-1.5">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-foreground-theme/80 mb-1.5">
                     Publish Date
                   </label>
                   <input
@@ -438,19 +437,19 @@ export default function BlogListPage() {
                     value={editDate}
                     onChange={(e) => setEditDate(e.target.value)}
                     placeholder="e.g. September 18, 2026"
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-gold/50"
+                    className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme focus:outline-none focus:border-gold/50"
                   />
                 </div>
               </div>
 
               {/* Cover Image */}
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-white/70 mb-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-foreground-theme/80 mb-1.5">
                   Cover Image Banner (Max 5MB)
                 </label>
                 <div className="flex items-center gap-4">
                   {editThumbnailPreview && (
-                    <div className="relative w-28 h-16 rounded-lg overflow-hidden border border-white/20 shrink-0">
+                    <div className="relative w-28 h-16 rounded-lg overflow-hidden border border-border-theme shrink-0">
                       <Image
                         src={editThumbnailPreview}
                         alt="Preview"
@@ -460,9 +459,9 @@ export default function BlogListPage() {
                       />
                     </div>
                   )}
-                  <label className="flex-1 flex flex-col items-center justify-center p-3 border border-dashed border-white/15 hover:border-gold/40 rounded-xl cursor-pointer bg-white/[0.02] hover:bg-white/[0.04] transition-all">
-                    <UploadCloud size={18} className="text-gold/80 mb-0.5" />
-                    <span className="text-[11px] text-white/70 font-mono">
+                  <label className="flex-1 flex flex-col items-center justify-center p-3 border border-dashed border-border-theme hover:border-gold/40 rounded-xl cursor-pointer bg-slate-50 dark:bg-white/[0.02] hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-all">
+                    <UploadCloud size={18} className="text-amber-600 dark:text-gold/80 mb-0.5" />
+                    <span className="text-[11px] text-muted-foreground-theme font-mono">
                       {editThumbnail ? editThumbnail.name : 'Click to replace cover photo'}
                     </span>
                     <input
@@ -483,12 +482,12 @@ export default function BlogListPage() {
 
               {/* Full Content */}
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-white/70 mb-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-foreground-theme/80 mb-1.5">
                   Full Content (Markdown Supported) <span className="text-gold">*</span>
                 </label>
                 <div className="space-y-0">
                   {/* Formatting Toolbar */}
-                  <div className="flex items-center gap-0.5 px-2 py-1.5 bg-white/[0.03] border border-white/10 border-b-0 rounded-t-xl">
+                  <div className="flex items-center gap-0.5 px-2 py-1.5 bg-slate-100 dark:bg-white/[0.03] border border-border-theme border-b-0 rounded-t-xl">
                     {[
                       { icon: Bold, type: 'bold', label: 'Bold' },
                       { icon: Italic, type: 'italic', label: 'Italic' },
@@ -502,7 +501,7 @@ export default function BlogListPage() {
                         type="button"
                         onClick={() => insertEditFormatting(btn.type)}
                         title={btn.label}
-                        className="p-1.5 rounded text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+                        className="p-1.5 rounded text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-200 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
                       >
                         <btn.icon size={14} />
                       </button>
@@ -514,7 +513,7 @@ export default function BlogListPage() {
                     rows={6}
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-b-xl rounded-t-none p-3 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50 leading-relaxed font-body"
+                    className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-b-xl rounded-t-none p-3 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/40 focus:outline-none focus:border-gold/50 leading-relaxed font-body"
                   />
                 </div>
               </div>
@@ -522,7 +521,7 @@ export default function BlogListPage() {
               {/* Quotes and Link */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono uppercase tracking-wider text-white/70 mb-1.5">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-foreground-theme/80 mb-1.5">
                     Highlight Quote (Optional)
                   </label>
                   <input
@@ -530,11 +529,11 @@ export default function BlogListPage() {
                     value={editHighlightQuote}
                     onChange={(e) => setEditHighlightQuote(e.target.value)}
                     placeholder="Short standout statement..."
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-gold/50"
+                    className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme focus:outline-none focus:border-gold/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono uppercase tracking-wider text-white/70 mb-1.5">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-foreground-theme/80 mb-1.5">
                     Quote Author (Optional)
                   </label>
                   <input
@@ -542,13 +541,13 @@ export default function BlogListPage() {
                     value={editQuoteAuthor}
                     onChange={(e) => setEditQuoteAuthor(e.target.value)}
                     placeholder="e.g. Dean / President"
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-gold/50"
+                    className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme focus:outline-none focus:border-gold/50"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-white/70 mb-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-foreground-theme/80 mb-1.5">
                   External Post URL (Facebook / Article)
                 </label>
                 <input
@@ -556,20 +555,20 @@ export default function BlogListPage() {
                   value={editPostUrl}
                   onChange={(e) => setEditPostUrl(e.target.value)}
                   placeholder="https://..."
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-gold/50"
+                  className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme focus:outline-none focus:border-gold/50"
                 />
               </div>
 
               {/* Credits Section */}
               <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-mono uppercase tracking-wider text-white/70">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-foreground-theme/80">
                     Content Credits (Optional)
                   </label>
                   <button
                     type="button"
                     onClick={() => setEditCredits([...editCredits, { role: '', name: '' }])}
-                    className="text-xs text-gold hover:text-gold-light font-mono"
+                    className="text-xs text-amber-600 dark:text-gold hover:underline font-mono cursor-pointer"
                   >
                     + Add Credit
                   </button>
@@ -578,7 +577,7 @@ export default function BlogListPage() {
                 {editCredits.map((credit, index) => (
                   <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
                     <div>
-                      <label className="block text-xs font-mono uppercase tracking-wider text-white/60 mb-1.5">
+                      <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme mb-1.5">
                         Role
                       </label>
                       <Select
@@ -601,7 +600,7 @@ export default function BlogListPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-mono uppercase tracking-wider text-white/60 mb-1.5">
+                      <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme mb-1.5">
                         Member
                       </label>
                       <Select
@@ -620,7 +619,7 @@ export default function BlogListPage() {
                     <button
                       type="button"
                       onClick={() => setEditCredits(editCredits.filter((_, i) => i !== index))}
-                      className="mb-1 p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                      className="mb-1 p-2 text-muted-foreground-theme hover:text-red-500 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
                       title="Remove credit"
                     >
                       <X size={16} />
@@ -629,17 +628,17 @@ export default function BlogListPage() {
                 ))}
                 
                 {editCredits.length === 0 && (
-                  <p className="text-xs text-white/40 text-center py-3">No credits added yet. Click &quot;+ Add Credit&quot; to add team members.</p>
+                  <p className="text-xs text-muted-foreground-theme text-center py-3">No credits added yet. Click &quot;+ Add Credit&quot; to add team members.</p>
                 )}
               </div>
 
               {/* Modal Footer */}
-              <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
+              <div className="pt-4 border-t border-border-theme flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={handleCloseEdit}
                   disabled={isUpdating}
-                  className="px-4 py-2 rounded-xl text-xs font-mono text-white/50 hover:text-white transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-mono text-muted-foreground-theme hover:text-foreground-theme transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -689,9 +688,9 @@ function DispatchRow({
   const isConfirming = deleteConfirmId === dispatch.id
 
   return (
-    <div className="group flex items-center gap-4 p-4 rounded-xl border border-white/6 hover:border-white/15 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-300">
+    <div className="group flex items-center gap-4 p-4 rounded-xl border border-border-theme hover:border-gold/30 bg-surface-theme shadow-xs transition-all duration-300">
       {/* Thumbnail */}
-      <div className="w-16 h-16 sm:w-20 sm:h-14 rounded-lg bg-surface/60 overflow-hidden flex-shrink-0 relative border border-white/6">
+      <div className="w-16 h-16 sm:w-20 sm:h-14 rounded-lg bg-slate-100 dark:bg-surface/60 overflow-hidden flex-shrink-0 relative border border-border-theme">
         {dispatch.imageUrl ? (
           <Image
             src={dispatch.imageUrl}
@@ -702,7 +701,7 @@ function DispatchRow({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Tag size={16} className="text-white/15" />
+            <Tag size={16} className="text-muted-foreground-theme/30" />
           </div>
         )}
       </div>
@@ -710,17 +709,17 @@ function DispatchRow({
       {/* Content */}
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-display font-bold text-white/85 truncate">
+          <h3 className="text-sm font-display font-bold text-foreground-theme group-hover:text-amber-600 dark:group-hover:text-gold transition-colors truncate">
             {dispatch.title}
           </h3>
           <StatusBadge status="Published" />
         </div>
-        <div className="flex items-center gap-3 text-[10px] text-white/30 font-mono">
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground-theme font-mono">
           <span className="flex items-center gap-1">
             <Calendar size={10} />
             {dispatch.date}
           </span>
-          <span className="px-1.5 py-0.5 rounded bg-white/[0.05] text-white/35">
+          <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/[0.05] text-muted-foreground-theme border border-border-theme">
             {dispatch.category}
           </span>
         </div>
@@ -730,11 +729,11 @@ function DispatchRow({
       <div className="flex items-center gap-1.5 flex-shrink-0">
         {isConfirming ? (
           <div className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg">
-            <span className="text-red-400 text-[11px] font-medium">Confirm delete?</span>
+            <span className="text-red-500 text-[11px] font-medium">Confirm delete?</span>
             <button
               onClick={onDeleteConfirm}
               disabled={isDeleting}
-              className="px-2 py-0.5 rounded bg-red-500 hover:bg-red-600 text-white text-[11px] font-semibold transition-colors disabled:opacity-50"
+              className="px-2 py-0.5 rounded bg-red-500 hover:bg-red-600 text-white text-[11px] font-semibold transition-colors disabled:opacity-50 cursor-pointer"
             >
               {isDeleting ? (
                 <Loader2 size={11} className="animate-spin" />
@@ -745,7 +744,7 @@ function DispatchRow({
             <button
               onClick={onDeleteCancel}
               disabled={isDeleting}
-              className="px-1.5 py-0.5 rounded text-white/40 hover:text-white text-[11px] disabled:opacity-50"
+              className="px-1.5 py-0.5 rounded text-muted-foreground-theme hover:text-foreground-theme text-[11px] disabled:opacity-50 cursor-pointer"
             >
               Cancel
             </button>
@@ -757,7 +756,7 @@ function DispatchRow({
                 href={dispatch.postUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 rounded-lg text-white/20 hover:text-gold/70 hover:bg-white/[0.04] transition-colors"
+                className="p-2 rounded-lg text-muted-foreground-theme hover:text-amber-600 dark:hover:text-gold hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors"
                 title="View Source Link"
               >
                 <ExternalLink size={14} />
@@ -767,7 +766,7 @@ function DispatchRow({
               <button
                 type="button"
                 onClick={onEdit}
-                className="p-2 rounded-lg text-white/20 hover:text-gold hover:bg-white/[0.04] transition-colors"
+                className="p-2 rounded-lg text-muted-foreground-theme hover:text-amber-600 dark:hover:text-gold hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
                 title="Edit post"
               >
                 <FileEdit size={14} />
@@ -777,7 +776,7 @@ function DispatchRow({
               <button
                 type="button"
                 onClick={onDelete}
-                className="p-2 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                className="p-2 rounded-lg text-muted-foreground-theme hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                 title="Delete post"
               >
                 <Trash2 size={14} />

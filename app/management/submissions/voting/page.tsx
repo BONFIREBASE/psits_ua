@@ -1,0 +1,740 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import {
+  BarChart3,
+  Users,
+  TrendingUp,
+  Award,
+  Download,
+  RefreshCw,
+  Calendar,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Settings,
+  ArrowLeft,
+  Eye,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface VotingAnalytics {
+  id: string;
+  title: string | null;
+  designer_name: string;
+  designer_course_year: string | null;
+  file_url: string;
+  vote_count: number;
+  vote_percentage: number;
+  status: string;
+  created_at: string;
+}
+
+interface VoterRecord {
+  id: string;
+  student_email: string;
+  student_name: string;
+  voted_at: string;
+  submission_id: string;
+  polo_submissions: {
+    id: string;
+    title: string | null;
+    student_name: string;
+    file_url: string;
+  };
+}
+
+interface VotingConfig {
+  voting_enabled: boolean;
+  voting_start_date: string | null;
+  voting_end_date: string | null;
+  allow_vote_change: boolean;
+}
+
+interface AnalyticsData {
+  config: VotingConfig;
+  summary: {
+    total_votes: number;
+    total_submissions: number;
+    submissions_with_votes: number;
+    highest_votes: number;
+    average_votes: number;
+  };
+  analytics: VotingAnalytics[];
+  top_designs: Array<{
+    rank: number;
+    id: string;
+    title: string | null;
+    designer_name: string;
+    vote_count: number;
+    vote_percentage: number;
+    file_url: string;
+  }>;
+  voters: VoterRecord[];
+  timeline: Array<{ date: string; count: number }>;
+}
+
+// ============================================================================
+// Pie Chart Component
+// ============================================================================
+
+function PieChart({ data }: { data: VotingAnalytics[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground-theme">
+        No voting data available
+      </div>
+    );
+  }
+
+  const total = data.reduce((sum, item) => sum + item.vote_count, 0);
+  
+  if (total === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground-theme">
+        No votes cast yet
+      </div>
+    );
+  }
+
+  // Generate colors for pie chart
+  const colors = [
+    "#F5A623", // gold
+    "#4A90E2", // blue
+    "#7ED321", // green
+    "#BD10E0", // purple
+    "#F8E71C", // yellow
+    "#50E3C2", // cyan
+    "#FF6B6B", // red
+    "#4ECDC4", // teal
+    "#FFB6C1", // pink
+    "#DDA15E", // brown
+  ];
+
+  let currentAngle = -90; // Start from top
+
+  return (
+    <div className="flex items-center justify-center p-8">
+      <svg viewBox="0 0 200 200" className="w-full max-w-md">
+        {data.map((item, index) => {
+          const percentage = (item.vote_count / total) * 100;
+          const angle = (percentage / 100) * 360;
+          const endAngle = currentAngle + angle;
+
+          // Calculate pie slice path
+          const startX = 100 + 80 * Math.cos((Math.PI * currentAngle) / 180);
+          const startY = 100 + 80 * Math.sin((Math.PI * currentAngle) / 180);
+          const endX = 100 + 80 * Math.cos((Math.PI * endAngle) / 180);
+          const endY = 100 + 80 * Math.sin((Math.PI * endAngle) / 180);
+
+          const largeArcFlag = angle > 180 ? 1 : 0;
+
+          const pathData = [
+            `M 100 100`,
+            `L ${startX} ${startY}`,
+            `A 80 80 0 ${largeArcFlag} 1 ${endX} ${endY}`,
+            `Z`,
+          ].join(" ");
+
+          const slice = (
+            <g key={item.id}>
+              <path
+                d={pathData}
+                fill={colors[index % colors.length]}
+                stroke="white"
+                strokeWidth="2"
+                className="hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                <title>{`${item.title || item.designer_name}: ${item.vote_count} votes (${percentage.toFixed(1)}%)`}</title>
+              </path>
+            </g>
+          );
+
+          currentAngle = endAngle;
+          return slice;
+        })}
+
+        {/* Center circle for donut effect */}
+        <circle cx="100" cy="100" r="50" fill="var(--canvas-theme)" />
+        
+        {/* Center text */}
+        <text
+          x="100"
+          y="95"
+          textAnchor="middle"
+          className="text-2xl font-bold fill-current text-foreground-theme"
+        >
+          {total}
+        </text>
+        <text
+          x="100"
+          y="110"
+          textAnchor="middle"
+          className="text-xs fill-current text-muted-foreground-theme"
+        >
+          Total Votes
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+// ============================================================================
+// Legend Component
+// ============================================================================
+
+function ChartLegend({ data }: { data: VotingAnalytics[] }) {
+  const colors = [
+    "#F5A623", "#4A90E2", "#7ED321", "#BD10E0", "#F8E71C",
+    "#50E3C2", "#FF6B6B", "#4ECDC4", "#FFB6C1", "#DDA15E",
+  ];
+
+  const sortedData = [...data].sort((a, b) => b.vote_count - a.vote_count);
+
+  return (
+    <div className="space-y-2 max-h-96 overflow-y-auto">
+      {sortedData.map((item, index) => (
+        <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-canvas-theme/50 transition-colors">
+          <div
+            className="w-4 h-4 rounded shrink-0"
+            style={{ backgroundColor: colors[index % colors.length] }}
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-foreground-theme truncate">
+              {item.title || item.designer_name}
+            </p>
+            <p className="text-[10px] text-muted-foreground-theme">
+              {item.designer_name}
+            </p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-xs font-bold text-foreground-theme">
+              {item.vote_count}
+            </p>
+            <p className="text-[10px] text-muted-foreground-theme">
+              {item.vote_percentage.toFixed(1)}%
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================================
+// Main Page Component
+// ============================================================================
+
+export default function VotingAnalyticsPage() {
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configForm, setConfigForm] = useState<VotingConfig>({
+    voting_enabled: false,
+    voting_start_date: null,
+    voting_end_date: null,
+    allow_vote_change: false,
+  });
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+
+  // Auth check
+  useEffect(() => {
+    async function checkAuth() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        setSessionToken(session.access_token);
+      }
+    }
+    checkAuth();
+  }, []);
+
+  // Fetch analytics data
+  const fetchAnalytics = async () => {
+    if (!sessionToken) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/submissions/polo/analytics", {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      });
+
+      if (res.ok) {
+        const analyticsData = await res.json();
+        setData(analyticsData);
+        setConfigForm(analyticsData.config);
+      }
+    } catch (err) {
+      console.error("Error fetching analytics:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (sessionToken) {
+      fetchAnalytics();
+    }
+  }, [sessionToken]);
+
+  // Save voting configuration
+  const handleSaveConfig = async () => {
+    if (!sessionToken) return;
+
+    setIsSavingConfig(true);
+    try {
+      const res = await fetch("/api/submissions/polo/analytics", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify(configForm),
+      });
+
+      if (res.ok) {
+        await fetchAnalytics();
+        setShowConfigModal(false);
+      }
+    } catch (err) {
+      console.error("Error saving config:", err);
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  // Export results
+  const handleExport = () => {
+    if (!data) return;
+
+    const csvContent = [
+      ["Rank", "Design Title", "Designer", "Course/Year", "Votes", "Percentage"],
+      ...data.analytics.map((item, index) => [
+        index + 1,
+        item.title || "Untitled",
+        item.designer_name,
+        item.designer_course_year || "N/A",
+        item.vote_count,
+        `${item.vote_percentage.toFixed(2)}%`,
+      ]),
+    ]
+      .map((row) => row.join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `polo-voting-results-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <RefreshCw className="w-8 h-8 animate-spin text-gold" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="p-8">
+        <div className="text-center text-muted-foreground-theme">
+          Failed to load analytics data
+        </div>
+      </div>
+    );
+  }
+
+  const votingStatus = data.config.voting_enabled
+    ? "Active"
+    : "Inactive";
+
+  return (
+    <div className="p-8 space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <Link
+              href="/management/submissions"
+              className="text-muted-foreground-theme hover:text-foreground-theme transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <h1 className="text-2xl font-bold text-foreground-theme font-display">
+              Voting Analytics
+            </h1>
+          </div>
+          <p className="text-sm text-muted-foreground-theme">
+            Monitor vote counts, view statistics, and manage voting settings
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowConfigModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-canvas-theme hover:bg-surface-theme text-foreground-theme border border-border-theme transition-colors text-sm"
+          >
+            <Settings className="w-4 h-4" />
+            Settings
+          </button>
+
+          <button
+            onClick={handleExport}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] transition-colors text-sm font-medium"
+          >
+            <Download className="w-4 h-4" />
+            Export CSV
+          </button>
+
+          <button
+            onClick={fetchAnalytics}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-canvas-theme hover:bg-surface-theme text-foreground-theme border border-border-theme transition-colors text-sm"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Status Banner */}
+      <div className={`p-4 rounded-xl border ${
+        data.config.voting_enabled
+          ? "bg-emerald-500/10 border-emerald-500/30"
+          : "bg-orange-500/10 border-orange-500/30"
+      }`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {data.config.voting_enabled ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+            ) : (
+              <XCircle className="w-5 h-5 text-orange-500" />
+            )}
+            <div>
+              <p className="text-sm font-medium text-foreground-theme">
+                Voting Status: <span className={data.config.voting_enabled ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"}>{votingStatus}</span>
+              </p>
+              {data.config.voting_start_date && data.config.voting_end_date && (
+                <p className="text-xs text-muted-foreground-theme mt-0.5">
+                  Period: {new Date(data.config.voting_start_date).toLocaleDateString()} - {new Date(data.config.voting_end_date).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+          </div>
+          <Link
+            href="/view"
+            target="_blank"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-theme hover:bg-canvas-theme text-foreground-theme border border-border-theme transition-colors text-xs"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            View Gallery
+          </Link>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="bg-surface-theme border border-border-theme rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <Users className="w-5 h-5 text-gold" />
+            <span className="text-xs text-muted-foreground-theme font-mono">TOTAL</span>
+          </div>
+          <p className="text-2xl font-bold text-foreground-theme font-display">
+            {data.summary.total_votes}
+          </p>
+          <p className="text-xs text-muted-foreground-theme mt-1">Votes Cast</p>
+        </div>
+
+        <div className="bg-surface-theme border border-border-theme rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <Palette className="w-5 h-5 text-blue-500" />
+            <span className="text-xs text-muted-foreground-theme font-mono">DESIGNS</span>
+          </div>
+          <p className="text-2xl font-bold text-foreground-theme font-display">
+            {data.summary.submissions_with_votes}/{data.summary.total_submissions}
+          </p>
+          <p className="text-xs text-muted-foreground-theme mt-1">With Votes</p>
+        </div>
+
+        <div className="bg-surface-theme border border-border-theme rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <Award className="w-5 h-5 text-emerald-500" />
+            <span className="text-xs text-muted-foreground-theme font-mono">HIGHEST</span>
+          </div>
+          <p className="text-2xl font-bold text-foreground-theme font-display">
+            {data.summary.highest_votes}
+          </p>
+          <p className="text-xs text-muted-foreground-theme mt-1">Most Votes</p>
+        </div>
+
+        <div className="bg-surface-theme border border-border-theme rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <TrendingUp className="w-5 h-5 text-purple-500" />
+            <span className="text-xs text-muted-foreground-theme font-mono">AVERAGE</span>
+          </div>
+          <p className="text-2xl font-bold text-foreground-theme font-display">
+            {data.summary.average_votes.toFixed(1)}
+          </p>
+          <p className="text-xs text-muted-foreground-theme mt-1">Votes per Design</p>
+        </div>
+      </div>
+
+      {/* Pie Chart and Legend */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-surface-theme border border-border-theme rounded-xl p-6">
+          <h2 className="text-lg font-bold text-foreground-theme font-display mb-4">
+            Vote Distribution
+          </h2>
+          <PieChart data={data.analytics} />
+        </div>
+
+        <div className="bg-surface-theme border border-border-theme rounded-xl p-6">
+          <h2 className="text-lg font-bold text-foreground-theme font-display mb-4">
+            Designs Ranking
+          </h2>
+          <ChartLegend data={data.analytics} />
+        </div>
+      </div>
+
+      {/* Top 3 Designs */}
+      {data.top_designs.length > 0 && (
+        <div>
+          <h2 className="text-lg font-bold text-foreground-theme font-display mb-4">
+            Top 3 Designs
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {data.top_designs.map((design) => (
+              <div
+                key={design.id}
+                className="bg-surface-theme border border-border-theme rounded-xl overflow-hidden hover:border-gold/30 transition-all"
+              >
+                <div className="relative aspect-[3/4] bg-canvas-theme">
+                  <Image
+                    src={design.file_url}
+                    alt={design.title || "Design"}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                  <div className="absolute top-2 left-2 bg-gold text-[#0D1117] px-3 py-1 rounded-full text-xs font-bold">
+                    #{design.rank}
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-semibold text-foreground-theme text-sm mb-1">
+                    {design.title || "Untitled"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground-theme mb-3">
+                    {design.designer_name}
+                  </p>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-foreground-theme font-bold">
+                      {design.vote_count} votes
+                    </span>
+                    <span className="text-muted-foreground-theme">
+                      {design.vote_percentage.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Voter List */}
+      <div className="bg-surface-theme border border-border-theme rounded-xl p-6">
+        <h2 className="text-lg font-bold text-foreground-theme font-display mb-4">
+          Voter Records ({data.voters.length})
+        </h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border-theme">
+                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground-theme uppercase">
+                  Voter
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground-theme uppercase">
+                  Voted For
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground-theme uppercase">
+                  Designer
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground-theme uppercase">
+                  Date & Time
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.voters.map((voter) => (
+                <tr
+                  key={voter.id}
+                  className="border-b border-border-theme/50 hover:bg-canvas-theme/50 transition-colors"
+                >
+                  <td className="py-3 px-4">
+                    <div>
+                      <p className="text-foreground-theme font-medium text-xs">
+                        {voter.student_name}
+                      </p>
+                      <p className="text-muted-foreground-theme text-[11px] font-mono">
+                        {voter.student_email}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 text-foreground-theme text-xs">
+                    {voter.polo_submissions?.title || "Untitled"}
+                  </td>
+                  <td className="py-3 px-4 text-muted-foreground-theme text-xs">
+                    {voter.polo_submissions?.student_name}
+                  </td>
+                  <td className="py-3 px-4 text-muted-foreground-theme text-xs font-mono">
+                    {new Date(voter.voted_at).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Config Modal */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-surface-theme border border-border-theme rounded-2xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold text-foreground-theme font-display mb-4">
+              Voting Configuration
+            </h3>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-foreground-theme">
+                  Enable Voting
+                </label>
+                <button
+                  onClick={() =>
+                    setConfigForm({
+                      ...configForm,
+                      voting_enabled: !configForm.voting_enabled,
+                    })
+                  }
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    configForm.voting_enabled ? "bg-gold" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                      configForm.voting_enabled ? "translate-x-6" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-foreground-theme">
+                  Allow Vote Changes
+                </label>
+                <button
+                  onClick={() =>
+                    setConfigForm({
+                      ...configForm,
+                      allow_vote_change: !configForm.allow_vote_change,
+                    })
+                  }
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    configForm.allow_vote_change ? "bg-gold" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                      configForm.allow_vote_change ? "translate-x-6" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div>
+                <label className="text-sm text-foreground-theme block mb-2">
+                  Start Date
+                </label>
+                <input
+                  type="datetime-local"
+                  value={
+                    configForm.voting_start_date
+                      ? new Date(configForm.voting_start_date)
+                          .toISOString()
+                          .slice(0, 16)
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setConfigForm({
+                      ...configForm,
+                      voting_start_date: e.target.value
+                        ? new Date(e.target.value).toISOString()
+                        : null,
+                    })
+                  }
+                  className="w-full px-3 py-2 rounded-lg bg-canvas-theme border border-border-theme text-foreground-theme text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-foreground-theme block mb-2">
+                  End Date
+                </label>
+                <input
+                  type="datetime-local"
+                  value={
+                    configForm.voting_end_date
+                      ? new Date(configForm.voting_end_date)
+                          .toISOString()
+                          .slice(0, 16)
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setConfigForm({
+                      ...configForm,
+                      voting_end_date: e.target.value
+                        ? new Date(e.target.value).toISOString()
+                        : null,
+                    })
+                  }
+                  className="w-full px-3 py-2 rounded-lg bg-canvas-theme border border-border-theme text-foreground-theme text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowConfigModal(false)}
+                disabled={isSavingConfig}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-canvas-theme hover:bg-canvas-theme/80 text-foreground-theme text-sm font-medium transition-colors border border-border-theme disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveConfig}
+                disabled={isSavingConfig}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gold hover:bg-gold-light text-[#0D1117] text-sm font-bold transition-colors disabled:opacity-50"
+              >
+                {isSavingConfig ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

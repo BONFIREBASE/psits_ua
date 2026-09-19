@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Image from 'next/image'
 import coverImage from '@/public/assets/cover.jpg'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -11,8 +12,7 @@ import {
   Lock,
   KeyRound,
   X,
-  Loader2,
-  CheckCircle2,
+  ArrowLeft,
 } from 'lucide-react'
 import { useAuth } from './_context/auth-context'
 import { LoginCardSkeleton } from './_components/SkeletonPreloader'
@@ -120,20 +120,31 @@ export default function ManagementLoginPage() {
   }
 
   return (
-    <div className="min-h-dvh w-full bg-[#0a0e17] flex flex-col justify-between items-center px-4 py-6 sm:py-10 relative overflow-x-hidden overflow-y-auto selection:bg-gold/20 selection:text-white">
-      {/* Cover Image Background Layer */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+    <div className="relative min-h-screen flex flex-col justify-between items-center px-4 py-8 overflow-hidden bg-slate-100 dark:bg-[#0a0e17] transition-colors duration-200">
+      {/* Immersive Cover Background with subtle tint */}
+      <div className="absolute inset-0 pointer-events-none z-0">
         <Image
           src={coverImage}
-          alt="University of Antique"
+          alt=""
           fill
-          className="object-cover object-center opacity-35 sm:opacity-45"
+          className="object-cover object-center opacity-25 dark:opacity-45"
           priority
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0e17]/75 via-[#0a0e17]/85 to-[#0a0e17]/95 backdrop-blur-[2px]" />
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] sm:w-[700px] h-[350px] sm:h-[450px] bg-navy/20 rounded-full blur-[180px]" />
-        <div className="absolute bottom-1/4 left-1/3 w-[300px] sm:w-[350px] h-[300px] sm:h-[350px] bg-gold/[0.04] rounded-full blur-[150px]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#F1F5F9]/80 via-[#F1F5F9]/90 to-[#F1F5F9] dark:from-[#0a0e17]/75 dark:via-[#0a0e17]/85 dark:to-[#0a0e17]/95 backdrop-blur-[2px]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] sm:w-[700px] h-[350px] sm:h-[450px] bg-navy/15 dark:bg-navy/20 rounded-full blur-[180px]" />
+        <div className="absolute bottom-1/4 left-1/3 w-[300px] sm:w-[350px] h-[300px] sm:h-[350px] bg-gold/[0.06] dark:bg-gold/[0.04] rounded-full blur-[150px]" />
+      </div>
+
+      {/* Top Floating Back to Home Button */}
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/80 dark:bg-[#0d1219]/80 hover:bg-white dark:hover:bg-[#0d1219] backdrop-blur-md border border-black/10 dark:border-white/10 hover:border-gold/40 text-xs font-mono text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white transition-all shadow-xs group"
+        >
+          <ArrowLeft size={13} className="group-hover:-translate-x-0.5 transition-transform text-gold" />
+          <span>Back to Home</span>
+        </Link>
       </div>
 
       {/* Top spacer for clean vertical centering */}
@@ -146,7 +157,7 @@ export default function ManagementLoginPage() {
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         className="relative w-full max-w-[380px] my-auto"
       >
-        <div className="bg-[#0d1219]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 sm:p-8 shadow-[0_24px_70px_rgba(0,0,0,0.7)] relative overflow-hidden">
+        <div className="bg-white/95 dark:bg-[#0d1219]/95 backdrop-blur-2xl border border-black/10 dark:border-white/10 rounded-2xl p-6 sm:p-8 shadow-[0_24px_70px_rgba(0,0,0,0.1)] dark:shadow-[0_24px_70px_rgba(0,0,0,0.7)] relative overflow-hidden">
           {/* Specular top rim highlight */}
           <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-gold/35 to-transparent" />
 
@@ -161,12 +172,12 @@ export default function ManagementLoginPage() {
                 priority
               />
             </div>
-            <h1 className="font-display font-black text-xl sm:text-2xl text-white tracking-tight flex items-center gap-0.5">
+            <h1 className="font-display font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight flex items-center gap-0.5">
               <span>PSITS</span>
               <span className="text-gold">-U</span>
               <span className="text-[#E63946]">A</span>
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-white/40 font-mono uppercase tracking-[0.2em] mt-1">
+            <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-white/40 font-mono uppercase tracking-[0.2em] mt-1">
               Officer Management Portal
             </p>
           </div>
@@ -176,9 +187,9 @@ export default function ManagementLoginPage() {
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-start gap-2.5 p-2.5 rounded-xl bg-red-500/[0.08] border border-red-500/20 text-red-300 text-xs mb-4"
+              className="flex items-start gap-2.5 p-2.5 rounded-xl bg-red-500/[0.08] border border-red-500/20 text-red-600 dark:text-red-300 text-xs mb-4"
             >
-              <AlertCircle size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
+              <AlertCircle size={14} className="text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <span className="leading-relaxed text-[11px] sm:text-xs">{error}</span>
             </motion.div>
           )}
@@ -196,11 +207,11 @@ export default function ManagementLoginPage() {
                 className="space-y-4"
               >
                 {/* Security advisory */}
-                <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/6">
-                  <Shield size={14} className="text-gold/70 flex-shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-white/45 leading-relaxed">
+                <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/6">
+                  <Shield size={14} className="text-gold flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-slate-600 dark:text-white/45 leading-relaxed">
                     Access restricted to verified PSITS officers with an official{' '}
-                    <span className="text-white/70 font-medium">@antiquespride.edu.ph</span>{' '}
+                    <span className="text-slate-900 dark:text-white/70 font-medium">@antiquespride.edu.ph</span>{' '}
                     Google Workspace account.
                   </p>
                 </div>
@@ -213,12 +224,12 @@ export default function ManagementLoginPage() {
                   className="
                     w-full flex items-center justify-center gap-3
                     py-3 px-4 rounded-xl
-                    bg-white hover:bg-slate-100
-                    text-[#0f172a] font-semibold text-xs sm:text-sm
+                    bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100
+                    text-white dark:text-[#0f172a] font-semibold text-xs sm:text-sm
                     active:scale-[0.98]
                     disabled:opacity-50 disabled:cursor-not-allowed
                     transition-all duration-200
-                    shadow-lg shadow-black/40
+                    shadow-lg shadow-black/10 dark:shadow-black/40
                     min-h-[46px]
                   "
                 >
@@ -257,14 +268,14 @@ export default function ManagementLoginPage() {
                 className="space-y-3.5"
               >
                 {/* Header with Return button */}
-                <div className="flex items-center justify-between pb-1 border-b border-white/6">
+                <div className="flex items-center justify-between pb-1 border-b border-black/8 dark:border-white/6">
                   <span className="text-[11px] font-mono uppercase tracking-wider text-gold flex items-center gap-1.5 font-bold">
                     <KeyRound size={12} /> Master Console
                   </span>
                   <button
                     type="button"
                     onClick={() => switchMode('sso')}
-                    className="text-white/30 hover:text-white transition-colors p-1"
+                    className="text-slate-400 dark:text-white/30 hover:text-slate-800 dark:hover:text-white transition-colors p-1"
                     title="Return to Officer Portal"
                     aria-label="Close"
                   >
@@ -275,7 +286,7 @@ export default function ManagementLoginPage() {
                 <div className="space-y-1">
                   <label
                     htmlFor="master-key"
-                    className="block font-mono text-[10px] text-gold/70 uppercase tracking-wider font-semibold"
+                    className="block font-mono text-[10px] text-gold uppercase tracking-wider font-semibold"
                   >
                     Authorization Key
                   </label>
@@ -290,7 +301,7 @@ export default function ManagementLoginPage() {
                     }}
                     autoFocus
                     required
-                    className="w-full bg-white/[0.04] border border-gold/30 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-white/20 outline-none focus:border-gold focus:ring-1 focus:ring-gold/30 font-mono transition-all min-h-[42px]"
+                    className="w-full bg-slate-50 dark:bg-white/[0.04] border border-gold/40 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/20 outline-none focus:border-gold focus:ring-1 focus:ring-gold/30 font-mono transition-all min-h-[42px]"
                   />
                 </div>
 
@@ -315,7 +326,7 @@ export default function ManagementLoginPage() {
                   disabled={isSubmitting || !adminPassword.trim()}
                   className="
                     w-full py-2.5 px-4 rounded-xl
-                    bg-gold hover:bg-gold-light text-[#0a0e17]
+                    bg-gold hover:bg-gold-muted text-[#0a0e17]
                     text-xs font-bold transition-all duration-200
                     disabled:opacity-40 disabled:cursor-not-allowed
                     shadow-lg shadow-gold/10 min-h-[44px]
@@ -334,7 +345,7 @@ export default function ManagementLoginPage() {
             type="button"
             onClick={() => switchMode(mode === 'admin' ? 'sso' : 'admin')}
             title="System Console"
-            className="p-1.5 rounded-lg text-white/20 hover:text-gold hover:bg-white/[0.06] transition-all"
+            className="p-1.5 rounded-lg text-slate-400 dark:text-white/20 hover:text-gold hover:bg-black/5 dark:hover:bg-white/[0.06] transition-all cursor-pointer"
             aria-label="Admin Access"
           >
             <Lock size={12} />

@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import LayoutShell from "@/components/LayoutShell";
+import { ThemeProvider, themeScript } from "@/components/ThemeProvider";
 
 const syne = localFont({
   src: "../public/assets/font/Syne/Syne-VariableFont_wght.ttf",
@@ -46,11 +47,17 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       data-scroll-behavior="smooth"
       className={`${syne.variable} ${inter.variable} ${architectsDaughter.variable}`}
     >
-      <body className="bg-base text-text font-body">
-        <LayoutShell>{children}</LayoutShell>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="bg-base text-text font-body transition-colors duration-200">
+        <ThemeProvider>
+          <LayoutShell>{children}</LayoutShell>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

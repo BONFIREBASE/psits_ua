@@ -119,25 +119,25 @@ export default function AttendanceManagementPage() {
     <div className="p-6 sm:p-8 max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="font-display font-black text-2xl text-white tracking-tight">
+        <h1 className="font-display font-black text-2xl text-foreground-theme tracking-tight">
           Attendance System
         </h1>
-        <p className="text-sm text-white/35 mt-1">
+        <p className="text-sm text-muted-foreground-theme mt-1">
           Manage meetings, officer QR codes, and track attendance.
         </p>
       </div>
 
       {/* Tab Bar */}
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/6 w-fit">
+      <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-white/[0.03] border border-border-theme w-fit">
         {tabConfig.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`
-              flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
+              flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer
               ${activeTab === tab.key
-                ? 'bg-gold/15 text-gold shadow-sm'
-                : 'text-white/40 hover:text-white/65'
+                ? 'bg-gold/15 text-amber-600 dark:text-gold shadow-xs font-bold'
+                : 'text-muted-foreground-theme hover:text-foreground-theme'
               }
             `}
           >
@@ -284,18 +284,18 @@ function MeetingsTab() {
       {/* Actions Row */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground-theme" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search meetings..."
-            className="w-full bg-white/[0.04] border border-white/10 rounded-lg pl-9 pr-3.5 py-2.5 text-sm text-white placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20"
+            className="w-full bg-surface-theme border border-border-theme rounded-lg pl-9 pr-3.5 py-2.5 text-sm text-foreground-theme placeholder:text-muted-foreground-theme/50 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20"
           />
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit cursor-pointer"
         >
           <Plus size={16} />
           <span>New Meeting</span>
@@ -304,10 +304,10 @@ function MeetingsTab() {
 
       {/* Add Modal */}
       {showAddModal && (
-        <div className="border border-gold/20 rounded-xl bg-gold/[0.03] p-5 space-y-4">
+        <div className="border border-gold/20 rounded-xl bg-surface-theme p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-display font-bold text-white">Create New Meeting</h3>
-            <button onClick={() => { setShowAddModal(false); resetForm() }} className="text-white/30 hover:text-white/60 transition-colors">
+            <h3 className="text-sm font-display font-bold text-foreground-theme">Create New Meeting</h3>
+            <button onClick={() => { setShowAddModal(false); resetForm() }} className="text-muted-foreground-theme hover:text-foreground-theme transition-colors cursor-pointer">
               <X size={16} />
             </button>
           </div>
@@ -347,10 +347,10 @@ function MeetingsTab() {
             />
           </FormField>
           <div className="flex gap-2">
-            <button onClick={handleCreate} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors">
+            <button onClick={handleCreate} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors cursor-pointer">
               <Save size={13} /> Create Meeting
             </button>
-            <button onClick={() => { setShowAddModal(false); resetForm() }} className="px-3 py-2 rounded-lg text-xs text-white/40 border border-white/8 hover:text-white/60 transition-colors">
+            <button onClick={() => { setShowAddModal(false); resetForm() }} className="px-3 py-2 rounded-lg text-xs text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer">
               Cancel
             </button>
           </div>
@@ -364,25 +364,25 @@ function MeetingsTab() {
           return (
             <div
               key={meeting.id}
-              className="border border-white/6 hover:border-white/15 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-300 p-5"
+              className="border border-border-theme hover:border-gold/30 rounded-xl bg-surface-theme shadow-xs transition-all duration-300 p-5"
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div className="space-y-2 flex-1 min-w-0">
                   <div className="flex items-center gap-2.5 flex-wrap">
-                    <h3 className="font-display font-bold text-base text-white">
+                    <h3 className="font-display font-bold text-base text-foreground-theme">
                       {meeting.title}
                     </h3>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(meeting.status)}`}>
                       {meeting.status}
                     </span>
                     {meeting.type === 'emergency' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500/15 text-red-400 border border-red-500/25">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/25">
                         <AlertTriangle size={9} />
                         Emergency
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-white/40 flex-wrap">
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground-theme flex-wrap">
                     <span className="inline-flex items-center gap-1.5">
                       <CalendarDays size={12} />
                       {formatDate(meeting.date)}
@@ -403,7 +403,7 @@ function MeetingsTab() {
                     </span>
                   </div>
                   {meeting.description && (
-                    <p className="text-xs text-white/25 mt-1 line-clamp-2">{meeting.description}</p>
+                    <p className="text-xs text-muted-foreground-theme/70 mt-1 line-clamp-2">{meeting.description}</p>
                   )}
                 </div>
 
@@ -411,7 +411,7 @@ function MeetingsTab() {
                   <button
                     onClick={() => handleOpenRoster(meeting)}
                     title="Edit Attendance (Present / Late / Absent)"
-                    className="p-2 rounded-lg bg-white/[0.04] border border-white/10 text-white/70 hover:text-gold hover:border-gold/30 hover:bg-gold/[0.06] transition-all flex items-center justify-center"
+                    className="p-2 rounded-lg bg-slate-100 dark:bg-white/[0.04] border border-border-theme text-muted-foreground-theme hover:text-amber-600 dark:hover:text-gold hover:border-gold/30 hover:bg-gold/[0.06] transition-all flex items-center justify-center cursor-pointer"
                   >
                     <ClipboardList size={15} />
                   </button>
@@ -423,7 +423,7 @@ function MeetingsTab() {
                       }
                     }}
                     title="Open Attendance Scanner"
-                    className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 transition-all flex items-center justify-center"
+                    className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 hover:text-amber-500 transition-all flex items-center justify-center cursor-pointer"
                   >
                     <Camera size={15} />
                   </Link>
@@ -437,13 +437,13 @@ function MeetingsTab() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleDelete(meeting.id)}
-                        className="px-2 py-1.5 rounded-lg text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/25 hover:bg-red-500/20 transition-colors"
+                        className="px-2 py-1.5 rounded-lg text-[10px] font-bold text-red-500 bg-red-500/10 border border-red-500/25 hover:bg-red-500/20 transition-colors cursor-pointer"
                       >
                         Confirm
                       </button>
                       <button
                         onClick={() => setDeleteConfirmId(null)}
-                        className="px-2 py-1.5 rounded-lg text-[10px] text-white/40 border border-white/8 hover:text-white/60 transition-colors"
+                        className="px-2 py-1.5 rounded-lg text-[10px] text-muted-foreground-theme border border-border-theme hover:text-foreground-theme transition-colors cursor-pointer"
                       >
                         Cancel
                       </button>
@@ -451,7 +451,7 @@ function MeetingsTab() {
                   ) : (
                     <button
                       onClick={() => setDeleteConfirmId(meeting.id)}
-                      className="p-2 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/[0.06] transition-all"
+                      className="p-2 rounded-lg text-muted-foreground-theme hover:text-red-500 hover:bg-red-500/[0.06] transition-all cursor-pointer"
                       title="Delete meeting"
                     >
                       <Trash2 size={14} />
@@ -466,7 +466,7 @@ function MeetingsTab() {
 
       {filtered.length === 0 && (
         <EmptyState
-          icon={<CalendarDays size={24} className="text-white/20" />}
+          icon={<CalendarDays size={24} className="text-muted-foreground-theme" />}
           title="No meetings yet"
           description="Create your first meeting to start tracking attendance."
         />
@@ -479,28 +479,28 @@ function MeetingsTab() {
           onClick={() => setRosterMeeting(null)}
         >
           <div
-            className="bg-[#121929] border border-white/10 rounded-2xl p-5 sm:p-6 max-w-2xl w-full max-h-[85vh] flex flex-col space-y-4 shadow-2xl"
+            className="bg-white dark:bg-[#121929] border border-border-theme rounded-2xl p-5 sm:p-6 max-w-2xl w-full max-h-[85vh] flex flex-col space-y-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-start justify-between gap-4 pb-3 border-b border-white/6">
+            <div className="flex items-start justify-between gap-4 pb-3 border-b border-border-theme">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-display font-bold text-base text-white">
+                  <h3 className="font-display font-bold text-base text-foreground-theme">
                     {rosterMeeting.title}
                   </h3>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(rosterMeeting.status)}`}>
                     {rosterMeeting.status}
                   </span>
                 </div>
-                <p className="text-xs text-white/40 mt-1">
+                <p className="text-xs text-muted-foreground-theme mt-1">
                   {formatDate(rosterMeeting.date)} · {formatTime(rosterMeeting.startTime)} – {formatTime(rosterMeeting.endTime)}
                   {rosterMeeting.location && ` · ${rosterMeeting.location}`}
                 </p>
               </div>
               <button
                 onClick={() => setRosterMeeting(null)}
-                className="text-white/30 hover:text-white/60 p-1 transition-colors"
+                className="text-muted-foreground-theme hover:text-foreground-theme p-1 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -514,17 +514,17 @@ function MeetingsTab() {
 
               return (
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="p-2.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/20 text-center">
-                    <span className="text-base font-display font-black text-emerald-400">{presentCount}</span>
-                    <span className="text-[10px] block font-mono text-white/40 uppercase tracking-wider">Present</span>
+                  <div className="p-2.5 rounded-xl bg-emerald-500/[0.08] border border-emerald-500/20 text-center">
+                    <span className="text-base font-display font-black text-emerald-600 dark:text-emerald-400">{presentCount}</span>
+                    <span className="text-[10px] block font-mono text-muted-foreground-theme uppercase tracking-wider">Present</span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-amber-500/[0.06] border border-amber-500/20 text-center">
-                    <span className="text-base font-display font-black text-amber-400">{lateCount}</span>
-                    <span className="text-[10px] block font-mono text-white/40 uppercase tracking-wider">Late</span>
+                  <div className="p-2.5 rounded-xl bg-amber-500/[0.08] border border-amber-500/20 text-center">
+                    <span className="text-base font-display font-black text-amber-600 dark:text-amber-400">{lateCount}</span>
+                    <span className="text-[10px] block font-mono text-muted-foreground-theme uppercase tracking-wider">Late</span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-red-500/[0.06] border border-red-500/20 text-center">
-                    <span className="text-base font-display font-black text-red-400">{Math.max(0, absentCount)}</span>
-                    <span className="text-[10px] block font-mono text-white/40 uppercase tracking-wider">Absent</span>
+                  <div className="p-2.5 rounded-xl bg-red-500/[0.08] border border-red-500/20 text-center">
+                    <span className="text-base font-display font-black text-red-600 dark:text-red-400">{Math.max(0, absentCount)}</span>
+                    <span className="text-[10px] block font-mono text-muted-foreground-theme uppercase tracking-wider">Absent</span>
                   </div>
                 </div>
               )
@@ -532,13 +532,13 @@ function MeetingsTab() {
 
             {/* Search Input */}
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground-theme" />
               <input
                 type="text"
                 value={rosterSearch}
                 onChange={(e) => setRosterSearch(e.target.value)}
                 placeholder="Search officer name or position..."
-                className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder:text-white/25 outline-none focus:border-gold/50"
+                className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-xl pl-9 pr-3.5 py-2 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/50 outline-none focus:border-gold/50"
               />
             </div>
 
@@ -557,27 +557,27 @@ function MeetingsTab() {
                   return (
                     <div
                       key={officer.name}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/6 hover:border-white/10 transition-all"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-border-theme hover:border-gold/30 transition-all"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-surface border border-white/10 flex items-center justify-center font-display font-bold text-[10px] text-gold/70 shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-surface border border-border-theme flex items-center justify-center font-display font-bold text-[10px] text-gold/80 shrink-0">
                           {getInitials(officer.name)}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-display font-bold text-xs text-white truncate">
+                          <p className="font-display font-bold text-xs text-foreground-theme truncate">
                             {officer.name}
                           </p>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-white/40 truncate">
+                            <span className="text-[10px] text-muted-foreground-theme truncate">
                               {officer.position}
                             </span>
                             {record?.method === 'qr' && (
-                              <span className="text-[9px] text-emerald-400/80 font-mono bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
+                              <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded font-semibold">
                                 QR
                               </span>
                             )}
                             {record?.method === 'manual' && (
-                              <span className="text-[9px] text-amber-400/80 font-mono bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 rounded">
+                              <span className="text-[9px] text-amber-600 dark:text-amber-400 font-mono bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 rounded font-semibold">
                                 Manual
                               </span>
                             )}
@@ -586,15 +586,15 @@ function MeetingsTab() {
                       </div>
 
                       {/* 3-Way Toggle */}
-                      <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/6 shrink-0 self-end sm:self-auto">
+                      <div className="flex items-center gap-1 bg-slate-200 dark:bg-black/40 p-1 rounded-xl border border-border-theme shrink-0 self-end sm:self-auto">
                         <button
                           onClick={() =>
                             handleSetOfficerStatus(rosterMeeting.id, officer.name, officer.position, 'present')
                           }
-                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                             currentStatus === 'present'
-                              ? 'bg-emerald-500 text-black shadow-sm'
-                              : 'text-white/40 hover:text-white/70'
+                              ? 'bg-emerald-500 text-white shadow-xs'
+                              : 'text-muted-foreground-theme hover:text-foreground-theme'
                           }`}
                         >
                           Present
@@ -603,10 +603,10 @@ function MeetingsTab() {
                           onClick={() =>
                             handleSetOfficerStatus(rosterMeeting.id, officer.name, officer.position, 'late')
                           }
-                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                             currentStatus === 'late'
-                              ? 'bg-amber-400 text-black shadow-sm'
-                              : 'text-white/40 hover:text-white/70'
+                              ? 'bg-amber-500 text-white shadow-xs'
+                              : 'text-muted-foreground-theme hover:text-foreground-theme'
                           }`}
                         >
                           Late
@@ -615,10 +615,10 @@ function MeetingsTab() {
                           onClick={() =>
                             handleSetOfficerStatus(rosterMeeting.id, officer.name, officer.position, 'absent')
                           }
-                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                             currentStatus === 'absent'
-                              ? 'bg-red-500/80 text-white shadow-sm'
-                              : 'text-white/40 hover:text-white/70'
+                              ? 'bg-red-500 text-white shadow-xs'
+                              : 'text-muted-foreground-theme hover:text-foreground-theme'
                           }`}
                         >
                           Absent
@@ -630,10 +630,10 @@ function MeetingsTab() {
             </div>
 
             {/* Footer */}
-            <div className="pt-2 border-t border-white/6 flex justify-end">
+            <div className="pt-2 border-t border-border-theme flex justify-end">
               <button
                 onClick={() => setRosterMeeting(null)}
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-semibold text-white transition-all"
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-xs font-semibold text-foreground-theme transition-all cursor-pointer"
               >
                 Done
               </button>
@@ -727,10 +727,10 @@ function QRCodesTab() {
       const payload = QRStore.buildPayload(qr.token)
       const url = await QRCode.toDataURL(payload, {
         width: 600,
-        margin: 3,
+        margin: 2,
         color: {
-          dark: '#000000',
-          light: '#FFFFFF',
+          dark: '#F5A623',
+          light: '#0D1117',
         },
       })
       const link = document.createElement('a')
@@ -748,19 +748,19 @@ function QRCodesTab() {
       {/* Actions Row */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground-theme" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search officers..."
-            className="w-full bg-white/[0.04] border border-white/10 rounded-lg pl-9 pr-3.5 py-2.5 text-sm text-white placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20"
+            className="w-full bg-surface-theme border border-border-theme rounded-lg pl-9 pr-3.5 py-2.5 text-sm text-foreground-theme placeholder:text-muted-foreground-theme/50 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20"
           />
         </div>
         <button
           onClick={handleGenerateAllClick}
           disabled={generatingAll}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit disabled:opacity-50 cursor-pointer"
         >
           <QrCode size={16} />
           <span>{generatingAll ? 'Generating...' : 'Generate All QR'}</span>
@@ -772,49 +772,49 @@ function QRCodesTab() {
         {filtered.map((officer) => (
           <div
             key={officer.name}
-            className="group border border-white/6 hover:border-white/15 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-300 p-4"
+            className="group border border-border-theme hover:border-gold/30 rounded-xl bg-surface-theme shadow-xs transition-all duration-300 p-4"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-navy via-surface to-navy border border-gold/15 flex items-center justify-center font-display font-bold text-xs text-gold/60 flex-shrink-0">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-navy via-surface to-navy border border-gold/15 flex items-center justify-center font-display font-bold text-xs text-gold/80 flex-shrink-0">
                 {getInitials(officer.name)}
               </div>
               <div className="min-w-0 flex-1">
-                <span className="font-mono text-[9px] text-gold/70 font-bold uppercase tracking-[0.15em] block mb-0.5">
+                <span className="font-mono text-[9px] text-amber-600 dark:text-gold/80 font-bold uppercase tracking-[0.15em] block mb-0.5">
                   {officer.position}
                 </span>
-                <h4 className="font-display font-bold text-sm text-white leading-tight truncate">
+                <h4 className="font-display font-bold text-sm text-foreground-theme leading-tight truncate">
                   {officer.name}
                 </h4>
               </div>
             </div>
 
-            <div className="mt-3 pt-3 border-t border-white/6 flex items-center justify-between">
+            <div className="mt-3 pt-3 border-t border-border-theme flex items-center justify-between">
               {officer.qr ? (
                 <>
                   <div className="flex items-center gap-1.5">
-                    <div className={`w-1.5 h-1.5 rounded-full ${officer.qr.isActive ? 'bg-emerald-400' : 'bg-red-400'}`} />
-                    <span className="text-[10px] text-white/30 font-mono">
+                    <div className={`w-1.5 h-1.5 rounded-full ${officer.qr.isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                    <span className="text-[10px] text-muted-foreground-theme font-mono">
                       {officer.qr.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handlePreview(officer.qr!)}
-                      className="p-1.5 rounded-lg text-white/25 hover:text-gold hover:bg-gold/[0.06] transition-all"
+                      className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-amber-600 dark:hover:text-gold hover:bg-gold/[0.06] transition-all cursor-pointer"
                       title="Preview QR"
                     >
                       <Eye size={13} />
                     </button>
                     <button
                       onClick={() => handleDownload(officer.qr!)}
-                      className="p-1.5 rounded-lg text-white/25 hover:text-gold hover:bg-gold/[0.06] transition-all"
+                      className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-amber-600 dark:hover:text-gold hover:bg-gold/[0.06] transition-all cursor-pointer"
                       title="Download QR"
                     >
                       <Download size={13} />
                     </button>
                     <button
                       onClick={() => setConfirmRegenOfficer({ name: officer.name, position: officer.position })}
-                      className="p-1.5 rounded-lg text-white/25 hover:text-amber-400 hover:bg-amber-500/[0.06] transition-all"
+                      className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-500/[0.06] transition-all cursor-pointer"
                       title="Regenerate QR"
                     >
                       <RefreshCw size={13} />
@@ -824,7 +824,7 @@ function QRCodesTab() {
               ) : (
                 <button
                   onClick={() => handleGenerate(officer.name, officer.position)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gold bg-gold/[0.08] border border-gold/20 hover:bg-gold/15 transition-all w-full justify-center"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-amber-600 dark:text-gold bg-gold/[0.08] border border-gold/20 hover:bg-gold/15 transition-all w-full justify-center cursor-pointer"
                 >
                   <QrCode size={11} />
                   Generate QR
@@ -838,21 +838,21 @@ function QRCodesTab() {
       {/* QR Preview Modal */}
       {previewQR && qrImageUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => { setPreviewQR(null); setQrImageUrl(null) }}>
-          <div className="bg-[#121929] border border-white/10 rounded-2xl p-6 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-[#121929] border border-border-theme rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="font-display font-bold text-base text-white">QR Code Preview</h3>
-              <button onClick={() => { setPreviewQR(null); setQrImageUrl(null) }} className="text-white/30 hover:text-white/60 transition-colors">
+              <h3 className="font-display font-bold text-base text-foreground-theme">QR Code Preview</h3>
+              <button onClick={() => { setPreviewQR(null); setQrImageUrl(null) }} className="text-muted-foreground-theme hover:text-foreground-theme transition-colors cursor-pointer">
                 <X size={18} />
               </button>
             </div>
 
             <div className="flex flex-col items-center space-y-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qrImageUrl} alt={`QR for ${previewQR.officerName}`} className="w-48 h-48 rounded-xl" />
+              <img src={qrImageUrl} alt={`QR for ${previewQR.officerName}`} className="w-48 h-48 rounded-xl bg-white p-2 border border-border-theme" />
               <div className="text-center">
-                <p className="font-display font-bold text-sm text-white">{previewQR.officerName}</p>
-                <p className="text-[11px] text-gold/70 font-mono uppercase tracking-wider">{previewQR.position}</p>
-                <p className="text-[10px] text-white/25 mt-1 font-mono">
+                <p className="font-display font-bold text-sm text-foreground-theme">{previewQR.officerName}</p>
+                <p className="text-[11px] text-amber-600 dark:text-gold/80 font-mono uppercase tracking-wider font-semibold">{previewQR.position}</p>
+                <p className="text-[10px] text-muted-foreground-theme mt-1 font-mono">
                   Token: {previewQR.token.slice(0, 8)}...
                 </p>
               </div>
@@ -861,14 +861,14 @@ function QRCodesTab() {
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => handleDownload(previewQR)}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors cursor-pointer shadow-xs"
               >
                 <Download size={13} />
                 Download PNG
               </button>
               <button
                 onClick={() => setConfirmRegenOfficer({ name: previewQR.officerName, position: previewQR.position })}
-                className="px-3 py-2 rounded-lg text-xs text-white/40 border border-white/8 hover:text-amber-400 hover:border-amber-400/20 transition-colors"
+                className="px-3 py-2 rounded-lg text-xs text-muted-foreground-theme border border-border-theme hover:text-amber-600 dark:hover:text-amber-400 hover:border-amber-400/20 transition-colors cursor-pointer"
                 title="Regenerate QR"
               >
                 <RefreshCw size={13} />
@@ -884,21 +884,21 @@ function QRCodesTab() {
           onClick={() => setConfirmRegenOfficer(null)}
         >
           <div
-            className="bg-[#121929] border border-amber-500/30 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl"
+            className="bg-white dark:bg-[#121929] border border-amber-500/30 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-400">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-500">
               <AlertTriangle size={24} />
             </div>
 
             <div className="text-center space-y-1.5">
-              <h3 className="font-display font-bold text-base text-white">
+              <h3 className="font-display font-bold text-base text-foreground-theme">
                 Regenerate QR Code?
               </h3>
-              <p className="text-xs font-semibold text-gold">
+              <p className="text-xs font-semibold text-amber-600 dark:text-gold">
                 {confirmRegenOfficer.name} · {confirmRegenOfficer.position}
               </p>
-              <p className="text-xs text-white/50 leading-relaxed pt-1">
+              <p className="text-xs text-muted-foreground-theme leading-relaxed pt-1">
                 This will immediately invalidate their current QR code. Any physical ID printed with the old code will no longer work for attendance.
               </p>
             </div>
@@ -906,7 +906,7 @@ function QRCodesTab() {
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setConfirmRegenOfficer(null)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white hover:border-white/20 text-xs font-medium transition-all"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border-theme text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] text-xs font-medium transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -919,7 +919,7 @@ function QRCodesTab() {
                     setQrImageUrl(null)
                   }
                 }}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-[#0D1117] text-xs font-bold transition-all shadow-lg"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-[#0D1117] text-xs font-bold transition-all shadow-md cursor-pointer"
               >
                 <RefreshCw size={13} />
                 Regenerate
@@ -936,18 +936,18 @@ function QRCodesTab() {
           onClick={() => setShowConfirmRegenAll(false)}
         >
           <div
-            className="bg-[#121929] border border-amber-500/30 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl"
+            className="bg-white dark:bg-[#121929] border border-amber-500/30 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-400">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-500">
               <AlertTriangle size={24} />
             </div>
 
             <div className="text-center space-y-1.5">
-              <h3 className="font-display font-bold text-base text-white">
+              <h3 className="font-display font-bold text-base text-foreground-theme">
                 Regenerate All QR Codes?
               </h3>
-              <p className="text-xs text-white/50 leading-relaxed pt-1">
+              <p className="text-xs text-muted-foreground-theme leading-relaxed pt-1">
                 Active QR codes already exist. Regenerating all codes will invalidate all previously printed officer IDs at once.
               </p>
             </div>
@@ -955,7 +955,7 @@ function QRCodesTab() {
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setShowConfirmRegenAll(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white hover:border-white/20 text-xs font-medium transition-all"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border-theme text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] text-xs font-medium transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -964,7 +964,7 @@ function QRCodesTab() {
                   setShowConfirmRegenAll(false)
                   executeGenerateAll()
                 }}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-[#0D1117] text-xs font-bold transition-all shadow-lg"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-[#0D1117] text-xs font-bold transition-all shadow-md cursor-pointer"
               >
                 <RefreshCw size={13} />
                 Regenerate All
@@ -993,12 +993,12 @@ function CreditScoreGauge({ score, tier }: { score: number; tier: OfficerStandin
     tier === 'max'
       ? '#F5A623'
       : tier === 'high'
-      ? '#38BDF8'
+      ? '#0284C7'
       : tier === 'warning'
-      ? '#F59E0B'
+      ? '#D97706'
       : tier === 'critical'
-      ? '#F43F5E'
-      : '#10B981'
+      ? '#E11D48'
+      : '#059669'
 
   return (
     <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
@@ -1007,7 +1007,8 @@ function CreditScoreGauge({ score, tier }: { score: number; tier: OfficerStandin
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="rgba(255, 255, 255, 0.08)"
+          stroke="currentColor"
+          className="text-slate-200 dark:text-white/[0.08]"
           strokeWidth={strokeWidth}
           fill="transparent"
         />
@@ -1026,10 +1027,10 @@ function CreditScoreGauge({ score, tier }: { score: number; tier: OfficerStandin
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
-        <span className="font-display font-black text-xl text-white tracking-tight leading-none">
+        <span className="font-display font-black text-xl text-foreground-theme tracking-tight leading-none">
           {score}
         </span>
-        <span className="text-[9px] font-mono text-white/40 uppercase tracking-wider mt-1">
+        <span className="text-[9px] font-mono text-muted-foreground-theme uppercase tracking-wider mt-1">
           / 110 PTS
         </span>
       </div>
@@ -1098,41 +1099,41 @@ function OfficerStandingTab() {
     <>
       {/* Overview Header / Rules Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="border border-white/6 rounded-xl bg-white/[0.02] p-4 text-center">
-          <p className="text-2xl font-display font-black text-white">{standings.length}</p>
-          <p className="text-[10px] text-white/30 font-mono uppercase tracking-wider mt-1">Officers</p>
+        <div className="border border-border-theme rounded-xl bg-surface-theme p-4 text-center shadow-xs">
+          <p className="text-2xl font-display font-black text-foreground-theme">{standings.length}</p>
+          <p className="text-[10px] text-muted-foreground-theme font-mono uppercase tracking-wider mt-1">Officers</p>
         </div>
-        <div className="border border-gold/20 rounded-xl bg-gold/[0.04] p-4 text-center">
-          <p className="text-2xl font-display font-black text-gold flex items-center justify-center gap-1">
+        <div className="border border-gold/20 rounded-xl bg-gold/[0.04] p-4 text-center shadow-xs">
+          <p className="text-2xl font-display font-black text-amber-600 dark:text-gold flex items-center justify-center gap-1">
             <Sparkles size={16} />
             {maxTierCount}
           </p>
-          <p className="text-[10px] text-gold/70 font-mono uppercase tracking-wider mt-1">110 Honor Tier</p>
+          <p className="text-[10px] text-amber-600 dark:text-gold/80 font-mono uppercase tracking-wider mt-1">110 Honor Tier</p>
         </div>
-        <div className="border border-sky-500/20 rounded-xl bg-sky-500/[0.04] p-4 text-center">
-          <p className="text-2xl font-display font-black text-sky-400">{highTierCount}</p>
-          <p className="text-[10px] text-sky-400/70 font-mono uppercase tracking-wider mt-1">105 High Tier</p>
+        <div className="border border-sky-500/20 rounded-xl bg-sky-500/[0.04] p-4 text-center shadow-xs">
+          <p className="text-2xl font-display font-black text-sky-600 dark:text-sky-400">{highTierCount}</p>
+          <p className="text-[10px] text-sky-600 dark:text-sky-400/80 font-mono uppercase tracking-wider mt-1">105 High Tier</p>
         </div>
-        <div className="border border-amber-500/20 rounded-xl bg-amber-500/[0.04] p-4 text-center">
-          <p className="text-2xl font-display font-black text-amber-400">{warningCount}</p>
-          <p className="text-[10px] text-amber-400/70 font-mono uppercase tracking-wider mt-1">Warning (80)</p>
+        <div className="border border-amber-500/20 rounded-xl bg-amber-500/[0.04] p-4 text-center shadow-xs">
+          <p className="text-2xl font-display font-black text-amber-600 dark:text-amber-400">{warningCount}</p>
+          <p className="text-[10px] text-amber-600 dark:text-amber-400/80 font-mono uppercase tracking-wider mt-1">Warning (80)</p>
         </div>
-        <div className="border border-red-500/20 rounded-xl bg-red-500/[0.04] p-4 text-center col-span-2 sm:col-span-1">
-          <p className="text-2xl font-display font-black text-red-400">{criticalCount}</p>
-          <p className="text-[10px] text-red-400/70 font-mono uppercase tracking-wider mt-1">Removal (≤75)</p>
+        <div className="border border-red-500/20 rounded-xl bg-red-500/[0.04] p-4 text-center col-span-2 sm:col-span-1 shadow-xs">
+          <p className="text-2xl font-display font-black text-red-600 dark:text-red-400">{criticalCount}</p>
+          <p className="text-[10px] text-red-600 dark:text-red-400/80 font-mono uppercase tracking-wider mt-1">Removal (≤75)</p>
         </div>
       </div>
 
       {/* Search & Tier Filter Tabs */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground-theme" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search officer standing..."
-            className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder:text-white/25 outline-none focus:border-gold/50"
+            className="w-full bg-surface-theme border border-border-theme rounded-xl pl-9 pr-3.5 py-2 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/50 outline-none focus:border-gold/50"
           />
         </div>
 
@@ -1149,10 +1150,10 @@ function OfficerStandingTab() {
             <button
               key={pill.key}
               onClick={() => setFilterTier(pill.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                 filterTier === pill.key
-                  ? 'bg-white/15 text-white font-bold border border-white/20'
-                  : 'text-white/40 hover:text-white/70 border border-white/6 hover:bg-white/[0.02]'
+                  ? 'bg-slate-200 dark:bg-white/15 text-foreground-theme font-bold border border-border-theme'
+                  : 'text-muted-foreground-theme hover:text-foreground-theme border border-border-theme hover:bg-slate-100 dark:hover:bg-white/[0.02]'
               }`}
             >
               {pill.label}
@@ -1167,16 +1168,16 @@ function OfficerStandingTab() {
           return (
             <div
               key={s.officerName}
-              className={`relative border rounded-2xl p-4 sm:p-5 transition-all duration-300 ${
+              className={`relative border rounded-2xl p-4 sm:p-5 transition-all duration-300 shadow-xs ${
                 s.tier === 'max'
-                  ? 'bg-gradient-to-br from-gold/[0.06] via-transparent to-gold/[0.02] border-gold/30 hover:border-gold/50 shadow-[0_0_24px_rgba(245,166,35,0.08)]'
+                  ? 'bg-gradient-to-br from-gold/[0.08] via-surface-theme to-gold/[0.02] border-gold/30 hover:border-gold/50'
                   : s.tier === 'high'
-                  ? 'bg-gradient-to-br from-sky-500/[0.06] via-transparent to-transparent border-sky-500/25 hover:border-sky-500/40'
+                  ? 'bg-gradient-to-br from-sky-500/[0.06] via-surface-theme to-transparent border-sky-500/25 hover:border-sky-500/40'
                   : s.tier === 'warning'
-                  ? 'bg-gradient-to-br from-amber-500/[0.06] via-transparent to-transparent border-amber-500/30 hover:border-amber-500/50'
+                  ? 'bg-gradient-to-br from-amber-500/[0.06] via-surface-theme to-transparent border-amber-500/30 hover:border-amber-500/50'
                   : s.tier === 'critical'
-                  ? 'bg-gradient-to-br from-red-500/[0.08] via-transparent to-transparent border-red-500/35 hover:border-red-500/60'
-                  : 'bg-white/[0.02] border-white/8 hover:border-white/15'
+                  ? 'bg-gradient-to-br from-red-500/[0.08] via-surface-theme to-transparent border-red-500/35 hover:border-red-500/60'
+                  : 'bg-surface-theme border-border-theme hover:border-gold/30'
               }`}
             >
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
@@ -1187,10 +1188,10 @@ function OfficerStandingTab() {
                 <div className="flex-1 min-w-0 space-y-2.5 text-center sm:text-left w-full">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                     <div>
-                      <h4 className="font-display font-bold text-sm text-white truncate">
+                      <h4 className="font-display font-bold text-sm text-foreground-theme truncate">
                         {s.officerName}
                       </h4>
-                      <p className="text-[10px] text-gold/70 font-mono uppercase tracking-wider font-semibold">
+                      <p className="text-[10px] text-amber-600 dark:text-gold/80 font-mono uppercase tracking-wider font-semibold">
                         {s.position}
                       </p>
                     </div>
@@ -1199,14 +1200,14 @@ function OfficerStandingTab() {
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border self-center sm:self-auto ${
                         s.tier === 'max'
-                          ? 'bg-gold/15 text-gold border-gold/30'
+                          ? 'bg-gold/15 text-amber-700 dark:text-gold border-gold/30'
                           : s.tier === 'high'
-                          ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                          ? 'bg-sky-500/15 text-sky-600 dark:text-sky-300 border-sky-500/30'
                           : s.tier === 'warning'
-                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
                           : s.tier === 'critical'
-                          ? 'bg-red-500/15 text-red-300 border-red-500/30'
-                          : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                          ? 'bg-red-500/15 text-red-600 dark:text-red-300 border-red-500/30'
+                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20'
                       }`}
                     >
                       {s.tier === 'max' && '110 Honor Tier'}
@@ -1218,37 +1219,37 @@ function OfficerStandingTab() {
                   </div>
 
                   {/* Leave Credits (Whiteboard System) */}
-                  <div className="p-2.5 rounded-xl bg-black/40 border border-white/6 space-y-1.5">
-                    <div className="flex items-center justify-between text-[10px] font-mono text-white/50 border-b border-white/6 pb-1">
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-black/40 border border-border-theme space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground-theme border-b border-border-theme pb-1">
                       <span>Leave Privileges Available</span>
-                      <span className="text-white/80 font-bold">
+                      <span className="text-foreground-theme font-bold">
                         {s.leavesAvailable.medical > 0
                           ? `${s.leavesAvailable.medical} each`
                           : 'No leaves (need 105+)'}
                       </span>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5 text-center">
-                      <div className="px-1.5 py-1 rounded bg-white/[0.03]">
-                        <span className="block text-[9px] text-white/40">Medical</span>
-                        <span className="text-xs font-bold text-white">
+                      <div className="px-1.5 py-1 rounded bg-white dark:bg-white/[0.03] border border-border-theme">
+                        <span className="block text-[9px] text-muted-foreground-theme">Medical</span>
+                        <span className="text-xs font-bold text-foreground-theme">
                           {s.leavesAvailable.medical}
                         </span>
                       </div>
-                      <div className="px-1.5 py-1 rounded bg-white/[0.03]">
-                        <span className="block text-[9px] text-white/40">Personal</span>
-                        <span className="text-xs font-bold text-white">
+                      <div className="px-1.5 py-1 rounded bg-white dark:bg-white/[0.03] border border-border-theme">
+                        <span className="block text-[9px] text-muted-foreground-theme">Personal</span>
+                        <span className="text-xs font-bold text-foreground-theme">
                           {s.leavesAvailable.personal}
                         </span>
                       </div>
-                      <div className="px-1.5 py-1 rounded bg-white/[0.03]">
-                        <span className="block text-[9px] text-white/40">Academic</span>
-                        <span className="text-xs font-bold text-white">
+                      <div className="px-1.5 py-1 rounded bg-white dark:bg-white/[0.03] border border-border-theme">
+                        <span className="block text-[9px] text-muted-foreground-theme">Academic</span>
+                        <span className="text-xs font-bold text-foreground-theme">
                           {s.leavesAvailable.academic}
                         </span>
                       </div>
                     </div>
                     {s.hasPrivileges && (
-                      <p className="text-[10px] text-gold/90 font-mono text-center pt-0.5 font-semibold">
+                      <p className="text-[10px] text-amber-600 dark:text-gold/90 font-mono text-center pt-0.5 font-semibold">
                         Eligible for Seminars (Travel) & Tokens
                       </p>
                     )}
@@ -1256,17 +1257,17 @@ function OfficerStandingTab() {
 
                   {/* Real-time stats pills & Adjust button */}
                   <div className="flex items-center justify-between gap-2 pt-0.5">
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-white/40">
-                      <span className="text-emerald-400/90 font-semibold">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground-theme">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                         +{s.stats.presentCount * 3} ({s.stats.presentCount} present)
                       </span>
                       {s.stats.absentCount > 0 && (
-                        <span className="text-red-400/90 font-semibold">
+                        <span className="text-red-600 dark:text-red-400 font-semibold">
                           -{s.stats.absentCount * 5} ({s.stats.absentCount} abs)
                         </span>
                       )}
                       {s.stats.lateCount > 0 && (
-                        <span className="text-amber-400/80">
+                        <span className="text-amber-600 dark:text-amber-400">
                           {s.stats.lateCount} lates
                         </span>
                       )}
@@ -1279,7 +1280,7 @@ function OfficerStandingTab() {
                         setAdjustReason('contribution')
                         setAdjustNote('')
                       }}
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-gold/80 bg-gold/[0.08] border border-gold/20 hover:bg-gold/15 hover:text-gold transition-all shrink-0"
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-amber-600 dark:text-gold/80 bg-gold/[0.08] border border-gold/20 hover:bg-gold/15 hover:text-amber-700 dark:hover:text-gold transition-all shrink-0 cursor-pointer"
                     >
                       + Adjust
                     </button>
@@ -1298,24 +1299,24 @@ function OfficerStandingTab() {
           onClick={() => setAdjustTarget(null)}
         >
           <div
-            className="bg-[#121929] border border-white/10 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl"
+            className="bg-white dark:bg-[#121929] border border-border-theme rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-display font-bold text-base text-white">Adjust Credit Points</h3>
-                <p className="text-xs text-gold font-semibold mt-0.5">
+                <h3 className="font-display font-bold text-base text-foreground-theme">Adjust Credit Points</h3>
+                <p className="text-xs text-amber-600 dark:text-gold font-semibold mt-0.5">
                   {adjustTarget.officerName} · {adjustTarget.score} PTS
                 </p>
               </div>
-              <button onClick={() => setAdjustTarget(null)} className="text-white/30 hover:text-white/60">
+              <button onClick={() => setAdjustTarget(null)} className="text-muted-foreground-theme hover:text-foreground-theme cursor-pointer">
                 <X size={18} />
               </button>
             </div>
 
             {/* Whiteboard Quick Presets */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-mono text-white/50 uppercase tracking-wider block">
+              <label className="text-[11px] font-mono text-muted-foreground-theme uppercase tracking-wider block">
                 Whiteboard Point Presets
               </label>
               <div className="grid grid-cols-3 gap-1.5">
@@ -1325,10 +1326,10 @@ function OfficerStandingTab() {
                     setAdjustPoints(5)
                     setAdjustReason('contribution')
                   }}
-                  className={`p-2 rounded-xl text-center border transition-all ${
+                  className={`p-2 rounded-xl text-center border transition-all cursor-pointer ${
                     adjustPoints === 5 && adjustReason === 'contribution'
-                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                      : 'bg-white/[0.02] border-white/8 text-white/60 hover:text-white'
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-bold'
+                      : 'bg-slate-50 dark:bg-white/[0.02] border-border-theme text-muted-foreground-theme hover:text-foreground-theme'
                   }`}
                 >
                   <span className="block font-display font-bold text-sm">+5</span>
@@ -1340,10 +1341,10 @@ function OfficerStandingTab() {
                     setAdjustPoints(7)
                     setAdjustReason('assessment')
                   }}
-                  className={`p-2 rounded-xl text-center border transition-all ${
+                  className={`p-2 rounded-xl text-center border transition-all cursor-pointer ${
                     adjustPoints === 7 && adjustReason === 'assessment'
-                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                      : 'bg-white/[0.02] border-white/8 text-white/60 hover:text-white'
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-bold'
+                      : 'bg-slate-50 dark:bg-white/[0.02] border-border-theme text-muted-foreground-theme hover:text-foreground-theme'
                   }`}
                 >
                   <span className="block font-display font-bold text-sm">+7</span>
@@ -1355,10 +1356,10 @@ function OfficerStandingTab() {
                     setAdjustPoints(-3)
                     setAdjustReason('negligence')
                   }}
-                  className={`p-2 rounded-xl text-center border transition-all ${
+                  className={`p-2 rounded-xl text-center border transition-all cursor-pointer ${
                     adjustPoints === -3 && adjustReason === 'negligence'
-                      ? 'bg-red-500/20 border-red-500/40 text-red-300'
-                      : 'bg-white/[0.02] border-white/8 text-white/60 hover:text-white'
+                      ? 'bg-red-500/20 border-red-500/40 text-red-600 dark:text-red-300 font-bold'
+                      : 'bg-slate-50 dark:bg-white/[0.02] border-border-theme text-muted-foreground-theme hover:text-foreground-theme'
                   }`}
                 >
                   <span className="block font-display font-bold text-sm">-3</span>
@@ -1370,7 +1371,7 @@ function OfficerStandingTab() {
             {/* Custom Value & Note */}
             <div className="space-y-3 pt-1">
               <div>
-                <label className="text-[11px] font-mono text-white/50 block mb-1">Points Delta (+ or -)</label>
+                <label className="text-[11px] font-mono text-muted-foreground-theme block mb-1">Points Delta (+ or -)</label>
                 <input
                   type="number"
                   value={adjustPoints}
@@ -1378,18 +1379,18 @@ function OfficerStandingTab() {
                     setAdjustPoints(Number(e.target.value))
                     setAdjustReason('custom')
                   }}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-gold/50"
+                  className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-xl px-3 py-2 text-sm text-foreground-theme outline-none focus:border-gold/50"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-mono text-white/50 block mb-1">Reason / Note (Optional)</label>
+                <label className="text-[11px] font-mono text-muted-foreground-theme block mb-1">Reason / Note (Optional)</label>
                 <input
                   type="text"
                   value={adjustNote}
                   onChange={(e) => setAdjustNote(e.target.value)}
-                  placeholder="e.g. Sugataw Photobooth Committee"
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-white/25 outline-none focus:border-gold/50"
+                  placeholder="e.g. Sugalaw Photobooth Committee"
+                  className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-xl px-3 py-2 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/50 outline-none focus:border-gold/50"
                 />
               </div>
             </div>
@@ -1398,13 +1399,13 @@ function OfficerStandingTab() {
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setAdjustTarget(null)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-xs font-medium"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border-theme text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] text-xs font-medium cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddAdjustment}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-all shadow-md"
+                className="flex-1 px-4 py-2.5 rounded-xl bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-all shadow-md cursor-pointer"
               >
                 Apply Points
               </button>
@@ -1415,3 +1416,4 @@ function OfficerStandingTab() {
     </>
   )
 }
+

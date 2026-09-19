@@ -1,13 +1,71 @@
 @import "tailwindcss";
 
-@theme inline {
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+@custom-variant light (&:where([data-theme=light], [data-theme=light] *));
+
+:root {
   --color-canvas: #0D1117;
   --color-surface: #121929;
+  --color-surface-subtle: #161F36;
   --color-navy: #1B2A6B;
   --color-gold: #F5A623;
   --color-gold-muted: #B87D1A;
   --color-text: #E8E8E8;
   --color-muted: #7A8394;
+  --color-card: #121929;
+  --color-card-border: rgba(255, 255, 255, 0.08);
+  --color-card-border-hover: rgba(245, 166, 35, 0.4);
+  --color-admin-bg: #0a0e17;
+  --color-admin-sidebar: #0a0e17;
+  --color-admin-card: #121929;
+  --color-admin-border: rgba(255, 255, 255, 0.06);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --glass-bg: rgba(13, 17, 23, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-card: rgba(18, 25, 41, 0.6);
+  --selection-bg: #F5A623;
+  --selection-text: #0D1117;
+}
+
+[data-theme='light'] {
+  --color-canvas: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F1F5F9;
+  --color-navy: #1B2A6B;
+  --color-gold: #D97706;
+  --color-gold-muted: #B45309;
+  --color-text: #0F172A;
+  --color-muted: #64748B;
+  --color-card: #FFFFFF;
+  --color-card-border: rgba(0, 0, 0, 0.08);
+  --color-card-border-hover: rgba(217, 119, 6, 0.4);
+  --color-admin-bg: #F1F5F9;
+  --color-admin-sidebar: #FFFFFF;
+  --color-admin-card: #FFFFFF;
+  --color-admin-border: rgba(0, 0, 0, 0.08);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.16);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-card: rgba(255, 255, 255, 0.85);
+  --selection-bg: #F5A623;
+  --selection-text: #FFFFFF;
+}
+
+@theme inline {
+  --color-canvas: var(--color-canvas);
+  --color-surface: var(--color-surface);
+  --color-surface-subtle: var(--color-surface-subtle);
+  --color-navy: var(--color-navy);
+  --color-gold: var(--color-gold);
+  --color-gold-muted: var(--color-gold-muted);
+  --color-text: var(--color-text);
+  --color-muted: var(--color-muted);
+  --color-card: var(--color-card);
+  --color-card-border: var(--color-card-border);
+  --color-admin-bg: var(--color-admin-bg);
+  --color-admin-sidebar: var(--color-admin-sidebar);
+  --color-admin-card: var(--color-admin-card);
+  --color-admin-border: var(--color-admin-border);
 
   --font-display: var(--font-syne), sans-serif;
   --font-body: var(--font-inter), sans-serif;
@@ -29,7 +87,7 @@
     margin: 0;
     padding: 0;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.12) transparent;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -42,7 +100,7 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.12);
+    background: var(--scrollbar-thumb);
     border-radius: 99px;
   }
 
@@ -66,8 +124,8 @@
   }
 
   ::selection {
-    background-color: var(--color-gold);
-    color: var(--color-canvas);
+    background-color: var(--selection-bg);
+    color: var(--selection-text);
   }
 
   .gold-underline {
@@ -187,28 +245,28 @@
   }
 
   .org-node {
-    border: 1px solid rgba(255,255,255,0.08);
-    background: rgba(18,25,41,0.6);
+    border: 1px solid var(--color-card-border);
+    background: var(--glass-card);
     backdrop-filter: blur(8px);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .org-node:hover {
-    border-color: rgba(245,166,35,0.4);
+    border-color: var(--color-card-border-hover);
     transform: translateY(-3px);
     box-shadow: 0 8px 32px rgba(245,166,35,0.08);
   }
 
   .org-node-featured {
-    border: 1px solid rgba(245,166,35,0.3);
-    background: linear-gradient(135deg, rgba(18,25,41,0.8), rgba(27,42,107,0.2));
+    border: 1px solid var(--color-card-border-hover);
+    background: var(--glass-card);
     backdrop-filter: blur(12px);
     box-shadow: 0 0 40px rgba(245,166,35,0.06);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .org-node-featured:hover {
-    border-color: rgba(245,166,35,0.5);
+    border-color: var(--color-gold);
     transform: translateY(-3px);
-    box-shadow: 0 0 60px rgba(245,166,35,0.12), 0 8px 32px rgba(0,0,0,0.3);
+    box-shadow: 0 0 60px rgba(245,166,35,0.15), 0 8px 32px rgba(0,0,0,0.1);
   }
 
   .org-tier-label {

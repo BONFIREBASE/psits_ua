@@ -64,13 +64,13 @@ export default function AdminSidebar() {
       className={`
         hidden lg:flex flex-col flex-shrink-0
         h-screen sticky top-0
-        bg-[#0a0e17] border-r border-white/6
+        bg-white dark:bg-[#0a0e17] border-r border-black/8 dark:border-white/6
         transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
         ${collapsed ? 'w-[64px]' : 'w-[252px]'}
       `}
     >
       {/* Brand Header — Compact 48px height */}
-      <div className="flex items-center justify-between px-3.5 h-12 border-b border-white/6 flex-shrink-0">
+      <div className="flex items-center justify-between px-3.5 h-12 border-b border-black/8 dark:border-white/6 flex-shrink-0">
         <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
           <Image
             src="/assets/logo/PSITS logo.png"
@@ -86,7 +86,7 @@ export default function AdminSidebar() {
                 animate={{ opacity: 1, width: 'auto' }}
                 exit={{ opacity: 0, width: 0 }}
                 transition={{ duration: 0.15 }}
-                className="font-display font-bold text-[13px] text-white tracking-tight whitespace-nowrap overflow-hidden"
+                className="font-display font-bold text-[13px] text-slate-900 dark:text-white tracking-tight whitespace-nowrap overflow-hidden"
               >
                 Management
               </motion.span>
@@ -97,7 +97,7 @@ export default function AdminSidebar() {
         <button
           onClick={() => setCollapsed((c) => !c)}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="p-1 rounded text-white/30 hover:text-white/75 hover:bg-white/[0.04] transition-colors flex-shrink-0"
+          className="p-1 rounded text-slate-400 hover:text-slate-800 hover:bg-black/5 dark:text-white/30 dark:hover:text-white/75 dark:hover:bg-white/[0.04] transition-colors flex-shrink-0"
         >
           {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
@@ -119,8 +119,8 @@ export default function AdminSidebar() {
                 transition-all duration-150
                 ${collapsed ? 'px-2.5 py-1.5 justify-center' : 'px-2.5 py-1.5'}
                 ${isActive
-                  ? 'bg-gold/10 text-gold'
-                  : 'text-white/50 hover:text-white/90 hover:bg-white/[0.04]'
+                  ? 'bg-gold/15 text-gold font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-black/5 dark:text-white/50 dark:hover:text-white/90 dark:hover:bg-white/[0.04]'
                 }
               `}
             >
@@ -151,18 +151,18 @@ export default function AdminSidebar() {
       </nav>
 
       {/* Compact User Footer + Quick Sign Out */}
-      <div className="border-t border-white/6 p-2 flex-shrink-0">
+      <div className="border-t border-black/8 dark:border-white/6 p-2 flex-shrink-0">
         {!collapsed && user ? (
-          <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+          <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-white/[0.02] border border-black/5 dark:border-white/[0.04]">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-6 h-6 rounded-full bg-gold/15 text-gold text-[10px] font-bold border border-gold/25 flex items-center justify-center flex-shrink-0">
                 {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'A'}
               </div>
               <div className="min-w-0">
-                <p className="text-[11.5px] font-semibold text-white/90 truncate leading-tight">
+                <p className="text-[11.5px] font-semibold text-slate-800 dark:text-white/90 truncate leading-tight">
                   {user.displayName}
                 </p>
-                <p className="text-[9px] font-mono text-gold/75 uppercase tracking-wider leading-none mt-0.5">
+                <p className="text-[9px] font-mono text-gold uppercase tracking-wider leading-none mt-0.5 font-semibold">
                   {user.role === 'admin' ? 'Super Admin' : 'Officer'}
                 </p>
               </div>
@@ -170,7 +170,7 @@ export default function AdminSidebar() {
             <button
               onClick={logout}
               title="Sign Out"
-              className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/[0.08] rounded-md transition-colors flex-shrink-0"
+              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:text-white/30 dark:hover:text-red-400 dark:hover:bg-red-500/[0.08] rounded-md transition-colors flex-shrink-0"
             >
               <LogOut size={13} />
             </button>
@@ -179,7 +179,7 @@ export default function AdminSidebar() {
           <button
             onClick={logout}
             title="Sign Out"
-            className="flex items-center justify-center w-full py-1.5 text-white/35 hover:text-red-400 hover:bg-red-500/[0.06] rounded-md transition-colors"
+            className="flex items-center justify-center w-full py-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:text-white/35 dark:hover:text-red-400 dark:hover:bg-red-500/[0.06] rounded-md transition-colors"
           >
             <LogOut size={14} />
           </button>
@@ -218,7 +218,7 @@ export function MobileSidebar({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-[100] bg-black/40 dark:bg-black/70 backdrop-blur-sm lg:hidden"
           />
           <motion.div
             key="sidebar-drawer"
@@ -226,10 +226,10 @@ export function MobileSidebar({
             animate={{ x: 0 }}
             exit={{ x: -280 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-y-0 left-0 z-[101] w-[260px] bg-[#0a0e17] border-r border-white/8 flex flex-col lg:hidden"
+            className="fixed inset-y-0 left-0 z-[101] w-[260px] bg-white dark:bg-[#0a0e17] border-r border-black/8 dark:border-white/8 flex flex-col lg:hidden shadow-2xl"
           >
             {/* Brand */}
-            <div className="flex items-center gap-2.5 px-3.5 h-12 border-b border-white/6 flex-shrink-0">
+            <div className="flex items-center gap-2.5 px-3.5 h-12 border-b border-black/8 dark:border-white/6 flex-shrink-0">
               <Image
                 src="/assets/logo/PSITS logo.png"
                 alt="PSITS-UA"
@@ -237,7 +237,7 @@ export function MobileSidebar({
                 height={24}
                 className="object-contain"
               />
-              <span className="font-display font-bold text-[13px] text-white tracking-tight">
+              <span className="font-display font-bold text-[13px] text-slate-900 dark:text-white tracking-tight">
                 Management
               </span>
             </div>
@@ -257,8 +257,8 @@ export function MobileSidebar({
                       flex items-center gap-2.5 px-2.5 py-1.5 rounded-md
                       transition-all duration-150 text-[12.5px] font-medium
                       ${isActive
-                        ? 'bg-gold/10 text-gold'
-                        : 'text-white/50 hover:text-white/90 hover:bg-white/[0.04]'
+                        ? 'bg-gold/15 text-gold font-semibold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-black/5 dark:text-white/50 dark:hover:text-white/90 dark:hover:bg-white/[0.04]'
                       }
                     `}
                   >
@@ -270,18 +270,18 @@ export function MobileSidebar({
             </nav>
 
             {/* Footer */}
-            <div className="border-t border-white/6 p-2 flex-shrink-0">
+            <div className="border-t border-black/8 dark:border-white/6 p-2 flex-shrink-0">
               {user ? (
-                <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-white/[0.02] border border-black/5 dark:border-white/[0.04]">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-6 h-6 rounded-full bg-gold/15 text-gold text-[10px] font-bold border border-gold/25 flex items-center justify-center flex-shrink-0">
                       {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'A'}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[11.5px] font-semibold text-white/90 truncate leading-tight">
+                      <p className="text-[11.5px] font-semibold text-slate-800 dark:text-white/90 truncate leading-tight">
                         {user.displayName}
                       </p>
-                      <p className="text-[9px] font-mono text-gold/75 uppercase tracking-wider leading-none mt-0.5">
+                      <p className="text-[9px] font-mono text-gold uppercase tracking-wider leading-none mt-0.5 font-semibold">
                         {user.role === 'admin' ? 'Super Admin' : 'Officer'}
                       </p>
                     </div>
@@ -289,7 +289,7 @@ export function MobileSidebar({
                   <button
                     onClick={() => { logout(); onClose() }}
                     title="Sign Out"
-                    className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/[0.08] rounded-md transition-colors flex-shrink-0"
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:text-white/30 dark:hover:text-red-400 dark:hover:bg-red-500/[0.08] rounded-md transition-colors flex-shrink-0"
                   >
                     <LogOut size={13} />
                   </button>
@@ -297,7 +297,7 @@ export function MobileSidebar({
               ) : (
                 <button
                   onClick={() => { logout(); onClose() }}
-                  className="flex items-center justify-center w-full py-1.5 text-white/35 hover:text-red-400 hover:bg-red-500/[0.06] rounded-md transition-colors"
+                  className="flex items-center justify-center w-full py-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:text-white/35 dark:hover:text-red-400 dark:hover:bg-red-500/[0.06] rounded-md transition-colors"
                 >
                   <LogOut size={14} />
                 </button>

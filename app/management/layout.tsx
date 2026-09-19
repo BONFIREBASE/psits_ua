@@ -47,7 +47,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0a0e17]">
+    <div className="flex min-h-screen bg-slate-100 dark:bg-[#0a0e17] text-slate-900 dark:text-white transition-colors duration-200">
       <AdminSidebar />
       <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">

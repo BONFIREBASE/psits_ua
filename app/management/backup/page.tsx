@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   ShieldCheck,
   Calendar,
@@ -53,64 +53,65 @@ export default function BackupManagementPage() {
   const [liveAuditReports, setLiveAuditReports] = useState<AuditReportRow[]>([])
   const [liveEvents, setLiveEvents] = useState<EventRow[]>([])
 
-  // Load real database content from Supabase
-  const fetchLiveRecords = useCallback(async () => {
-    setIsLoadingLive(true)
-    try {
-      const [
-        officersData,
-        postsDataRes,
-        bannersData,
-        meetingsData,
-        treasuryData,
-        documentsData,
-        auditReportsData,
-        eventsData,
-      ] = await Promise.all([
-        getOfficers(),
-        getPosts(),
-        getBanners(),
-        getMeetings(),
-        getTreasuryRecords(),
-        getDocuments(),
-        getAuditReports(),
-        getEvents(),
-      ])
-      setLiveOfficers(officersData || [])
-      setLivePosts(postsDataRes || [])
-      setLiveBanners(bannersData || [])
-      setLiveMeetings(meetingsData || [])
-      setLiveTreasury(treasuryData || [])
-      setLiveDocuments(documentsData || [])
-      setLiveAuditReports(auditReportsData || [])
-      setLiveEvents(eventsData || [])
-    } catch (err) {
-      console.warn('Error loading live database records:', err)
-    } finally {
-      setIsLoadingLive(false)
-    }
-  }, [])
-
   // Initial fetch and Realtime subscription
   useEffect(() => {
-    fetchLiveRecords()
+    let active = true
+
+    async function loadRecords() {
+      try {
+        const [
+          officersData,
+          postsDataRes,
+          bannersData,
+          meetingsData,
+          treasuryData,
+          documentsData,
+          auditReportsData,
+          eventsData,
+        ] = await Promise.all([
+          getOfficers(),
+          getPosts(),
+          getBanners(),
+          getMeetings(),
+          getTreasuryRecords(),
+          getDocuments(),
+          getAuditReports(),
+          getEvents(),
+        ])
+        if (active) {
+          setLiveOfficers(officersData || [])
+          setLivePosts(postsDataRes || [])
+          setLiveBanners(bannersData || [])
+          setLiveMeetings(meetingsData || [])
+          setLiveTreasury(treasuryData || [])
+          setLiveDocuments(documentsData || [])
+          setLiveAuditReports(auditReportsData || [])
+          setLiveEvents(eventsData || [])
+        }
+      } catch (err) {
+        console.warn('Error loading live database records:', err)
+      } finally {
+        if (active) {
+          setIsLoadingLive(false)
+        }
+      }
+    }
+
+    loadRecords()
 
     // Subscribe to realtime changes on public schema so changes update instantly
     const channel = supabase
       .channel('realtime-backup-portal')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public' },
-        () => {
-          fetchLiveRecords()
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+        loadRecords()
+      })
       .subscribe()
 
     return () => {
+      active = false
       supabase.removeChannel(channel)
     }
-  }, [fetchLiveRecords])
+  }, [])
 
   // Partition officers vs pubmat team directly from real database records
   const executiveOfficers = useMemo<OfficerRow[]>(() => {
@@ -128,11 +129,11 @@ export default function BackupManagementPage() {
   if (user && user.role !== 'admin') {
     return (
       <div className="p-8 max-w-md mx-auto text-center space-y-4 pt-24">
-        <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto">
+        <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center mx-auto">
           <ShieldCheck size={28} />
         </div>
-        <h2 className="font-display font-bold text-xl text-white">Access Restricted</h2>
-        <p className="text-xs text-white/50 leading-relaxed">
+        <h2 className="font-display font-bold text-xl text-foreground-theme">Access Restricted</h2>
+        <p className="text-xs text-muted-foreground-theme leading-relaxed">
           System backup and accredited report operations are restricted exclusively to authorized administration.
         </p>
       </div>
@@ -241,13 +242,13 @@ export default function BackupManagementPage() {
       <div className="no-print space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="font-display font-black text-2xl sm:text-3xl text-white tracking-tight flex items-center gap-2.5">
+            <h1 className="font-display font-black text-2xl sm:text-3xl text-foreground-theme tracking-tight flex items-center gap-2.5">
               <span>Official Institutional Documents & Reports</span>
               {isLoadingLive && (
                 <RefreshCw size={16} className="animate-spin text-gold" />
               )}
             </h1>
-            <p className="text-xs sm:text-sm text-white/50 mt-1">
+            <p className="text-xs sm:text-sm text-muted-foreground-theme mt-1">
               Accredited University of Antique printable reports connected live to database with real-time sync. Select any document below to preview or print directly onto standard bond paper.
             </p>
           </div>
@@ -260,10 +261,10 @@ export default function BackupManagementPage() {
         {/* Grid of Individual Bond Paper Document Cards */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-white/40">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground-theme">
               Individual Accredited Documents (Print Each on Separate Bond Paper)
             </h3>
-            <span className="text-[11px] text-gold/70 font-mono">8 Documents Ready</span>
+            <span className="text-[11px] text-amber-600 dark:text-gold/70 font-mono font-semibold">8 Documents Ready</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -272,46 +273,46 @@ export default function BackupManagementPage() {
               return (
                 <div
                   key={item.id}
-                  className="p-5 rounded-xl border border-white/8 hover:border-gold/30 bg-white/[0.02] hover:bg-white/[0.04] transition-all flex flex-col justify-between space-y-4 group"
+                  className="p-5 rounded-xl border border-border-theme hover:border-gold/30 bg-surface-theme hover:shadow-xs transition-all flex flex-col justify-between space-y-4 group"
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] text-gold font-bold px-2 py-0.5 rounded bg-gold/10 border border-gold/20">
+                      <span className="font-mono text-[10px] text-amber-600 dark:text-gold font-bold px-2 py-0.5 rounded bg-gold/10 border border-gold/20">
                         {item.code}
                       </span>
-                      <span className="text-[10px] font-mono text-white/40">
+                      <span className="text-[10px] font-mono text-muted-foreground-theme">
                         {item.tag}
                       </span>
                     </div>
                     <div className="flex items-start gap-3 pt-1">
-                      <div className="w-10 h-10 rounded-lg bg-white/[0.04] border border-white/8 flex items-center justify-center text-white/60 group-hover:text-gold group-hover:border-gold/30 transition-colors flex-shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-white/[0.04] border border-border-theme flex items-center justify-center text-muted-foreground-theme group-hover:text-amber-600 dark:group-hover:text-gold group-hover:border-gold/30 transition-colors flex-shrink-0">
                         <IconComponent size={18} />
                       </div>
                       <div className="space-y-1 min-w-0">
-                        <h4 className="font-display font-bold text-sm text-white group-hover:text-gold transition-colors leading-snug">
+                        <h4 className="font-display font-bold text-sm text-foreground-theme group-hover:text-amber-600 dark:group-hover:text-gold transition-colors leading-snug">
                           {item.title}
                         </h4>
-                        <p className="text-xs text-white/50 line-clamp-2 leading-relaxed">
+                        <p className="text-xs text-muted-foreground-theme line-clamp-2 leading-relaxed">
                           {item.desc}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-white/5 flex items-center justify-between">
-                    <span className="text-[11px] font-mono text-white/40">
+                  <div className="pt-3 border-t border-border-theme flex items-center justify-between">
+                    <span className="text-[11px] font-mono text-muted-foreground-theme">
                       {item.count}
                     </span>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setPreviewDoc(item.id)}
-                        className="px-3 py-1.5 rounded-lg border border-white/10 text-white/60 hover:text-white hover:bg-white/5 text-xs transition-colors cursor-pointer"
+                        className="px-3 py-1.5 rounded-lg border border-border-theme text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/5 text-xs transition-colors cursor-pointer"
                       >
                         Preview
                       </button>
                       <button
                         onClick={() => printDocument(item.id)}
-                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gold/15 hover:bg-gold text-gold hover:text-slate-950 font-bold text-xs border border-gold/30 hover:border-gold transition-all active:scale-95 shadow-sm cursor-pointer"
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gold/15 hover:bg-gold text-amber-700 dark:text-gold hover:text-slate-950 font-bold text-xs border border-gold/30 hover:border-gold transition-all active:scale-95 shadow-xs cursor-pointer"
                       >
                         <Printer size={13} />
                         <span>Print Bond Paper</span>
@@ -327,18 +328,18 @@ export default function BackupManagementPage() {
 
       {/* ─── MODAL PREVIEW OVERLAY (Only shown when preview clicked) ─── */}
       {previewDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto no-print">
-          <div className="relative w-full max-w-5xl my-8 bg-slate-900 border border-white/15 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 dark:bg-black/85 backdrop-blur-md overflow-y-auto no-print">
+          <div className="relative w-full max-w-5xl my-8 bg-white dark:bg-slate-900 border border-border-theme rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border-theme pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gold/10 text-gold">
+                <div className="p-2 rounded-lg bg-gold/10 text-amber-600 dark:text-gold">
                   <Printer size={18} />
                 </div>
                 <div>
-                  <h3 className="font-display font-bold text-white text-base">
+                  <h3 className="font-display font-bold text-foreground-theme text-base">
                     Document Print Preview
                   </h3>
-                  <p className="text-xs text-white/40 font-mono">
+                  <p className="text-xs text-muted-foreground-theme font-mono">
                     University of Antique · PSITS-UA Chapter Accreditation
                   </p>
                 </div>
@@ -346,21 +347,21 @@ export default function BackupManagementPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => printDocument(previewDoc)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-slate-950 font-bold text-xs hover:bg-gold-light transition-all shadow-md cursor-pointer"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-slate-950 font-bold text-xs hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] transition-all cursor-pointer"
                 >
                   <Printer size={14} />
                   Print Now
                 </button>
                 <button
                   onClick={() => setPreviewDoc(null)}
-                  className="px-3 py-2 text-white/50 hover:text-white rounded-lg hover:bg-white/5 text-xs transition-colors cursor-pointer"
+                  className="px-3 py-2 text-muted-foreground-theme hover:text-foreground-theme rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 text-xs transition-colors cursor-pointer"
                 >
                   Close
                 </button>
               </div>
             </div>
 
-            <div className="max-h-[75vh] overflow-y-auto rounded-xl p-2 bg-slate-800/40">
+            <div className="max-h-[75vh] overflow-y-auto rounded-xl p-3 bg-slate-100 dark:bg-slate-800/40 border border-border-theme">
               <FormalAuditDocument
                 officersList={executiveOfficers}
                 pubmatList={pubmatCreativeTeam}

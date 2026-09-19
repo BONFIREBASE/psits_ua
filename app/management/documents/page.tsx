@@ -12,19 +12,17 @@ import {
   BookOpen,
   Loader2,
   Trash2,
-  Download,
   ExternalLink,
-  Printer,
 } from 'lucide-react'
 import FormField, { inputStyles, textareaStyles } from '../_components/FormField'
 import Select from '../_components/Select'
 import FileUpload from '../_components/FileUpload'
 import StatusBadge from '../_components/StatusBadge'
 import EmptyState from '../_components/EmptyState'
+import { ManagementTableSkeleton } from '../_components/SkeletonPreloader'
 import { useToast } from '../_components/Toast'
 import { getDocuments, supabase, type DocumentRow } from '@/lib/supabase'
 import { createDocument, deleteDocument } from './actions'
-import FormalResolutionDocument, { type ResolutionData } from '@/components/FormalResolutionDocument'
 
 type DocCategory = 'Resolution' | 'Memo' | 'Minutes'
 
@@ -42,7 +40,6 @@ export default function DocumentsManagementPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<DocCategory>('Resolution')
   const [showForm, setShowForm] = useState(false)
-  const [previewResolution, setPreviewResolution] = useState<ResolutionData | null>(null)
 
   const [form, setForm] = useState({
     referenceNo: '',
@@ -163,18 +160,18 @@ export default function DocumentsManagementPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="font-display font-black text-2xl text-white tracking-tight">Documents</h1>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+            <h1 className="font-display font-black text-2xl text-foreground-theme tracking-tight">Documents</h1>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 font-semibold">
               Live Database
             </span>
           </div>
-          <p className="text-sm text-white/35 mt-1">
+          <p className="text-sm text-muted-foreground-theme mt-1">
             Official resolutions, memorandums, and minutes of meetings stored securely in cloud storage.
           </p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit cursor-pointer"
         >
           {showForm ? <X size={16} /> : <Plus size={16} />}
           <span>{showForm ? 'Cancel' : `New ${activeCategory}`}</span>
@@ -182,7 +179,7 @@ export default function DocumentsManagementPage() {
       </div>
 
       {/* Category Tabs */}
-      <div className="flex gap-2 border-b border-white/6 pb-3">
+      <div className="flex gap-2 border-b border-border-theme pb-3">
         {categoryTabs.map((tab) => {
           const Icon = tab.icon
           const count = documents.filter((d) => d.category === tab.key).length
@@ -192,16 +189,16 @@ export default function DocumentsManagementPage() {
               key={tab.key}
               onClick={() => { setActiveCategory(tab.key); setShowForm(false) }}
               className={`
-                flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all duration-200
+                flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer
                 ${isActive
-                  ? 'bg-gold/15 text-gold border border-gold/25 shadow-sm'
-                  : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                  ? 'bg-gold/15 text-amber-600 dark:text-gold border border-gold/30 shadow-xs font-bold'
+                  : 'text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04]'
                 }
               `}
             >
               <Icon size={14} />
               <span>{tab.label}</span>
-              <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${isActive ? 'bg-gold/20 text-gold' : 'bg-white/[0.06] text-white/30'}`}>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${isActive ? 'bg-gold/20 text-amber-600 dark:text-gold font-bold' : 'bg-slate-100 dark:bg-white/[0.06] text-muted-foreground-theme'}`}>
                 {count}
               </span>
             </button>
@@ -211,8 +208,8 @@ export default function DocumentsManagementPage() {
 
       {/* Upload Form */}
       {showForm && (
-        <div className="p-6 rounded-xl border border-gold/20 bg-gold/[0.02] space-y-4">
-          <h2 className="font-display font-bold text-base text-white">Upload New {activeCategory}</h2>
+        <div className="p-6 rounded-xl border border-border-theme bg-surface-theme shadow-sm space-y-4">
+          <h2 className="font-display font-bold text-base text-foreground-theme">Upload New {activeCategory}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
               <FormField label="Reference No." htmlFor="doc-ref" required hint="Official tracking reference">
@@ -233,7 +230,7 @@ export default function DocumentsManagementPage() {
                   type="date"
                   value={form.date}
                   onChange={(e) => update('date', e.target.value)}
-                  className={`${inputStyles} [color-scheme:dark]`}
+                  className={inputStyles}
                   required
                 />
               </FormField>
@@ -290,7 +287,7 @@ export default function DocumentsManagementPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-bold text-xs hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] transition-all disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                 <span>{submitting ? 'Saving Document...' : 'Save Document'}</span>
@@ -298,7 +295,7 @@ export default function DocumentsManagementPage() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="px-3 py-2 rounded-lg text-xs text-white/40 border border-white/8 hover:text-white/60 transition-colors"
+                className="px-3 py-2 rounded-lg text-xs text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -309,19 +306,16 @@ export default function DocumentsManagementPage() {
 
       {/* Documents List */}
       {loading ? (
-        <div className="text-center py-16">
-          <Loader2 size={24} className="animate-spin text-gold mx-auto mb-2" />
-          <p className="text-xs text-white/30 font-mono">Loading documents from Supabase...</p>
-        </div>
+        <ManagementTableSkeleton rows={5} />
       ) : filtered.length === 0 && !showForm ? (
         <EmptyState
-          icon={<ActiveCategoryIcon size={24} className="text-white/20" />}
+          icon={<ActiveCategoryIcon size={24} className="text-muted-foreground-theme/40" />}
           title={`No ${activeCategory.toLowerCase()}s yet`}
           description={`Upload your first ${activeCategory.toLowerCase()} to get started. Documents will be stored securely.`}
           action={
             <button
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gold/25 text-gold text-sm font-medium hover:bg-gold/[0.06] transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gold/30 text-amber-600 dark:text-gold text-sm font-medium hover:bg-gold/[0.06] transition-colors cursor-pointer"
             >
               <Plus size={14} />
               Add {activeCategory}
@@ -333,30 +327,30 @@ export default function DocumentsManagementPage() {
           {filtered.map((doc) => (
             <div
               key={doc.id}
-              className="flex items-start gap-4 p-4 rounded-xl border border-white/6 hover:border-white/15 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-300"
+              className="flex items-start gap-4 p-4 rounded-xl border border-border-theme hover:border-gold/30 bg-surface-theme hover:shadow-xs transition-all duration-300"
             >
-              <div className="w-10 h-10 rounded-lg bg-white/[0.05] border border-white/8 flex items-center justify-center flex-shrink-0">
-                {doc.category === 'Resolution' && <ScrollText size={16} className="text-gold/60" />}
-                {doc.category === 'Memo' && <FileText size={16} className="text-gold/60" />}
-                {doc.category === 'Minutes' && <BookOpen size={16} className="text-gold/60" />}
+              <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-border-theme flex items-center justify-center flex-shrink-0">
+                {doc.category === 'Resolution' && <ScrollText size={16} className="text-amber-600 dark:text-gold/60" />}
+                {doc.category === 'Memo' && <FileText size={16} className="text-amber-600 dark:text-gold/60" />}
+                {doc.category === 'Minutes' && <BookOpen size={16} className="text-amber-600 dark:text-gold/60" />}
               </div>
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-[10px] text-gold/60 font-bold">{doc.reference_no}</span>
+                  <span className="font-mono text-[10px] text-amber-600 dark:text-gold/80 font-bold">{doc.reference_no}</span>
                   <StatusBadge status={doc.status} />
                   {doc.file_url && (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 font-medium">
                       Attached
                     </span>
                   )}
                 </div>
-                <h3 className="text-sm font-display font-bold text-white/85 truncate">{doc.title}</h3>
-                <div className="flex items-center gap-3 text-[10px] text-white/30 font-mono">
+                <h3 className="text-sm font-display font-bold text-foreground-theme truncate">{doc.title}</h3>
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground-theme font-mono">
                   <span className="flex items-center gap-1"><Calendar size={10} />{doc.date}</span>
-                  {doc.file_name && <span className="text-white/20">{doc.file_name}</span>}
+                  {doc.file_name && <span className="text-muted-foreground-theme/70">{doc.file_name}</span>}
                 </div>
                 {doc.description && (
-                  <p className="text-xs text-white/35 line-clamp-2 mt-1">{doc.description}</p>
+                  <p className="text-xs text-muted-foreground-theme line-clamp-2 mt-1">{doc.description}</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -365,7 +359,7 @@ export default function DocumentsManagementPage() {
                     href={doc.file_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 rounded-lg text-white/30 hover:text-gold hover:bg-white/[0.04] transition-colors"
+                    className="p-2 rounded-lg text-muted-foreground-theme hover:text-amber-600 dark:hover:text-gold hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
                     title="Download / View Document"
                   >
                     <ExternalLink size={14} />
@@ -374,11 +368,11 @@ export default function DocumentsManagementPage() {
                 <button
                   onClick={() => handleDelete(doc.id, doc.file_url)}
                   disabled={deletingId === doc.id}
-                  className="p-2 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                  className="p-2 rounded-lg text-muted-foreground-theme/60 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40 cursor-pointer"
                   title="Delete Document"
                 >
                   {deletingId === doc.id ? (
-                    <Loader2 size={14} className="animate-spin text-red-400" />
+                    <Loader2 size={14} className="animate-spin text-red-500" />
                   ) : (
                     <Trash2 size={14} />
                   )}

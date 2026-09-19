@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import SocialDispatchCard from './SocialDispatchCard'
 import type { SocialDispatch } from '@/data/announcements'
 
@@ -11,10 +10,6 @@ interface DispatchCarouselProps {
 }
 
 const AUTO_INTERVAL = 5000
-const TRANSITION_CONFIG = {
-  duration: 0.8,
-  ease: [0.16, 1, 0.3, 1],
-} as const
 
 export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0)
@@ -49,7 +44,7 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
       onMouseLeave={resetTimer}
     >
       {/* 6-Card Panoramic Carousel Stage - Buttery smooth, zero-bug 3D transitions */}
-      <div className="relative flex items-center justify-center h-[430px] sm:h-[490px] md:h-[540px] lg:h-[570px] overflow-visible">
+      <div className="relative flex items-center justify-center h-[390px] sm:h-[440px] md:h-[480px] lg:h-[500px] overflow-visible">
         {dispatches.map((dispatch, index) => {
           let offset = (index - activeIndex) % count
           if (offset < -Math.floor(count / 2)) offset += count
@@ -65,42 +60,50 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
           let xPercent = 0
           let scale = 0.6
           let opacity = 0
+          let blur = 'blur(0px)'
           let zIndex = 0
 
           if (isCenter) {
             xPercent = 0
             scale = 1
             opacity = 1
+            blur = 'blur(0px)'
             zIndex = 40
           } else if (isLeft1) {
-            xPercent = -44
+            xPercent = -48
             scale = 0.88
-            opacity = 0.72
+            opacity = 0.68
+            blur = 'blur(3.5px)'
             zIndex = 30
           } else if (isRight1) {
-            xPercent = 44
+            xPercent = 48
             scale = 0.88
-            opacity = 0.72
+            opacity = 0.68
+            blur = 'blur(3.5px)'
             zIndex = 30
           } else if (isLeft2) {
-            xPercent = -85
+            xPercent = -90
             scale = 0.76
-            opacity = 0.42
+            opacity = 0.38
+            blur = 'blur(6px)'
             zIndex = 20
           } else if (isRight2) {
-            xPercent = 85
+            xPercent = 90
             scale = 0.76
-            opacity = 0.42
+            opacity = 0.38
+            blur = 'blur(6px)'
             zIndex = 20
           } else if (offset < 0) {
-            xPercent = -125
+            xPercent = -130
             scale = 0.62
             opacity = 0
+            blur = 'blur(8px)'
             zIndex = 10
           } else {
-            xPercent = 125
+            xPercent = 130
             scale = 0.62
             opacity = 0
+            blur = 'blur(8px)'
             zIndex = 10
           }
 
@@ -114,6 +117,7 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
                 x: `${xPercent}%`,
                 scale,
                 opacity,
+                filter: blur,
                 zIndex,
               }}
               transition={
@@ -127,11 +131,11 @@ export default function DispatchCarousel({ dispatches }: DispatchCarouselProps) 
               onClick={() => {
                 if (isClickable) navigate((activeIndex + offset + count) % count)
               }}
-              className={`absolute w-[90%] sm:w-[62%] md:w-[48%] lg:w-[38%] xl:w-[33%] max-w-[480px] ${
+              className={`absolute w-[92%] sm:w-[72%] md:w-[58%] lg:w-[48%] xl:w-[42%] max-w-[580px] ${
                 isClickable ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''
               } ${isOffstage ? 'pointer-events-none' : ''}`}
               style={{
-                willChange: 'transform, opacity',
+                willChange: 'transform, opacity, filter',
               }}
             >
               <SocialDispatchCard dispatch={dispatch} isActive={isCenter} />

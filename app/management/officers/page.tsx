@@ -13,7 +13,6 @@ import {
   Palette,
   Trash2,
   Edit2,
-  AlertTriangle,
 } from 'lucide-react'
 import {
   officers as initialOfficers,
@@ -23,6 +22,7 @@ import {
 import FormField, { inputStyles } from '../_components/FormField'
 import FileUpload from '../_components/FileUpload'
 import Select from '../_components/Select'
+import { ManagementCardGridSkeleton } from '../_components/SkeletonPreloader'
 import { useToast } from '../_components/Toast'
 import { getOfficers, supabase } from '@/lib/supabase'
 import {
@@ -77,6 +77,7 @@ export default function OfficersManagementPage() {
   const canManage = !user || user.role === 'admin' || user.role === 'officer'
 
   const [officersList, setOfficersList] = useState<OfficerWithMeta[]>([])
+  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('All')
   const [search, setSearch] = useState('')
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
@@ -120,10 +121,13 @@ export default function OfficersManagementPage() {
       }
     } catch {
       toast('Failed to load officers directory')
+    } finally {
+      setLoading(false)
     }
   }, [toast])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadOfficers()
 
     const channel = supabase
@@ -346,17 +350,17 @@ export default function OfficersManagementPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-display font-black text-2xl text-white tracking-tight">
+          <h1 className="font-display font-black text-2xl text-foreground-theme tracking-tight">
             Officers & Pubmat Directory
           </h1>
-          <p className="text-sm text-white/35 mt-1">
+          <p className="text-sm text-muted-foreground-theme mt-1">
             Manage student officers and Pubmat creative members, edit profiles, and configure access.
           </p>
         </div>
         {canManage && (
           <button
             onClick={startAdd}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit cursor-pointer"
           >
             <Plus size={16} />
             <span>Add Member</span>
@@ -371,10 +375,10 @@ export default function OfficersManagementPage() {
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`
-              flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+              flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer
               ${activeTab === tab.key
-                ? 'bg-gold/15 text-gold border border-gold/25'
-                : 'bg-white/[0.03] text-white/40 border border-white/8 hover:text-white/60 hover:border-white/15'
+                ? 'bg-gold/15 text-amber-600 dark:text-gold border border-gold/30 font-bold'
+                : 'bg-surface-theme text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04]'
               }
             `}
           >
@@ -386,30 +390,30 @@ export default function OfficersManagementPage() {
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground-theme" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name, position, or email..."
-          className="w-full bg-white/[0.04] border border-white/10 rounded-lg pl-9 pr-3.5 py-2.5 text-sm text-white placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20"
+          className="w-full bg-surface-theme border border-border-theme rounded-lg pl-9 pr-3.5 py-2.5 text-sm text-foreground-theme placeholder:text-muted-foreground-theme/50 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20"
         />
       </div>
 
       {/* Add Form */}
       {showAdd && (
-        <div className="border border-gold/20 rounded-xl bg-gold/[0.03] p-5 space-y-4">
+        <div className="border border-gold/20 rounded-xl bg-surface-theme p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-display font-bold text-white">
+            <h3 className="text-sm font-display font-bold text-foreground-theme">
               Add New {form.isPubmat ? 'Pubmat Member' : 'Officer'}
             </h3>
-            <button onClick={() => setShowAdd(false)} className="text-white/30 hover:text-white/60 transition-colors">
+            <button onClick={() => setShowAdd(false)} className="text-muted-foreground-theme hover:text-foreground-theme transition-colors cursor-pointer">
               <X size={16} />
             </button>
           </div>
 
-          <div className="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/8 rounded-lg">
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-white/80 select-none">
+          <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-white/[0.02] border border-border-theme rounded-lg">
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground-theme select-none">
               <input
                 type="checkbox"
                 checked={form.isPubmat}
@@ -423,9 +427,9 @@ export default function OfficersManagementPage() {
                     pubmatRole: isPub ? 'Graphic Designer' : '',
                   })
                 }}
-                className="w-4 h-4 rounded border-white/20 text-gold focus:ring-gold/30 bg-white/5"
+                className="w-4 h-4 rounded border-border-theme text-gold focus:ring-gold/30 bg-surface-theme"
               />
-              <span className="font-semibold text-white">Pubmat Creative Team Member</span>
+              <span className="font-semibold text-foreground-theme">Pubmat Creative Team Member</span>
             </label>
           </div>
 
@@ -472,10 +476,10 @@ export default function OfficersManagementPage() {
           </FormField>
 
           <div className="flex gap-2">
-            <button onClick={saveAdd} disabled={savingAdd} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50">
+            <button onClick={saveAdd} disabled={savingAdd} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50 cursor-pointer">
               <Save size={13} /> {savingAdd ? 'Saving...' : 'Save Member'}
             </button>
-            <button onClick={() => setShowAdd(false)} className="px-3 py-2 rounded-lg text-xs text-white/40 border border-white/8 hover:text-white/60 transition-colors">
+            <button onClick={() => setShowAdd(false)} className="px-3 py-2 rounded-lg text-xs text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer">
               Cancel
             </button>
           </div>
@@ -483,8 +487,11 @@ export default function OfficersManagementPage() {
       )}
 
       {/* Officers Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map((officer, i) => {
+      {loading ? (
+        <ManagementCardGridSkeleton count={6} />
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filtered.map((officer, i) => {
           const realIndex = officersList.indexOf(officer)
           const isEditing = editingIndex === realIndex
           const isConfirmingDelete = confirmDeleteId === (officer.id || officer.name)
@@ -493,33 +500,33 @@ export default function OfficersManagementPage() {
             <div
               key={`${officer.name}-${officer.id || i}`}
               className={`
-                group relative border rounded-xl overflow-hidden transition-all duration-300
+                group relative border rounded-xl overflow-hidden transition-all duration-300 shadow-xs
                 ${isEditing
-                  ? 'border-gold/30 bg-gold/[0.04]'
-                  : 'border-white/6 hover:border-white/15 bg-white/[0.02] hover:bg-white/[0.04]'
+                  ? 'border-gold/30 bg-surface-theme ring-1 ring-gold/20'
+                  : 'border-border-theme hover:border-gold/30 bg-surface-theme'
                 }
               `}
             >
               {isEditing ? (
                 <div className="p-4 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-white/8">
-                    <h4 className="text-xs font-display font-bold text-gold uppercase tracking-wider">
+                  <div className="flex items-center justify-between pb-2 border-b border-border-theme">
+                    <h4 className="text-xs font-display font-bold text-amber-600 dark:text-gold uppercase tracking-wider">
                       Edit Profile
                     </h4>
-                    <button onClick={cancelEdit} className="text-white/30 hover:text-white/60">
+                    <button onClick={cancelEdit} className="text-muted-foreground-theme hover:text-foreground-theme cursor-pointer">
                       <X size={14} />
                     </button>
                   </div>
 
                   <div className="flex items-center gap-2 py-1">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs text-white/80 select-none">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground-theme select-none">
                       <input
                         type="checkbox"
                         checked={form.isPubmat}
                         onChange={(e) => setForm({ ...form, isPubmat: e.target.checked })}
-                        className="w-3.5 h-3.5 rounded border-white/20 text-gold focus:ring-gold/30 bg-white/5"
+                        className="w-3.5 h-3.5 rounded border-border-theme text-gold focus:ring-gold/30 bg-surface-theme"
                       />
-                      <span className="text-[11px] text-white/70">Pubmat Member</span>
+                      <span className="text-[11px] text-muted-foreground-theme">Pubmat Member</span>
                     </label>
                   </div>
 
@@ -564,17 +571,17 @@ export default function OfficersManagementPage() {
                   </FormField>
 
                   <div className="flex items-center gap-2 pt-1">
-                    <button onClick={saveEdit} disabled={savingEdit} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold text-[#0D1117] font-bold text-[11px] hover:bg-[#FFA726] transition-colors disabled:opacity-50">
+                    <button onClick={saveEdit} disabled={savingEdit} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold text-[#0D1117] font-bold text-[11px] hover:bg-[#FFA726] transition-colors disabled:opacity-50 cursor-pointer">
                       <Save size={12} /> {savingEdit ? 'Saving...' : 'Save'}
                     </button>
-                    <button onClick={cancelEdit} className="px-3 py-1.5 rounded-lg text-[11px] text-white/40 border border-white/8 hover:text-white/60 transition-colors">
+                    <button onClick={cancelEdit} className="px-3 py-1.5 rounded-lg text-[11px] text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer">
                       Cancel
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="p-4 flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-navy via-surface to-navy border border-gold/15 flex items-center justify-center font-display font-bold text-sm text-gold/60 flex-shrink-0 overflow-hidden mt-0.5">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-navy via-surface to-navy border border-gold/15 flex items-center justify-center font-display font-bold text-sm text-gold/80 flex-shrink-0 overflow-hidden mt-0.5">
                     {officer.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={officer.image} alt={officer.name} className="w-full h-full object-cover" />
@@ -585,31 +592,31 @@ export default function OfficersManagementPage() {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono text-[9px] text-gold/70 font-bold uppercase tracking-[0.15em] block leading-tight">
+                      <span className="font-mono text-[9px] text-amber-600 dark:text-gold/80 font-bold uppercase tracking-[0.15em] block leading-tight">
                         {officer.position}
                       </span>
                       {officer.isPubmat && (
-                        <span className="px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-300 text-[8px] font-mono uppercase tracking-wider border border-purple-500/20">
+                        <span className="px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-300 text-[8px] font-mono uppercase tracking-wider border border-purple-500/20">
                           Pubmat
                         </span>
                       )}
                     </div>
 
-                    <h4 className="font-display font-bold text-sm text-white leading-tight truncate mt-0.5">
+                    <h4 className="font-display font-bold text-sm text-foreground-theme leading-tight truncate mt-0.5">
                       {officer.name}
                     </h4>
-                    <span className="font-mono text-[9px] text-white/25 uppercase tracking-widest block mt-0.5">
+                    <span className="font-mono text-[9px] text-muted-foreground-theme uppercase tracking-widest block mt-0.5">
                       {officer.department}
                     </span>
 
                     {officer.email ? (
-                      <div className="flex items-center gap-1.5 mt-1.5 text-[10px] font-mono text-emerald-400/90 bg-emerald-400/[0.06] border border-emerald-400/15 px-2 py-0.5 rounded w-fit max-w-full">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded w-fit max-w-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
                         <span className="truncate">{officer.email}</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1.5 mt-1.5 text-[10px] font-mono text-white/25 bg-white/[0.02] border border-white/6 px-2 py-0.5 rounded w-fit">
-                        <span className="w-1 h-1 rounded-full bg-white/20" />
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[10px] font-mono text-muted-foreground-theme bg-slate-100 dark:bg-white/[0.02] border border-border-theme px-2 py-0.5 rounded w-fit">
+                        <span className="w-1 h-1 rounded-full bg-muted-foreground-theme/30" />
                         <span>No SSO email</span>
                       </div>
                     )}
@@ -622,14 +629,14 @@ export default function OfficersManagementPage() {
                           <button
                             onClick={() => handleDelete(officer)}
                             disabled={deletingId === officer.id}
-                            className="px-2 py-1 bg-red-500 text-white font-bold text-[10px] rounded hover:bg-red-600 transition-colors"
+                            className="px-2 py-1 bg-red-500 text-white font-bold text-[10px] rounded hover:bg-red-600 transition-colors cursor-pointer"
                             title="Confirm delete"
                           >
                             {deletingId === officer.id ? '...' : 'Del'}
                           </button>
                           <button
                             onClick={() => setConfirmDeleteId(null)}
-                            className="px-1.5 py-1 text-white/40 hover:text-white text-[10px]"
+                            className="px-1.5 py-1 text-muted-foreground-theme hover:text-foreground-theme text-[10px] cursor-pointer"
                             title="Cancel"
                           >
                             <X size={12} />
@@ -639,7 +646,7 @@ export default function OfficersManagementPage() {
                         <>
                           <button
                             onClick={() => startEdit(realIndex)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-white/80 bg-white/[0.05] border border-white/10 hover:text-gold hover:border-gold/40 hover:bg-gold/10 transition-all shadow-sm"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-foreground-theme bg-slate-100 dark:bg-white/[0.05] border border-border-theme hover:text-amber-600 dark:hover:text-gold hover:border-gold/40 hover:bg-gold/10 transition-all shadow-xs cursor-pointer"
                             title="Edit profile"
                           >
                             <Edit2 size={12} />
@@ -647,7 +654,7 @@ export default function OfficersManagementPage() {
                           </button>
                           <button
                             onClick={() => setConfirmDeleteId(officer.id || officer.name)}
-                            className="p-1.5 rounded-lg text-white/35 hover:text-red-400 hover:bg-red-500/10 border border-white/6 hover:border-red-500/20 transition-all"
+                            className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-red-500 hover:bg-red-500/10 border border-border-theme hover:border-red-500/20 transition-all cursor-pointer"
                             title="Delete officer"
                           >
                             <Trash2 size={13} />
@@ -662,10 +669,11 @@ export default function OfficersManagementPage() {
           )
         })}
       </div>
+      )}
 
-      {filtered.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="text-center py-16">
-          <p className="text-sm text-white/30">No members found matching the criteria.</p>
+          <p className="text-sm text-muted-foreground-theme">No members found matching the criteria.</p>
         </div>
       )}
     </div>

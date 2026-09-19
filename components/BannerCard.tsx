@@ -24,8 +24,8 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
       onClick={onClick}
       className={`relative w-full h-full min-h-[390px] sm:min-h-[420px] md:min-h-[450px] rounded-3xl overflow-hidden border transition-all duration-500 group select-none ${
         isActive
-          ? 'border-white/20 bg-[#070A11] shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] ring-1 ring-white/10'
-          : 'border-white/15 bg-[#0a0e17] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.85)] hover:border-gold/40 cursor-pointer'
+          ? 'border-black/15 dark:border-white/20 bg-[#070A11] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] dark:shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] ring-1 ring-black/5 dark:ring-white/10'
+          : 'border-black/10 dark:border-white/15 bg-[#0a0e17] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.15)] dark:shadow-[0_15px_40px_-10px_rgba(0,0,0,0.85)] hover:border-gold/40 cursor-pointer'
       }`}
     >
       {/* ─── Luminous Top Rim Highlight (Defines card edge in 3D space) ─── */}
@@ -95,13 +95,13 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
       {/* ─── Bottom Dock (Aesthetic soft gradient, zero harsh blur lines) ─── */}
       <div className="absolute bottom-0 inset-x-0 z-20 px-4 sm:px-8 md:px-10 pb-4 sm:pb-5 pt-8 sm:pt-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4 md:gap-8">
         {/* Left: Title & Subtitle */}
-        <div className="flex-1 max-w-2xl">
-          <h2 className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-[32px] text-white leading-[1.18] tracking-tight mb-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+        <div className="flex-1 max-w-2xl min-w-0">
+          <h2 className="font-display font-black text-base xs:text-lg sm:text-2xl md:text-3xl lg:text-[32px] text-white leading-[1.18] tracking-tight mb-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] break-words line-clamp-2">
             {banner.title}
           </h2>
 
           {cleanSubtitle && (
-            <p className="text-white/85 text-[12px] sm:text-sm md:text-[14px] leading-relaxed font-normal drop-shadow-[0_1px_6px_rgba(0,0,0,0.9)] line-clamp-1 sm:line-clamp-2 max-w-xl">
+            <p className="text-white/85 text-[11px] sm:text-sm md:text-[14px] leading-relaxed font-normal drop-shadow-[0_1px_6px_rgba(0,0,0,0.9)] line-clamp-1 sm:line-clamp-2 max-w-xl break-words">
               {cleanSubtitle}
             </p>
           )}
@@ -110,7 +110,7 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
         {/* Right (Side): Action CTAs */}
         {(banner.link_text || banner.secondary_link_text) && (
           <div
-            className={`flex-shrink-0 flex items-center gap-2 sm:gap-3.5 ${
+            className={`flex-shrink-0 flex flex-wrap items-center gap-2 sm:gap-3.5 ${
               !isActive ? 'pointer-events-none' : ''
             }`}
           >

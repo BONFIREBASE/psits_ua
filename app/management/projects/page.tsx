@@ -294,16 +294,16 @@ export default function ProjectsManagementPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-display font-black text-2xl sm:text-3xl text-white tracking-tight">
+          <h1 className="font-display font-black text-2xl sm:text-3xl text-foreground-theme tracking-tight">
             Projects Showcase
           </h1>
-          <p className="text-sm text-white/40 mt-1">
+          <p className="text-sm text-muted-foreground-theme mt-1">
             Manage student capstones, campus software utilities, hackathon submissions, and open-source tools.
           </p>
         </div>
         <button
           onClick={openAddModal}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] font-semibold text-sm transition-all duration-200 shadow-lg shadow-gold/10"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] font-semibold text-sm transition-all duration-200 shadow-lg shadow-gold/10 cursor-pointer"
         >
           <Plus size={16} />
           <span>New Project</span>
@@ -312,69 +312,69 @@ export default function ProjectsManagementPage() {
 
       {/* Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-white/[0.02] border border-white/6 rounded-xl p-4">
-          <span className="text-[11px] text-white/35 font-mono uppercase tracking-wider block">
+        <div className="bg-surface-theme border border-border-theme rounded-xl p-4 shadow-xs">
+          <span className="text-[11px] text-muted-foreground-theme font-mono uppercase tracking-wider block">
             Total Projects
           </span>
-          <span className="font-display font-black text-2xl text-white mt-1 block">
+          <span className="font-display font-black text-2xl text-foreground-theme mt-1 block">
             {totalCount}
           </span>
         </div>
         <div
           onClick={() => setStatusFilter('Pending')}
-          className={`cursor-pointer rounded-xl p-4 border transition-all ${
+          className={`cursor-pointer rounded-xl p-4 border transition-all shadow-xs ${
             pendingCount > 0
               ? 'bg-amber-500/[0.08] border-amber-500/40 hover:bg-amber-500/15'
-              : 'bg-white/[0.02] border-white/6'
+              : 'bg-surface-theme border-border-theme'
           }`}
         >
-          <span className="text-[11px] text-amber-300/80 font-mono uppercase tracking-wider block flex items-center gap-1.5">
-            <Clock size={12} className="text-amber-400" /> Pending Review
+          <span className="text-[11px] text-amber-600 dark:text-amber-300/80 font-mono uppercase tracking-wider block flex items-center gap-1.5 font-bold">
+            <Clock size={12} className="text-amber-500" /> Pending Review
           </span>
-          <span className="font-display font-black text-2xl text-amber-400 mt-1 block">
+          <span className="font-display font-black text-2xl text-amber-600 dark:text-amber-400 mt-1 block">
             {pendingCount}
           </span>
         </div>
-        <div className="bg-white/[0.02] border border-white/6 rounded-xl p-4">
-          <span className="text-[11px] text-white/35 font-mono uppercase tracking-wider block">
+        <div className="bg-surface-theme border border-border-theme rounded-xl p-4 shadow-xs">
+          <span className="text-[11px] text-muted-foreground-theme font-mono uppercase tracking-wider block">
             Active / Live
           </span>
-          <span className="font-display font-black text-2xl text-emerald-400 mt-1 block">
+          <span className="font-display font-black text-2xl text-emerald-600 dark:text-emerald-400 mt-1 block">
             {activeCount}
           </span>
         </div>
-        <div className="bg-white/[0.02] border border-white/6 rounded-xl p-4">
-          <span className="text-[11px] text-white/35 font-mono uppercase tracking-wider block">
+        <div className="bg-surface-theme border border-border-theme rounded-xl p-4 shadow-xs">
+          <span className="text-[11px] text-muted-foreground-theme font-mono uppercase tracking-wider block">
             In Development
           </span>
-          <span className="font-display font-black text-2xl text-amber-400 mt-1 block">
+          <span className="font-display font-black text-2xl text-amber-500 mt-1 block">
             {inDevCount}
           </span>
         </div>
-        <div className="bg-white/[0.02] border border-white/6 rounded-xl p-4">
-          <span className="text-[11px] text-white/35 font-mono uppercase tracking-wider block">
+        <div className="bg-surface-theme border border-border-theme rounded-xl p-4 shadow-xs">
+          <span className="text-[11px] text-muted-foreground-theme font-mono uppercase tracking-wider block">
             Featured
           </span>
-          <span className="font-display font-black text-2xl text-gold mt-1 block">
+          <span className="font-display font-black text-2xl text-amber-600 dark:text-gold mt-1 block">
             {featuredCount}
           </span>
         </div>
       </div>
 
       {/* Toolbar & Filters */}
-      <div className="bg-white/[0.02] border border-white/6 rounded-xl p-4 space-y-3">
+      <div className="bg-surface-theme border border-border-theme rounded-xl p-4 space-y-3 shadow-xs">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
             <Search
               size={16}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground-theme"
             />
             <input
               type="text"
               placeholder="Search projects by title, description, team, or tags..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-white/[0.04] border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20"
+              className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-lg pl-10 pr-4 py-2.5 text-sm text-foreground-theme placeholder:text-muted-foreground-theme/50 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20"
             />
           </div>
 
@@ -383,12 +383,12 @@ export default function ProjectsManagementPage() {
               <button
                 key={stat}
                 onClick={() => setStatusFilter(stat)}
-                className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
+                className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
                   statusFilter === stat
                     ? stat === 'Pending'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      : 'bg-gold/15 text-gold border border-gold/30'
-                    : 'text-white/40 hover:text-white/80 hover:bg-white/[0.04] border border-transparent'
+                      ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 font-bold'
+                      : 'bg-gold/15 text-amber-600 dark:text-gold border border-gold/30 font-bold'
+                    : 'text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] border border-transparent'
                 }`}
               >
                 <span>{stat}</span>
@@ -403,18 +403,18 @@ export default function ProjectsManagementPage() {
         </div>
 
         {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-white/6">
-          <span className="text-[11px] text-white/30 font-mono uppercase tracking-wider mr-1 flex items-center gap-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-border-theme">
+          <span className="text-[11px] text-muted-foreground-theme font-mono uppercase tracking-wider mr-1 flex items-center gap-1">
             <Layers size={12} /> Category:
           </span>
           {(['All', 'Campus Utility', 'Capstone', 'Open Source', 'Hackathon'] as const).map((cat) => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
-              className={`px-2.5 py-1 rounded-md text-xs transition-all duration-200 ${
+              className={`px-2.5 py-1 rounded-md text-xs transition-all duration-200 cursor-pointer ${
                 categoryFilter === cat
-                  ? 'bg-white/15 text-white font-medium border border-white/20'
-                  : 'text-white/35 hover:text-white/70 hover:bg-white/[0.03]'
+                  ? 'bg-slate-200 dark:bg-white/15 text-foreground-theme font-medium border border-border-theme'
+                  : 'text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.03]'
               }`}
             >
               {cat}
@@ -426,13 +426,13 @@ export default function ProjectsManagementPage() {
       {/* Projects Grid */}
       {filtered.length === 0 ? (
         <EmptyState
-          icon={<Code2 size={24} className="text-white/20" />}
+          icon={<Code2 size={24} className="text-muted-foreground-theme" />}
           title="No projects found"
           description="Try modifying your search query or add a new project to the showcase."
           action={
             <button
               onClick={openAddModal}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] text-xs font-bold transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] text-xs font-bold transition-colors cursor-pointer"
             >
               <Plus size={14} />
               <span>Add First Project</span>
@@ -447,18 +447,18 @@ export default function ProjectsManagementPage() {
             return (
               <div
                 key={proj.id}
-                className={`group bg-[#0d121f] border rounded-xl overflow-hidden transition-all duration-200 flex flex-col justify-between ${
+                className={`group bg-surface-theme border rounded-xl overflow-hidden transition-all duration-200 flex flex-col justify-between shadow-xs ${
                   proj.status === 'Pending'
-                    ? 'border-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.1)]'
-                    : 'border-white/6 hover:border-white/12'
+                    ? 'border-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.08)]'
+                    : 'border-border-theme hover:border-gold/30'
                 }`}
               >
                 {/* Pending Submission Header Banner */}
                 {proj.status === 'Pending' && (
                   <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2.5 flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
-                      <Clock size={13} className="text-amber-400" />
-                      <span className="text-[11px] font-mono uppercase tracking-wider text-amber-300 font-bold">
+                      <Clock size={13} className="text-amber-500 dark:text-amber-400" />
+                      <span className="text-[11px] font-mono uppercase tracking-wider text-amber-700 dark:text-amber-300 font-bold">
                         Pending Officer Review
                       </span>
                     </div>
@@ -475,7 +475,7 @@ export default function ProjectsManagementPage() {
                       <button
                         type="button"
                         onClick={() => setDeleteConfirmId(proj.id)}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-[11px] font-medium transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-500/20 hover:bg-red-500/30 text-red-600 dark:text-red-300 border border-red-500/30 text-[11px] font-medium transition-all cursor-pointer"
                         title="Decline submission"
                       >
                         <X size={13} />
@@ -486,18 +486,18 @@ export default function ProjectsManagementPage() {
                 )}
                 {/* Image Banner / Preview */}
                 {proj.imageUrl ? (
-                  <div className="relative h-44 w-full bg-white/[0.02] overflow-hidden border-b border-white/6">
+                  <div className="relative h-44 w-full bg-slate-100 dark:bg-white/[0.02] overflow-hidden border-b border-border-theme">
                     <Image
                       src={proj.imageUrl}
                       alt={proj.title}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0d121f] via-transparent to-black/30" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
                   </div>
                 ) : (
-                  <div className="h-24 w-full bg-gradient-to-br from-gold/5 via-white/[0.02] to-transparent border-b border-white/6 flex items-center px-5">
-                    <Code2 size={24} className="text-white/15" />
+                  <div className="h-24 w-full bg-gradient-to-br from-gold/10 via-slate-100 dark:via-white/[0.02] to-transparent border-b border-border-theme flex items-center px-5">
+                    <Code2 size={24} className="text-muted-foreground-theme/40" />
                   </div>
                 )}
 
@@ -505,7 +505,7 @@ export default function ProjectsManagementPage() {
                   <div className="space-y-3">
                     {/* Header line: Category + Status + Featured */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-gold/10 text-gold border border-gold/20">
+                      <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-gold/10 text-amber-600 dark:text-gold border border-gold/20">
                         {proj.category}
                       </span>
 
@@ -513,43 +513,43 @@ export default function ProjectsManagementPage() {
                         <button
                           onClick={() => toggleFeatured(proj.id)}
                           title={proj.featured ? 'Featured Highlight' : 'Mark as Featured'}
-                          className={`p-1.5 rounded-lg transition-colors ${
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                             proj.featured
-                              ? 'text-amber-400 bg-amber-400/10'
-                              : 'text-white/20 hover:text-white/60 hover:bg-white/[0.04]'
+                              ? 'text-amber-500 bg-amber-500/10'
+                              : 'text-muted-foreground-theme/40 hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04]'
                           }`}
                         >
-                          <Star size={14} className={proj.featured ? 'fill-amber-400' : ''} />
+                          <Star size={14} className={proj.featured ? 'fill-amber-500 text-amber-500' : ''} />
                         </button>
                         <StatusBadge status={proj.status} />
                       </div>
                     </div>
 
                     {/* Title */}
-                    <h3 className="font-display font-bold text-white text-lg group-hover:text-gold transition-colors">
+                    <h3 className="font-display font-bold text-foreground-theme text-lg group-hover:text-amber-600 dark:group-hover:text-gold transition-colors">
                       {proj.title}
                     </h3>
 
                     {/* Description */}
-                    <p className="text-xs text-white/55 leading-relaxed line-clamp-3">
+                    <p className="text-xs text-muted-foreground-theme leading-relaxed line-clamp-3">
                       {proj.description}
                     </p>
 
                     {/* Problem Statement if available */}
                     {proj.problemStatement && (
-                      <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/6 text-[11px] text-white/45 italic">
+                      <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-white/[0.02] border border-border-theme text-[11px] text-muted-foreground-theme italic">
                         &ldquo;{proj.problemStatement}&rdquo;
                       </div>
                     )}
 
                     {/* Team & Year */}
-                    <div className="flex items-center justify-between text-[11px] font-mono text-white/40 pt-1">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground-theme pt-1">
                       <span className="flex items-center gap-1.5 truncate max-w-[70%]">
-                        <Users size={12} className="text-white/25 flex-shrink-0" />
+                        <Users size={12} className="text-muted-foreground-theme/60 flex-shrink-0" />
                         <span className="truncate">{proj.team}</span>
                       </span>
                       <span className="flex items-center gap-1">
-                        <Calendar size={12} className="text-white/25" />
+                        <Calendar size={12} className="text-muted-foreground-theme/60" />
                         {proj.year}
                       </span>
                     </div>
@@ -560,9 +560,9 @@ export default function ProjectsManagementPage() {
                         {proj.tags.map((t) => (
                           <span
                             key={t}
-                            className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.04] text-white/50 border border-white/6"
+                            className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-white/[0.04] text-muted-foreground-theme border border-border-theme"
                           >
-                            <Tag size={9} className="text-white/25" />
+                            <Tag size={9} className="text-muted-foreground-theme/60" />
                             {t}
                           </span>
                         ))}
@@ -571,14 +571,14 @@ export default function ProjectsManagementPage() {
                   </div>
 
                   {/* Actions & Links Bar */}
-                  <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/6 text-xs font-mono">
+                  <div className="flex items-center justify-between pt-4 mt-4 border-t border-border-theme text-xs font-mono">
                     <div className="flex items-center gap-2">
                       {proj.liveUrl && (
                         <a
                           href={proj.liveUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-gold hover:text-gold-light transition-colors text-[11px]"
+                          className="flex items-center gap-1 text-amber-600 dark:text-gold hover:underline text-[11px]"
                           title="Open Live Preview"
                         >
                           <ExternalLink size={12} />
@@ -590,7 +590,7 @@ export default function ProjectsManagementPage() {
                           href={proj.githubUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-white/40 hover:text-white transition-colors text-[11px]"
+                          className="flex items-center gap-1 text-muted-foreground-theme hover:text-foreground-theme transition-colors text-[11px]"
                           title="Open Source Code"
                         >
                           <GithubIcon size={12} />
@@ -602,16 +602,16 @@ export default function ProjectsManagementPage() {
                     <div className="flex items-center gap-1">
                       {isDeleting ? (
                         <div className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg">
-                          <span className="text-red-400 text-[11px]">Delete?</span>
+                          <span className="text-red-500 text-[11px]">Delete?</span>
                           <button
                             onClick={() => handleDelete(proj.id)}
-                            className="px-2 py-0.5 rounded bg-red-500 hover:bg-red-600 text-white text-[11px] font-semibold transition-colors"
+                            className="px-2 py-0.5 rounded bg-red-500 hover:bg-red-600 text-white text-[11px] font-semibold transition-colors cursor-pointer"
                           >
                             Yes
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(null)}
-                            className="px-1.5 py-0.5 rounded text-white/40 hover:text-white text-[11px]"
+                            className="px-1.5 py-0.5 rounded text-muted-foreground-theme hover:text-foreground-theme text-[11px] cursor-pointer"
                           >
                             No
                           </button>
@@ -622,7 +622,7 @@ export default function ProjectsManagementPage() {
                             <button
                               type="button"
                               onClick={() => handleApprove(proj.id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition-colors text-xs font-semibold cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition-colors text-xs font-semibold cursor-pointer"
                               title="Approve & Publish to Public Showcase"
                             >
                               <Check size={13} />
@@ -631,14 +631,14 @@ export default function ProjectsManagementPage() {
                           )}
                           <button
                             onClick={() => openEditModal(proj)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
                           >
                             <Edit2 size={12} />
                             <span>Edit</span>
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(proj.id)}
-                            className="p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/[0.08] transition-colors"
+                            className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-red-500 hover:bg-red-500/[0.08] transition-colors cursor-pointer"
                             title="Delete project"
                           >
                             <Trash2 size={13} />
@@ -661,23 +661,23 @@ export default function ProjectsManagementPage() {
           onClick={() => setShowAddModal(false)}
         >
           <div
-            className="bg-[#0e1422] border border-white/10 rounded-xl sm:rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-white dark:bg-[#0e1422] border border-border-theme rounded-xl sm:rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Pinned Header */}
-            <div className="flex items-center justify-between px-4 py-3.5 sm:px-6 sm:py-4 border-b border-white/6 flex-shrink-0 bg-[#0e1422]">
+            <div className="flex items-center justify-between px-4 py-3.5 sm:px-6 sm:py-4 border-b border-border-theme flex-shrink-0 bg-white dark:bg-[#0e1422]">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center text-gold">
+                <div className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center text-amber-600 dark:text-gold">
                   <Code2 size={18} />
                 </div>
-                <h2 className="font-display font-bold text-base sm:text-lg text-white">
+                <h2 className="font-display font-bold text-base sm:text-lg text-foreground-theme">
                   Add Showcase Project
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors"
+                className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -813,9 +813,9 @@ export default function ProjectsManagementPage() {
                       type="checkbox"
                       checked={formFeatured}
                       onChange={(e) => setFormFeatured(e.target.checked)}
-                      className="w-4 h-4 rounded bg-white/5 border border-white/20 text-gold focus:ring-gold/30 focus:ring-offset-0"
+                      className="w-4 h-4 rounded bg-surface-theme border border-border-theme text-gold focus:ring-gold/30 focus:ring-offset-0"
                     />
-                    <span className="text-xs font-mono text-white/80">
+                    <span className="text-xs font-mono text-foreground-theme">
                       Feature in public project highlights
                     </span>
                   </label>
@@ -823,17 +823,17 @@ export default function ProjectsManagementPage() {
               </div>
 
               {/* Pinned Footer */}
-              <div className="flex items-center justify-end gap-2.5 px-4 py-3 sm:px-6 sm:py-4 border-t border-white/6 flex-shrink-0 bg-[#0e1422]">
+              <div className="flex items-center justify-end gap-2.5 px-4 py-3 sm:px-6 sm:py-4 border-t border-border-theme flex-shrink-0 bg-white dark:bg-[#0e1422]">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-lg border border-white/10 text-white/60 hover:text-white hover:bg-white/[0.04] text-xs font-medium transition-colors"
+                  className="px-4 py-2 rounded-lg border border-border-theme text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] text-xs font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] text-xs font-bold transition-colors shadow-sm"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] text-xs font-bold transition-colors shadow-sm cursor-pointer"
                 >
                   <Save size={14} />
                   <span>Save Project</span>
@@ -851,23 +851,23 @@ export default function ProjectsManagementPage() {
           onClick={() => setEditingProject(null)}
         >
           <div
-            className="bg-[#0e1422] border border-white/10 rounded-xl sm:rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-white dark:bg-[#0e1422] border border-border-theme rounded-xl sm:rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Pinned Header */}
-            <div className="flex items-center justify-between px-4 py-3.5 sm:px-6 sm:py-4 border-b border-white/6 flex-shrink-0 bg-[#0e1422]">
+            <div className="flex items-center justify-between px-4 py-3.5 sm:px-6 sm:py-4 border-b border-border-theme flex-shrink-0 bg-white dark:bg-[#0e1422]">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center text-gold">
+                <div className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center text-amber-600 dark:text-gold">
                   <Edit2 size={18} />
                 </div>
-                <h2 className="font-display font-bold text-base sm:text-lg text-white">
+                <h2 className="font-display font-bold text-base sm:text-lg text-foreground-theme">
                   Edit Project Details
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingProject(null)}
-                className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors"
+                className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -994,9 +994,9 @@ export default function ProjectsManagementPage() {
                       type="checkbox"
                       checked={formFeatured}
                       onChange={(e) => setFormFeatured(e.target.checked)}
-                      className="w-4 h-4 rounded bg-white/5 border border-white/20 text-gold focus:ring-gold/30 focus:ring-offset-0"
+                      className="w-4 h-4 rounded bg-surface-theme border border-border-theme text-gold focus:ring-gold/30 focus:ring-offset-0"
                     />
-                    <span className="text-xs font-mono text-white/80">
+                    <span className="text-xs font-mono text-foreground-theme">
                       Feature in public project highlights
                     </span>
                   </label>
@@ -1004,17 +1004,17 @@ export default function ProjectsManagementPage() {
               </div>
 
               {/* Pinned Footer */}
-              <div className="flex items-center justify-end gap-2.5 px-4 py-3 sm:px-6 sm:py-4 border-t border-white/6 flex-shrink-0 bg-[#0e1422]">
+              <div className="flex items-center justify-end gap-2.5 px-4 py-3 sm:px-6 sm:py-4 border-t border-border-theme flex-shrink-0 bg-white dark:bg-[#0e1422]">
                 <button
                   type="button"
                   onClick={() => setEditingProject(null)}
-                  className="px-4 py-2 rounded-lg border border-white/10 text-white/60 hover:text-white hover:bg-white/[0.04] text-xs font-medium transition-colors"
+                  className="px-4 py-2 rounded-lg border border-border-theme text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] text-xs font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] text-xs font-bold transition-colors shadow-sm"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] text-xs font-bold transition-colors shadow-sm cursor-pointer"
                 >
                   <Save size={14} />
                   <span>Update Project</span>

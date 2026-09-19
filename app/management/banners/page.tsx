@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import FormField, { inputStyles } from '../_components/FormField'
 import FileUpload from '../_components/FileUpload'
+import { ManagementCardGridSkeleton } from '../_components/SkeletonPreloader'
 import { useToast } from '../_components/Toast'
 import { getBanners, type BannerRow } from '@/lib/supabase'
 import {
@@ -32,11 +33,11 @@ import { useAuth } from '../_context/auth-context'
 type BannerType = 'announcement' | 'meeting' | 'recruitment' | 'forms' | 'general'
 
 const bannerTypeOptions: { value: BannerType; label: string; icon: typeof Megaphone; color: string }[] = [
-  { value: 'announcement', label: 'Announcement', icon: Megaphone, color: 'text-amber-400 bg-amber-400/10 border-amber-400/20' },
-  { value: 'meeting', label: 'Meeting', icon: Calendar, color: 'text-sky-400 bg-sky-400/10 border-sky-400/20' },
-  { value: 'recruitment', label: 'Recruitment', icon: UserPlus, color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
-  { value: 'forms', label: 'Forms & Surveys', icon: FileText, color: 'text-purple-400 bg-purple-400/10 border-purple-400/20' },
-  { value: 'general', label: 'General Info', icon: Sparkles, color: 'text-white/60 bg-white/5 border-white/10' },
+  { value: 'announcement', label: 'Announcement', icon: Megaphone, color: 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20' },
+  { value: 'meeting', label: 'Meeting', icon: Calendar, color: 'text-sky-600 dark:text-sky-400 bg-sky-500/10 border-sky-500/20' },
+  { value: 'recruitment', label: 'Recruitment', icon: UserPlus, color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+  { value: 'forms', label: 'Forms & Surveys', icon: FileText, color: 'text-purple-600 dark:text-purple-400 bg-purple-500/10 border-purple-500/20' },
+  { value: 'general', label: 'General Info', icon: Sparkles, color: 'text-muted-foreground-theme bg-slate-100 dark:bg-white/5 border-border-theme' },
 ]
 
 export default function BannersManagementPage() {
@@ -77,6 +78,7 @@ export default function BannersManagementPage() {
   }, [toast])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadBanners()
   }, [loadBanners])
 
@@ -139,64 +141,58 @@ export default function BannersManagementPage() {
     setIsSubmitting(true)
     try {
       const finalSubtitle = formCredit.trim()
-        ? `${formSubtitle.trim()}\n\n[by:${formCredit.trim()}]`
+        ? `${formSubtitle.trim()} [by:${formCredit.trim()}]`
         : formSubtitle.trim()
 
       const formData = new FormData()
-      formData.append('title', formTitle)
+      formData.append('title', formTitle.trim())
       formData.append('subtitle', finalSubtitle)
       formData.append('type', formType)
-      formData.append('linkText', formLinkText)
-      formData.append('linkUrl', formLinkUrl)
-      formData.append('secondaryLinkText', formSecondaryLinkText)
-      formData.append('secondaryLinkUrl', formSecondaryLinkUrl)
-      formData.append('isActive', formIsActive ? 'true' : 'false')
+      formData.append('link_text', formLinkText.trim())
+      formData.append('link_url', formLinkUrl.trim())
+      formData.append('secondary_link_text', formSecondaryLinkText.trim())
+      formData.append('secondary_link_url', formSecondaryLinkUrl.trim())
+      formData.append('is_active', String(formIsActive))
+
       if (formThumbnail) {
         formData.append('thumbnail', formThumbnail)
+      } else if (editingBanner?.image_url) {
+        formData.append('existing_image_url', editingBanner.image_url)
       }
 
+      let res
       if (editingBanner) {
-        if (editingBanner.image_url) {
-          formData.append('existingImageUrl', editingBanner.image_url)
-        }
-        const res = await updateBannerAction(editingBanner.id, formData)
-        if (res.success) {
-          toast('Banner updated successfully!')
-          setShowModal(false)
-          await loadBanners()
-        } else {
-          toast(res.error || 'Failed to update banner')
-        }
+        res = await updateBannerAction(editingBanner.id, formData)
       } else {
-        const res = await createBannerAction(formData)
-        if (res.success) {
-          toast('Banner created successfully!')
-          setShowModal(false)
-          await loadBanners()
-        } else {
-          toast(res.error || 'Failed to create banner')
-        }
+        res = await createBannerAction(formData)
+      }
+
+      if (res.success) {
+        toast(editingBanner ? 'Banner updated successfully!' : 'Banner created successfully!')
+        setShowModal(false)
+        await loadBanners()
+      } else {
+        toast(res.error || 'Failed to save banner')
       }
     } catch {
-      toast('An error occurred while saving banner')
+      toast('Error saving banner')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   async function handleToggleActive(banner: BannerRow) {
-    const newStatus = !banner.is_active
-    // Optimistic update
+    const nextState = !banner.is_active
     setBanners((prev) =>
-      prev.map((b) => (b.id === banner.id ? { ...b, is_active: newStatus } : b))
+      prev.map((b) => (b.id === banner.id ? { ...b, is_active: nextState } : b))
     )
     try {
-      const res = await toggleBannerActiveAction(banner.id, newStatus)
-      if (res.success) {
-        toast(`Banner ${newStatus ? 'activated' : 'deactivated'}.`)
-      } else {
+      const res = await toggleBannerActiveAction(banner.id, nextState)
+      if (!res.success) {
         toast(res.error || 'Failed to update status')
         await loadBanners()
+      } else {
+        toast(nextState ? 'Banner activated' : 'Banner deactivated')
       }
     } catch {
       toast('Failed to toggle status')
@@ -241,10 +237,10 @@ export default function BannersManagementPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-display font-black text-2xl text-white tracking-tight">
+          <h1 className="font-display font-black text-2xl text-foreground-theme tracking-tight">
             Banner Management
           </h1>
-          <p className="text-sm text-white/35 mt-1">
+          <p className="text-sm text-muted-foreground-theme mt-1">
             Configure announcement, meeting, and recruitment hero banners displayed on the home page.
           </p>
         </div>
@@ -252,7 +248,7 @@ export default function BannersManagementPage() {
           {banners.length === 0 && (
             <button
               onClick={handleSeed}
-              className="px-3.5 py-2 rounded-lg border border-white/10 text-white/60 hover:text-white hover:bg-white/5 font-mono text-xs transition-colors"
+              className="px-3.5 py-2 rounded-lg border border-border-theme text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/5 font-mono text-xs transition-colors cursor-pointer"
             >
               Load Default
             </button>
@@ -260,7 +256,7 @@ export default function BannersManagementPage() {
           {isAdmin && (
             <button
               onClick={handleOpenCreate}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 cursor-pointer"
             >
               <Plus size={16} />
               <span>Create Banner</span>
@@ -271,18 +267,20 @@ export default function BannersManagementPage() {
 
       {/* Banner Cards List */}
       <div className="space-y-4">
-        {banners.map((banner) => {
-          const typeConfig =
-            bannerTypeOptions.find((t) => t.value === banner.type) || bannerTypeOptions[4]
+        {isLoading ? (
+          <ManagementCardGridSkeleton count={2} />
+        ) : banners.map((banner) => {
+            const typeConfig =
+              bannerTypeOptions.find((t) => t.value === banner.type) || bannerTypeOptions[4]
           const isConfirmingDelete = deleteConfirmId === banner.id
 
           return (
             <div
               key={banner.id}
-              className={`group relative rounded-2xl border transition-all duration-300 overflow-hidden ${
+              className={`group relative rounded-2xl border transition-all duration-300 overflow-hidden shadow-xs ${
                 banner.is_active
-                  ? 'border-gold/30 bg-[#0a0e17] shadow-[0_0_30px_rgba(245,166,35,0.05)]'
-                  : 'border-white/8 bg-[#0a0e17]/60 opacity-70'
+                  ? 'border-gold/30 bg-surface-theme'
+                  : 'border-border-theme bg-surface-theme opacity-70'
               }`}
             >
               <div className="relative min-h-[220px] md:min-h-[260px] flex items-center p-6 sm:p-8">
@@ -293,12 +291,12 @@ export default function BannersManagementPage() {
                     <img
                       src={banner.image_url}
                       alt={banner.title}
-                      className="w-full h-full object-cover object-right md:object-[80%_center] opacity-50 md:opacity-65"
+                      className="w-full h-full object-cover object-right md:object-[80%_center] opacity-40 dark:opacity-65"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-r from-[#0a0e17] to-[#121927]" />
+                    <div className="w-full h-full bg-gradient-to-r from-slate-100 to-slate-200 dark:from-[#0a0e17] dark:to-[#121927]" />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#0a0e17] from-35% via-[#0a0e17]/95 via-55% to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-white/95 dark:from-[#0a0e17] from-35% via-white/80 dark:via-[#0a0e17]/95 via-55% to-transparent" />
                 </div>
 
                 {/* Content Overlay */}
@@ -311,22 +309,22 @@ export default function BannersManagementPage() {
                       {typeConfig.label}
                     </span>
                     {banner.is_active ? (
-                      <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
+                      <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-medium">
                         <CheckCircle2 size={10} /> Active on Home
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-[10px] font-mono text-white/40 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
+                      <span className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground-theme bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full border border-border-theme">
                         <XCircle size={10} /> Inactive
                       </span>
                     )}
                   </div>
 
-                  <h2 className="font-display font-black text-xl sm:text-2xl md:text-3xl text-white leading-tight tracking-tight">
+                  <h2 className="font-display font-black text-xl sm:text-2xl md:text-3xl text-foreground-theme leading-tight tracking-tight">
                     {banner.title}
                   </h2>
 
                   {banner.subtitle && (
-                    <p className="text-white/70 text-xs sm:text-sm leading-relaxed max-w-md">
+                    <p className="text-muted-foreground-theme text-xs sm:text-sm leading-relaxed max-w-md">
                       {banner.subtitle}
                     </p>
                   )}
@@ -339,7 +337,7 @@ export default function BannersManagementPage() {
                       </div>
                     )}
                     {banner.secondary_link_text && (
-                      <div className="text-xs font-mono text-white/60">
+                      <div className="text-xs font-mono text-muted-foreground-theme">
                         {banner.secondary_link_text}
                       </div>
                     )}
@@ -348,14 +346,14 @@ export default function BannersManagementPage() {
 
                 {/* Management Action Buttons */}
                 {isAdmin && (
-                  <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-[#0a0e17]/80 backdrop-blur-md p-1.5 rounded-xl border border-white/10 shadow-lg">
+                  <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-white/90 dark:bg-[#0a0e17]/80 backdrop-blur-md p-1.5 rounded-xl border border-border-theme shadow-md">
                     {/* Active toggle */}
                     <button
                       onClick={() => handleToggleActive(banner)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                         banner.is_active
-                          ? 'bg-emerald-400/15 text-emerald-400 hover:bg-emerald-400/25'
-                          : 'bg-white/5 text-white/40 hover:text-white/70'
+                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25'
+                          : 'bg-slate-100 dark:bg-white/5 text-muted-foreground-theme hover:text-foreground-theme'
                       }`}
                       title={banner.is_active ? 'Deactivate banner' : 'Activate banner'}
                     >
@@ -365,7 +363,7 @@ export default function BannersManagementPage() {
                     {/* Edit */}
                     <button
                       onClick={() => handleOpenEdit(banner)}
-                      className="p-1.5 rounded-lg text-white/40 hover:text-gold hover:bg-gold/10 transition-colors"
+                      className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-amber-600 dark:hover:text-gold hover:bg-gold/10 transition-colors cursor-pointer"
                       title="Edit Banner"
                     >
                       <Edit2 size={14} />
@@ -377,13 +375,13 @@ export default function BannersManagementPage() {
                         <button
                           onClick={() => handleDelete(banner)}
                           disabled={deletingId === banner.id}
-                          className="px-2 py-1 bg-red-500 text-white font-bold text-[10px] rounded hover:bg-red-600 transition-colors"
+                          className="px-2 py-1 bg-red-500 text-white font-bold text-[10px] rounded hover:bg-red-600 transition-colors cursor-pointer"
                         >
                           {deletingId === banner.id ? '...' : 'Del'}
                         </button>
                         <button
                           onClick={() => setDeleteConfirmId(null)}
-                          className="p-1 text-white/40 hover:text-white"
+                          className="p-1 text-muted-foreground-theme hover:text-foreground-theme cursor-pointer"
                         >
                           <X size={12} />
                         </button>
@@ -391,7 +389,7 @@ export default function BannersManagementPage() {
                     ) : (
                       <button
                         onClick={() => setDeleteConfirmId(banner.id)}
-                        className="p-1.5 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                         title="Delete Banner"
                       >
                         <Trash2 size={14} />
@@ -405,17 +403,17 @@ export default function BannersManagementPage() {
         })}
 
         {!isLoading && banners.length === 0 && (
-          <div className="border border-white/6 rounded-2xl p-12 text-center space-y-4 bg-white/[0.01]">
-            <Megaphone size={32} className="mx-auto text-white/20" />
+          <div className="border border-border-theme rounded-2xl p-12 text-center space-y-4 bg-surface-theme">
+            <Megaphone size={32} className="mx-auto text-muted-foreground-theme/40" />
             <div>
-              <h3 className="text-white font-display font-bold text-base">No Banners Created Yet</h3>
-              <p className="text-white/40 text-xs mt-1 max-w-sm mx-auto">
+              <h3 className="text-foreground-theme font-display font-bold text-base">No Banners Created Yet</h3>
+              <p className="text-muted-foreground-theme text-xs mt-1 max-w-sm mx-auto">
                 Create a customized announcement or recruitment banner to greet visitors on the home page.
               </p>
             </div>
             <button
               onClick={handleOpenCreate}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors cursor-pointer"
             >
               <Plus size={14} />
               <span>Create First Banner</span>
@@ -427,19 +425,19 @@ export default function BannersManagementPage() {
       {/* Create / Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-2xl bg-[#0d1117] border border-white/10 rounded-2xl shadow-2xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-white/8">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-[#0d1117] border border-border-theme rounded-2xl shadow-2xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-border-theme">
               <div>
-                <h3 className="font-display font-black text-xl text-white">
+                <h3 className="font-display font-black text-xl text-foreground-theme">
                   {editingBanner ? 'Edit Banner' : 'Create New Banner'}
                 </h3>
-                <p className="text-xs text-white/40 mt-0.5">
+                <p className="text-xs text-muted-foreground-theme mt-0.5">
                   Decide what kind of banner to display on the home page hero section.
                 </p>
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors"
+                className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -456,13 +454,13 @@ export default function BannersManagementPage() {
                         key={opt.value}
                         type="button"
                         onClick={() => setFormType(opt.value)}
-                        className={`flex items-center gap-2 p-2.5 rounded-lg border text-left text-xs font-medium transition-all ${
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border text-left text-xs font-medium transition-all cursor-pointer ${
                           isSelected
-                            ? 'border-gold/50 bg-gold/10 text-gold shadow-[0_0_15px_rgba(245,166,35,0.1)]'
-                            : 'border-white/8 bg-white/[0.02] text-white/50 hover:border-white/20 hover:text-white/80'
+                            ? 'border-gold/50 bg-gold/10 text-amber-600 dark:text-gold shadow-xs font-bold'
+                            : 'border-border-theme bg-slate-50 dark:bg-white/[0.02] text-muted-foreground-theme hover:border-gold/30 hover:text-foreground-theme'
                         }`}
                       >
-                        <opt.icon size={14} className={isSelected ? 'text-gold' : 'text-white/40'} />
+                        <opt.icon size={14} className={isSelected ? 'text-amber-600 dark:text-gold' : 'text-muted-foreground-theme'} />
                         <span>{opt.label}</span>
                       </button>
                     )
@@ -572,31 +570,31 @@ export default function BannersManagementPage() {
               </FormField>
 
               {/* Active Toggle */}
-              <div className="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/8 rounded-lg">
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-white/80 select-none">
+              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-white/[0.02] border border-border-theme rounded-lg">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground-theme select-none">
                   <input
                     type="checkbox"
                     checked={formIsActive}
                     onChange={(e) => setFormIsActive(e.target.checked)}
-                    className="w-4 h-4 rounded border-white/20 text-gold focus:ring-gold/30 bg-white/5"
+                    className="w-4 h-4 rounded border-border-theme text-gold focus:ring-gold/30 bg-surface-theme"
                   />
-                  <span className="font-semibold text-white">Active (Display on Home Page)</span>
+                  <span className="font-semibold text-foreground-theme">Active (Display on Home Page)</span>
                 </label>
               </div>
 
               {/* Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/8">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border-theme">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-lg text-xs text-white/50 hover:text-white transition-colors"
+                  className="px-4 py-2 rounded-lg text-xs text-muted-foreground-theme hover:text-foreground-theme transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gold text-[#0D1117] font-display font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gold text-[#0D1117] font-display font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   <Save size={14} />
                   <span>{isSubmitting ? 'Saving...' : editingBanner ? 'Update Banner' : 'Create Banner'}</span>

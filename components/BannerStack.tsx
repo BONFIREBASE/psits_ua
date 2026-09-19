@@ -63,7 +63,7 @@ export default function BannerStack({ banners }: BannerStackProps) {
   /* ── Single banner ── */
   if (count === 1) {
     return (
-      <section className="relative max-w-6xl mx-auto px-6 pb-24">
+      <section className="relative max-w-6xl xl:max-w-7xl mx-auto px-6 pb-20 lg:pb-24">
         <BannerCard banner={banners[0]} isActive={true} />
       </section>
     )
@@ -72,7 +72,7 @@ export default function BannerStack({ banners }: BannerStackProps) {
   /* ── Multi-banner stacked carousel ── */
   return (
     <section
-      className="relative max-w-6xl mx-auto px-6 pb-24"
+      className="relative max-w-6xl xl:max-w-7xl mx-auto px-6 pb-20 lg:pb-24"
       onMouseEnter={() => {
         setIsHovered(true)
         clearAutoPlay()

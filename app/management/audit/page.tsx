@@ -16,6 +16,7 @@ import Select from '../_components/Select'
 import FileUpload from '../_components/FileUpload'
 import StatusBadge from '../_components/StatusBadge'
 import EmptyState from '../_components/EmptyState'
+import { ManagementTableSkeleton } from '../_components/SkeletonPreloader'
 import { useToast } from '../_components/Toast'
 import { getAuditReports, type AuditReportRow } from '@/lib/supabase'
 import { createAuditReportAction, deleteAuditReportAction } from './actions'
@@ -117,18 +118,18 @@ export default function AuditManagementPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="font-display font-black text-2xl text-white tracking-tight">Audit Reports</h1>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+            <h1 className="font-display font-black text-2xl text-foreground-theme tracking-tight">Audit Reports</h1>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 font-semibold">
               Live Database
             </span>
           </div>
-          <p className="text-sm text-white/35 mt-1">
+          <p className="text-sm text-muted-foreground-theme mt-1">
             Official semester audits, inventory reviews, and signed clearances stored securely in cloud storage.
           </p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit cursor-pointer"
         >
           {showForm ? <X size={16} /> : <Plus size={16} />}
           <span>{showForm ? 'Cancel' : 'New Audit Report'}</span>
@@ -137,8 +138,8 @@ export default function AuditManagementPage() {
 
       {/* Upload Form */}
       {showForm && (
-        <div className="p-6 rounded-xl border border-gold/20 bg-gold/[0.02] space-y-4">
-          <h2 className="font-display font-bold text-base text-white">Upload New Audit Report</h2>
+        <div className="p-6 rounded-xl border border-border-theme bg-surface-theme shadow-sm space-y-4">
+          <h2 className="font-display font-bold text-base text-foreground-theme">Upload New Audit Report</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <FormField label="Report Title" htmlFor="audit-title" required>
               <input
@@ -218,7 +219,7 @@ export default function AuditManagementPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-bold text-xs hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] transition-all disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                 <span>{submitting ? 'Saving Audit...' : 'Save Audit'}</span>
@@ -226,7 +227,7 @@ export default function AuditManagementPage() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="px-3 py-2 rounded-lg text-xs text-white/40 border border-white/8 hover:text-white/60 transition-colors"
+                className="px-3 py-2 rounded-lg text-xs text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -237,19 +238,16 @@ export default function AuditManagementPage() {
 
       {/* Reports List */}
       {loading ? (
-        <div className="text-center py-16">
-          <Loader2 size={24} className="animate-spin text-gold mx-auto mb-2" />
-          <p className="text-xs text-white/30 font-mono">Loading audit reports from Supabase...</p>
-        </div>
+        <ManagementTableSkeleton rows={5} />
       ) : reports.length === 0 && !showForm ? (
         <EmptyState
-          icon={<ClipboardCheck size={24} className="text-white/20" />}
+          icon={<ClipboardCheck size={24} className="text-muted-foreground-theme/40" />}
           title="No audit reports yet"
           description="Upload your first signed audit report or inventory clearance."
           action={
             <button
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gold/25 text-gold text-sm font-medium hover:bg-gold/[0.06] transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gold/30 text-amber-600 dark:text-gold text-sm font-medium hover:bg-gold/[0.06] transition-colors cursor-pointer"
             >
               <Plus size={14} />
               New Audit Report
@@ -261,28 +259,28 @@ export default function AuditManagementPage() {
           {reports.map((rep) => (
             <div
               key={rep.id}
-              className="flex items-start gap-4 p-4 rounded-xl border border-white/6 hover:border-white/15 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-300"
+              className="flex items-start gap-4 p-4 rounded-xl border border-border-theme hover:border-gold/30 bg-surface-theme hover:shadow-xs transition-all duration-300"
             >
-              <div className="w-10 h-10 rounded-lg bg-white/[0.05] border border-white/8 flex items-center justify-center flex-shrink-0">
-                <ClipboardCheck size={16} className="text-gold/60" />
+              <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-border-theme flex items-center justify-center flex-shrink-0">
+                <ClipboardCheck size={16} className="text-amber-600 dark:text-gold/60" />
               </div>
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-xs text-gold font-bold">{rep.academic_year} · {rep.semester}</span>
-                  <StatusBadge status={(rep.status as any) || 'Draft'} />
+                  <span className="font-mono text-xs text-amber-600 dark:text-gold font-bold">{rep.academic_year} · {rep.semester}</span>
+                  <StatusBadge status={(rep.status as 'Draft' | 'Approved' | 'Archived') || 'Draft'} />
                   {rep.file_url && (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 font-medium">
                       Attached
                     </span>
                   )}
                 </div>
-                <h3 className="text-sm font-display font-bold text-white/85 truncate">{rep.title}</h3>
-                <div className="flex items-center gap-3 text-[10px] text-white/30 font-mono">
+                <h3 className="text-sm font-display font-bold text-foreground-theme truncate">{rep.title}</h3>
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground-theme font-mono">
                   <span className="flex items-center gap-1"><Calendar size={10} />{new Date(rep.created_at).toLocaleDateString()}</span>
-                  {rep.file_name && <span className="text-white/20">{rep.file_name}</span>}
+                  {rep.file_name && <span className="text-muted-foreground-theme/70">{rep.file_name}</span>}
                 </div>
                 {rep.summary && (
-                  <p className="text-xs text-white/35 line-clamp-2 mt-1">{rep.summary}</p>
+                  <p className="text-xs text-muted-foreground-theme line-clamp-2 mt-1">{rep.summary}</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -291,7 +289,7 @@ export default function AuditManagementPage() {
                     href={rep.file_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 rounded-lg text-white/30 hover:text-gold hover:bg-white/[0.04] transition-colors"
+                    className="p-2 rounded-lg text-muted-foreground-theme hover:text-amber-600 dark:hover:text-gold hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
                     title="Download Audit PDF"
                   >
                     <ExternalLink size={14} />
@@ -300,11 +298,11 @@ export default function AuditManagementPage() {
                 <button
                   onClick={() => handleDelete(rep.id, rep.file_url)}
                   disabled={deletingId === rep.id}
-                  className="p-2 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                  className="p-2 rounded-lg text-muted-foreground-theme/60 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40 cursor-pointer"
                   title="Delete Report"
                 >
                   {deletingId === rep.id ? (
-                    <Loader2 size={14} className="animate-spin text-red-400" />
+                    <Loader2 size={14} className="animate-spin text-red-500" />
                   ) : (
                     <Trash2 size={14} />
                   )}

@@ -56,7 +56,7 @@ export default function Footer() {
   }, [isProBonoOpen])
 
   return (
-    <footer className="relative border-t border-white/5 bg-surface mt-24 overflow-hidden">
+    <footer className="relative border-t border-black/5 dark:border-white/5 bg-surface mt-24 overflow-hidden">
       <div
         aria-hidden="true"
         className="absolute -right-20 sm:-right-16 md:-right-10 lg:-right-6 top-1/3 -translate-y-1/2 pointer-events-none select-none opacity-[0.04] md:opacity-[0.06]"
@@ -72,7 +72,7 @@ export default function Footer() {
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 pt-12 sm:pt-16 pb-6 flex flex-wrap items-start justify-start gap-14 sm:gap-24">
         <div className="flex flex-col gap-2">
-          <p className="text-[11px] font-mono font-medium text-white/40 uppercase tracking-[0.2em] mb-1">
+          <p className="text-[11px] font-mono font-medium text-slate-500 dark:text-white/40 uppercase tracking-[0.2em] mb-1">
             Governance & Chapter
           </p>
           {navLinks.map((link) => (
@@ -87,7 +87,7 @@ export default function Footer() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <p className="text-[11px] font-mono font-medium text-white/40 uppercase tracking-[0.2em] mb-1">
+          <p className="text-[11px] font-mono font-medium text-slate-500 dark:text-white/40 uppercase tracking-[0.2em] mb-1">
             Connect
           </p>
           <div className="flex items-center gap-4">
@@ -111,7 +111,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="GitHub Repository"
-              className="text-muted hover:text-white transition-colors p-1"
+              className="text-muted hover:text-slate-900 dark:hover:text-white transition-colors p-1"
             >
               <UseAnimations
                 animation={github}
@@ -137,8 +137,8 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
-        <div className="flex items-center gap-3">
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-6 border-t border-black/5 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-center sm:text-left">
+        <div className="flex items-center gap-3 justify-center sm:justify-start">
           <div className="relative w-5 h-5 flex-shrink-0 flex items-center justify-center">
             <AnimatePresence mode="wait">
               <motion.div
@@ -160,15 +160,15 @@ export default function Footer() {
             </AnimatePresence>
           </div>
 
-          <span className="font-medium text-white/70 whitespace-nowrap">
+          <span className="font-medium text-slate-700 dark:text-white/70 break-words">
             College of Computing and Information Sciences — University of Antique
           </span>
         </div>
 
-        <div className="text-muted/80 flex items-center gap-2 flex-wrap">
+        <div className="text-muted/80 flex items-center justify-center sm:justify-start gap-2 flex-wrap text-center sm:text-left">
           <span>© {new Date().getFullYear()} PSITS-UA.</span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="text-white/45">Built by</span>
+            <span className="text-slate-500 dark:text-white/45">Built by</span>
             <button
               type="button"
               onClick={() => setIsProBonoOpen(true)}

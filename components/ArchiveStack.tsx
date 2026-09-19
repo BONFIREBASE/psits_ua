@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { motion, AnimatePresence, PanInfo } from 'framer-motion'
+import { motion, AnimatePresence, PanInfo, type Variants } from 'framer-motion'
 import type { ArchivePhoto } from '@/data/archive'
 
 interface ArchiveStackProps {
@@ -13,13 +13,37 @@ const AUTO_INTERVAL = 4500 // Automatically changes photos every 4.5 seconds
 
 // Organic, delightfully messy stack configuration — natural casual scattering with varied lateral shifts and rotations
 const STACK_LAYERS = [
-  { x: 0, y: 20, rotate: -0.8, scale: 1, opacity: 1, zIndex: 50 },
-  { x: 26, y: -10, rotate: 6.8, scale: 0.97, opacity: 0.95, zIndex: 40 },
-  { x: -32, y: -36, rotate: -7.6, scale: 0.94, opacity: 0.88, zIndex: 30 },
-  { x: 20, y: -64, rotate: 5.2, scale: 0.91, opacity: 0.75, zIndex: 20 },
-  { x: -22, y: -88, rotate: -5.8, scale: 0.88, opacity: 0.60, zIndex: 10 },
-  { x: 14, y: -108, rotate: 3.6, scale: 0.85, opacity: 0.40, zIndex: 5 },
+  { x: 0, y: 20, rotate: -0.8, scale: 1, opacity: 1, zIndex: 10 },
+  { x: 26, y: -10, rotate: 6.8, scale: 0.97, opacity: 0.95, zIndex: 8 },
+  { x: -32, y: -36, rotate: -7.6, scale: 0.94, opacity: 0.88, zIndex: 6 },
+  { x: 20, y: -64, rotate: 5.2, scale: 0.91, opacity: 0.75, zIndex: 4 },
+  { x: -22, y: -88, rotate: -5.8, scale: 0.88, opacity: 0.60, zIndex: 2 },
+  { x: 14, y: -108, rotate: 3.6, scale: 0.85, opacity: 0.40, zIndex: 1 },
 ]
+
+const topCardVariants: Variants = {
+  initial: (dir: 'left' | 'right') => ({
+    x: 0,
+    y: 35,
+    rotate: dir === 'left' ? 4 : -4,
+    scale: 0.97,
+    opacity: 0.85,
+  }),
+  animate: {
+    x: 0,
+    y: 20,
+    rotate: -0.8,
+    scale: 1,
+    opacity: 1,
+  },
+  exit: (dir: 'left' | 'right') => ({
+    x: dir === 'left' ? -680 : 680,
+    y: 40,
+    rotate: dir === 'left' ? -26 : 26,
+    opacity: 0,
+    transition: { duration: 0.45, ease: [0.32, 0.72, 0, 1] },
+  }),
+}
 
 export default function ArchiveStack({ photos }: ArchiveStackProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -27,6 +51,7 @@ export default function ArchiveStack({ photos }: ArchiveStackProps) {
   const [isHovered, setIsHovered] = useState(false)
   const count = photos.length
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isDraggingRef = useRef(false)
 
   const clearAutoPlay = useCallback(() => {
     if (timerRef.current) {
@@ -69,25 +94,39 @@ export default function ArchiveStack({ photos }: ArchiveStackProps) {
 
   if (!photos || count === 0) return null
 
+  const handleDragStart = () => {
+    isDraggingRef.current = true
+    clearAutoPlay()
+  }
+
   const handleDragEnd = (_: unknown, info: PanInfo) => {
-    const threshold = 50
-    const velocityThreshold = 250
+    const threshold = 40
+    const velocityThreshold = 200
 
     if (info.offset.x < -threshold || info.velocity.x < -velocityThreshold) {
       nextPhoto('left')
     } else if (info.offset.x > threshold || info.velocity.x > velocityThreshold) {
       nextPhoto('right')
-    } else if (Math.abs(info.offset.y) > threshold) {
-      nextPhoto(info.offset.x < 0 ? 'left' : 'right')
     }
+
+    // Small delay to prevent immediate tap trigger on drag release
+    setTimeout(() => {
+      isDraggingRef.current = false
+    }, 60)
+  }
+
+  const handleCardTap = () => {
+    if (isDraggingRef.current) return
+    nextPhoto('right')
   }
 
   // Display top photo + up to 5 layers visibly scattered underneath
   const visibleCount = Math.min(count, STACK_LAYERS.length)
-  const stackItems = []
-  for (let depth = 0; depth < visibleCount; depth++) {
+  const topPhoto = photos[currentIndex]
+  const backgroundLayers = []
+  for (let depth = 1; depth < visibleCount; depth++) {
     const photoIndex = (currentIndex + depth) % count
-    stackItems.push({
+    backgroundLayers.push({
       photo: photos[photoIndex],
       depth,
       config: STACK_LAYERS[depth],
@@ -96,87 +135,62 @@ export default function ArchiveStack({ photos }: ArchiveStackProps) {
 
   return (
     <div
-      className="relative w-full flex items-center justify-center select-none pt-20 pb-28 sm:pt-24 sm:pb-36 lg:pt-28 lg:pb-44"
+      className="relative isolate z-0 w-full flex items-center justify-center select-none pt-20 pb-28 sm:pt-24 sm:pb-36 lg:pt-28 lg:pb-44"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onTouchStart={() => setIsHovered(true)}
-      onTouchEnd={() => setIsHovered(false)}
     >
       {/* Viewport for the messy stacked photos */}
       <div className="relative w-full max-w-[560px] sm:max-w-[680px] md:max-w-[800px] lg:max-w-[900px] xl:max-w-[960px] h-[370px] sm:h-[470px] md:h-[560px] lg:h-[640px] xl:h-[680px] flex items-center justify-center">
-        {/* Render bottom layers first so top card stays in front */}
-        {stackItems.slice().reverse().map(({ photo, depth, config }) => {
-          const isTop = depth === 0
+        {/* Render background layers first so top card stays in front */}
+        {backgroundLayers.slice().reverse().map(({ photo, config }) => (
+          <motion.div
+            key={photo.id}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            style={{ zIndex: config.zIndex }}
+            initial={false}
+            animate={{
+              x: config.x,
+              y: config.y,
+              rotate: config.rotate,
+              scale: config.scale,
+              opacity: config.opacity,
+            }}
+            transition={{
+              type: 'spring',
+              stiffness: 260,
+              damping: 24,
+            }}
+          >
+            <PhotoPrint photo={photo} isTop={false} />
+          </motion.div>
+        ))}
 
-          if (isTop) {
-            return (
-              <AnimatePresence key={photo.id} mode="popLayout">
-                <motion.div
-                  key={photo.id}
-                  className="absolute inset-0 flex items-center justify-center cursor-grab active:cursor-grabbing"
-                  style={{ zIndex: config.zIndex }}
-                  initial={{
-                    x: config.x,
-                    y: config.y + 20,
-                    rotate: exitDirection === 'left' ? 4 : -4,
-                    scale: 0.97,
-                    opacity: 0.8,
-                  }}
-                  animate={{
-                    x: config.x,
-                    y: config.y,
-                    rotate: config.rotate,
-                    scale: config.scale,
-                    opacity: config.opacity,
-                  }}
-                  exit={{
-                    x: exitDirection === 'left' ? -680 : 680,
-                    y: 40,
-                    rotate: exitDirection === 'left' ? -26 : 26,
-                    opacity: 0,
-                    transition: { duration: 0.48, ease: [0.32, 0.72, 0, 1] },
-                  }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 280,
-                    damping: 24,
-                  }}
-                  drag={true}
-                  dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                  dragElastic={0.65}
-                  onDragEnd={handleDragEnd}
-                  onClick={() => nextPhoto('right')}
-                >
-                  <PhotoPrint photo={photo} isTop={true} />
-                </motion.div>
-              </AnimatePresence>
-            )
-          }
-
-          // Messy stacked layers underneath with irregular scatter
-          return (
-            <motion.div
-              key={photo.id}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              style={{ zIndex: config.zIndex }}
-              initial={false}
-              animate={{
-                x: config.x,
-                y: config.y,
-                rotate: config.rotate,
-                scale: config.scale,
-                opacity: config.opacity,
-              }}
-              transition={{
-                type: 'spring',
-                stiffness: 260,
-                damping: 24,
-              }}
-            >
-              <PhotoPrint photo={photo} isTop={false} />
-            </motion.div>
-          )
-        })}
+        {/* Top interactive card */}
+        <AnimatePresence mode="popLayout" custom={exitDirection}>
+          <motion.div
+            key={topPhoto.id}
+            custom={exitDirection}
+            variants={topCardVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="absolute inset-0 flex items-center justify-center cursor-grab active:cursor-grabbing touch-pan-y"
+            style={{ zIndex: 10 }}
+            transition={{
+              type: 'spring',
+              stiffness: 280,
+              damping: 24,
+            }}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.65}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onTap={handleCardTap}
+          >
+            <PhotoPrint photo={topPhoto} isTop={true} />
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   )
