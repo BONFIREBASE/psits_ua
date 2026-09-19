@@ -175,6 +175,13 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        if (!title || !String(title).trim()) {
+          return NextResponse.json(
+            { error: "Design title is required." },
+            { status: 400 }
+          );
+        }
+
         if (!courseYear || !String(courseYear).trim()) {
           return NextResponse.json(
             { error: "BSINFO Year & Section is required." },
@@ -228,6 +235,13 @@ export async function POST(req: NextRequest) {
           if (!dbError && data) {
             dbRecord = data;
           } else if (dbError) {
+            // Catch unique constraint violation (race condition: same student double-submitted)
+            if (dbError.code === "23505") {
+              return NextResponse.json(
+                { error: "You have already submitted an entry. Please edit your existing submission instead." },
+                { status: 409 }
+              );
+            }
             console.warn("Supabase polo_submissions insert note:", dbError.message);
           }
         } catch (dbErr) {
@@ -274,6 +288,13 @@ export async function POST(req: NextRequest) {
           description,
           courseYear,
         } = body;
+
+        if (title !== undefined && !String(title).trim()) {
+          return NextResponse.json(
+            { error: "Design title cannot be empty." },
+            { status: 400 }
+          );
+        }
 
         if (courseYear !== undefined && !String(courseYear).trim()) {
           return NextResponse.json(
@@ -466,6 +487,13 @@ export async function POST(req: NextRequest) {
       if (!dbError && data) {
         dbRecord = data;
       } else if (dbError) {
+        // Catch unique constraint violation (race condition: same student double-submitted)
+        if (dbError.code === "23505") {
+          return NextResponse.json(
+            { error: "You have already submitted an entry. Please edit your existing submission instead." },
+            { status: 409 }
+          );
+        }
         console.warn("Supabase polo_submissions insert note:", dbError.message);
       }
     } catch (dbErr) {

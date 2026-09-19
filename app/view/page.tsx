@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   AlertCircle,
   LogIn,
+  Trophy,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
@@ -45,8 +46,8 @@ interface VoteStatus {
 // Constants
 // ────────────────────────────────────────────────────────────────────────────
 
-const VOTING_OPENS = new Date(); // Testing: Open now
-const VOTING_CLOSES = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Testing: Closes in 7 days
+const VOTING_OPENS = new Date("2026-10-05T00:00:00+08:00");
+const VOTING_CLOSES = new Date("2026-10-09T23:59:59+08:00");
 const ALLOWED_DOMAIN = "@antiquespride.edu.ph";
 
 function getTimeRemaining() {
@@ -63,6 +64,159 @@ function getTimeRemaining() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Winner Banner Component (Awards Centerpiece Showcase)
+// ────────────────────────────────────────────────────────────────────────────
+
+function WinnerBanner({
+  winner,
+  totalVotes,
+  onOpenLightbox,
+}: {
+  winner: ApprovedEntry;
+  totalVotes: number;
+  onOpenLightbox?: (entry: ApprovedEntry) => void;
+}) {
+  const votePercent = totalVotes > 0 ? Math.round(((winner.vote_count || 0) / totalVotes) * 100) : 0;
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    if (naturalWidth && naturalHeight) {
+      setAspectRatio(naturalWidth / naturalHeight);
+    }
+  };
+
+  return (
+    <div className="relative mb-14 max-w-5xl mx-auto">
+      {/* Theatrical ambient back-glow */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-[420px] bg-gradient-to-r from-gold/15 via-navy/35 to-gold/15 rounded-full blur-[140px] pointer-events-none -z-10" />
+
+      {/* Main Glass Stage */}
+      <div className="relative rounded-3xl bg-surface-theme/85 backdrop-blur-2xl border border-gold/30 shadow-[0_25px_60px_rgba(0,0,0,0.45)] overflow-hidden">
+        {/* Top Gold Accent Bar */}
+        <div className="h-[2px] bg-gradient-to-r from-transparent via-gold to-transparent opacity-90" />
+
+        {/* Header Kicker */}
+        <div className="pt-8 pb-3 px-6 sm:px-10 text-center">
+          <h2 className="font-display font-black text-2xl xs:text-3xl sm:text-4xl md:text-5xl text-foreground-theme uppercase tracking-tight leading-[1.1]">
+            {winner.title || "The Winning Design"}
+          </h2>
+        </div>
+
+        {/* Centerpiece Apparel Plinth — Auto-adapts to any photo ratio */}
+        <div className="px-4 sm:px-8 py-3">
+          <div
+            onClick={() => onOpenLightbox?.(winner)}
+            className={`group relative w-full ${
+              aspectRatio === null
+                ? "min-h-[380px] sm:min-h-[460px] md:min-h-[520px]"
+                : aspectRatio < 0.85
+                ? "h-[460px] sm:h-[540px] md:h-[600px]"
+                : aspectRatio < 1.3
+                ? "h-[400px] sm:h-[480px] md:h-[540px]"
+                : "aspect-[16/10] sm:aspect-[16/9] min-h-[340px] max-h-[520px]"
+            } rounded-2xl overflow-hidden bg-[#0A0E17] shadow-2xl border border-gold/25 cursor-pointer transition-all duration-300`}
+          >
+            {/* Ambient dynamic backdrop matching the winner photo */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+              <Image
+                src={winner.file_url}
+                alt=""
+                fill
+                className="object-cover scale-125 blur-3xl opacity-30 dark:opacity-35 brightness-75 saturate-150 transform-gpu"
+                sizes="(max-width: 1024px) 100vw, 1024px"
+                unoptimized
+                aria-hidden
+              />
+              {/* Theatrical dark vignettes for deep contrast & theme blending */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0A0E17] via-[#0A0E17]/60 to-[#0A0E17]/80" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.05)_0%,transparent_60%,rgba(10,14,23,0.85)_100%)]" />
+            </div>
+
+            {/* Foreground image: uncropped, centered, floating with depth shadow */}
+            <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-8 z-10">
+              <Image
+                src={winner.file_url}
+                alt={winner.title || "Winning Polo Shirt Design"}
+                fill
+                className="object-contain p-2 sm:p-6 drop-shadow-[0_20px_40px_rgba(0,0,0,0.7)] transition-transform duration-700 ease-out group-hover:scale-[1.015]"
+                sizes="(max-width: 1024px) 100vw, 1024px"
+                unoptimized
+                priority
+                onLoad={handleImageLoad}
+              />
+            </div>
+
+            {/* Corner Badge: 1st Place */}
+            <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full bg-[#0D1117]/90 backdrop-blur-md border border-gold/40 text-gold text-xs font-mono font-bold uppercase tracking-wider shadow-lg">
+              <Trophy className="w-3.5 h-3.5 text-gold" />
+              <span>1st Place Winner</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Story, Designer & Metric Section */}
+        <div className="px-6 sm:px-10 py-6 sm:py-8 grid md:grid-cols-12 gap-6 items-center border-t border-border-theme/60 bg-canvas-theme/20">
+          {/* Designer & Concept */}
+          <div className="md:col-span-7 space-y-3">
+            <div>
+              <p className="text-[10px] font-mono uppercase tracking-widest text-gold font-bold">
+                Design Submission
+              </p>
+              <h3 className="font-display font-black text-xl sm:text-2xl text-foreground-theme tracking-tight mt-0.5">
+                Designed by {winner.student_name}
+                {winner.student_course_year && (
+                  <span className="text-muted-foreground-theme font-normal text-base"> · {winner.student_course_year}</span>
+                )}
+              </h3>
+            </div>
+
+            {winner.description && (
+              <p className="text-xs sm:text-sm text-muted-foreground-theme leading-relaxed border-l-2 border-gold/40 pl-4 italic">
+                &ldquo;{winner.description}&rdquo;
+              </p>
+            )}
+          </div>
+
+          {/* Metrics Grid */}
+          <div className="md:col-span-5 grid grid-cols-2 gap-3">
+            <div className="p-4 rounded-2xl bg-canvas-theme/70 border border-border-theme backdrop-blur-md">
+              <p className="text-[10px] font-mono text-muted-foreground-theme uppercase tracking-wider">
+                Student Votes
+              </p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="font-display font-black text-2xl sm:text-3xl text-gold">
+                  {winner.vote_count || 0}
+                </span>
+                {totalVotes > 0 && (
+                  <span className="text-xs font-mono text-emerald-400 font-semibold">
+                    {votePercent}% share
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-canvas-theme/70 border border-border-theme backdrop-blur-md">
+              <p className="text-[10px] font-mono text-muted-foreground-theme uppercase tracking-wider">
+                Status
+              </p>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="font-display font-bold text-sm sm:text-base text-foreground-theme">
+                  Official Attire
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground-theme/70 mt-0.5 font-mono">
+                A.Y. 2026–2027
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Lightbox Component
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -72,24 +226,28 @@ function Lightbox({
   onClose,
   onPrev,
   onNext,
+  customEntry,
 }: {
   entries: ApprovedEntry[];
   currentIndex: number;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
+  customEntry?: ApprovedEntry | null;
 }) {
-  const entry = entries[currentIndex];
+  const entry = customEntry || entries[currentIndex];
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      if (e.key === "ArrowLeft") onPrev();
-      if (e.key === "ArrowRight") onNext();
+      if (!customEntry) {
+        if (e.key === "ArrowLeft") onPrev();
+        if (e.key === "ArrowRight") onNext();
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose, onPrev, onNext]);
+  }, [onClose, onPrev, onNext, customEntry]);
 
   if (!entry) return null;
 
@@ -107,7 +265,7 @@ function Lightbox({
       </button>
 
       {/* Prev */}
-      {entries.length > 1 && (
+      {!customEntry && entries.length > 1 && (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -121,27 +279,27 @@ function Lightbox({
 
       {/* Image + Info */}
       <div
-        className="relative max-w-4xl w-full mx-4 flex flex-col items-center"
+        className="relative max-w-5xl w-full mx-4 flex flex-col items-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative w-full aspect-[3/4] sm:aspect-[4/3] max-h-[75vh] rounded-xl overflow-hidden bg-black/50">
+        <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[75vh] rounded-2xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl">
           <Image
             src={entry.file_url}
             alt={entry.title || "Design entry"}
             fill
             className="object-contain"
-            sizes="(max-width: 768px) 95vw, 800px"
+            sizes="(max-width: 1024px) 95vw, 1024px"
             unoptimized
           />
         </div>
 
-        <div className="mt-4 text-center max-w-lg">
+        <div className="mt-4 text-center max-w-xl">
           {entry.title && (
-            <h3 className="text-lg font-semibold text-white font-display">
+            <h3 className="text-lg sm:text-xl font-bold text-white font-display">
               {entry.title}
             </h3>
           )}
-          <p className="text-sm text-white/60 mt-1">
+          <p className="text-sm text-white/70 mt-1">
             {entry.student_name}
             {entry.student_course_year && (
               <span className="text-white/40">
@@ -151,18 +309,20 @@ function Lightbox({
             )}
           </p>
           {entry.description && (
-            <p className="text-xs text-white/50 mt-2 leading-relaxed">
+            <p className="text-xs sm:text-sm text-white/60 mt-2 leading-relaxed max-w-md mx-auto">
               {entry.description}
             </p>
           )}
-          <p className="text-xs text-white/30 mt-2">
-            {currentIndex + 1} / {entries.length}
-          </p>
+          {!customEntry && entries.length > 0 && (
+            <p className="text-xs text-white/30 mt-2 font-mono">
+              {currentIndex + 1} / {entries.length}
+            </p>
+          )}
         </div>
       </div>
 
       {/* Next */}
-      {entries.length > 1 && (
+      {!customEntry && entries.length > 1 && (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -182,12 +342,11 @@ function Lightbox({
 // ────────────────────────────────────────────────────────────────────────────
 
 function CountdownPill() {
-  const [remaining, setRemaining] = useState<ReturnType<typeof getTimeRemaining> | undefined>(undefined);
+  const [remaining, setRemaining] = useState<ReturnType<typeof getTimeRemaining> | undefined>(
+    () => (typeof window !== "undefined" ? getTimeRemaining() : undefined)
+  );
 
   useEffect(() => {
-    // Set initial value on client only
-    setRemaining(getTimeRemaining());
-    
     const timer = setInterval(() => {
       setRemaining(getTimeRemaining());
     }, 1000);
@@ -424,7 +583,24 @@ export default function ViewGalleryPage() {
   const [entries, setEntries] = useState<ApprovedEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [votingOpen, setVotingOpen] = useState(false);
+  const [lightboxCustomEntry, setLightboxCustomEntry] = useState<ApprovedEntry | null>(null);
+  const [votingTick, setVotingTick] = useState(0);
+
+  // Derive voting state from current time — no setState in effect needed
+  const votingOpen = (() => {
+    void votingTick; // trigger re-render on tick
+    const now = new Date();
+    return now >= VOTING_OPENS && now <= VOTING_CLOSES;
+  })();
+
+  const votingEnded = new Date() > VOTING_CLOSES;
+
+  // Determine winner (highest vote_count after voting concludes on Oct 9)
+  const winner = votingEnded && entries.length > 0
+    ? entries.reduce((best, e) => ((e.vote_count || 0) > (best.vote_count || 0) ? e : best), entries[0])
+    : null;
+
+  const totalVotes = entries.reduce((sum, e) => sum + (e.vote_count || 0), 0);
 
   // Auth State
   const [user, setUser] = useState<User | null>(null);
@@ -494,11 +670,9 @@ export default function ViewGalleryPage() {
   }, []);
 
   // Fetch voting status when user is authenticated
+  // Fetch voting status when user is authenticated
   useEffect(() => {
-    if (!sessionToken) {
-      setVoteStatus(null);
-      return;
-    }
+    if (!sessionToken) return;
 
     async function fetchVoteStatus() {
       try {
@@ -530,13 +704,9 @@ export default function ViewGalleryPage() {
     }
     fetchApproved();
 
-    // Check voting status
-    const now = new Date();
-    setVotingOpen(now >= VOTING_OPENS && now <= VOTING_CLOSES);
-    
+    // Tick to re-derive votingOpen each second
     const timer = setInterval(() => {
-      const currentTime = new Date();
-      setVotingOpen(currentTime >= VOTING_OPENS && currentTime <= VOTING_CLOSES);
+      setVotingTick((t) => t + 1);
     }, 1000);
     
     return () => clearInterval(timer);
@@ -575,15 +745,21 @@ export default function ViewGalleryPage() {
       } else {
         setVoteMessage({ type: "error", text: data.error || "Failed to record vote." });
       }
-    } catch (err) {
+    } catch {
       setVoteMessage({ type: "error", text: "An unexpected error occurred." });
     } finally {
       setIsVoting(false);
     }
   };
 
-  const openLightbox = (i: number) => setLightboxIndex(i);
-  const closeLightbox = () => setLightboxIndex(null);
+  const openLightbox = (i: number) => {
+    setLightboxCustomEntry(null);
+    setLightboxIndex(i);
+  };
+  const closeLightbox = () => {
+    setLightboxIndex(null);
+    setLightboxCustomEntry(null);
+  };
   const prevLightbox = () =>
     setLightboxIndex((prev) =>
       prev !== null ? (prev - 1 + entries.length) % entries.length : null
@@ -638,19 +814,35 @@ export default function ViewGalleryPage() {
             PSITS-UA Competition
           </p>
           <h1 className="font-display font-black text-2xl xs:text-3xl sm:text-4xl md:text-5xl text-foreground-theme tracking-tight uppercase leading-[1.08] break-words">
-            Design <span className="text-gold">Gallery</span>
+            {votingEnded ? (
+              <>Results &amp; <span className="text-gold">Winner</span></>
+            ) : (
+              <>Design <span className="text-gold">Gallery</span></>
+            )}
           </h1>
           <p className="text-muted-foreground-theme text-xs sm:text-sm">
-            Browse the approved polo shirt designs submitted by BSINFO students.
-            {!votingOpen
-              ? " Voting opens on October 5, 2026."
-              : " Cast your vote for your favorite design!"}
+            {votingEnded
+              ? "Voting has ended. Thank you to all BSINFO students who participated!"
+              : votingOpen
+                ? "Cast your vote for your favorite design!"
+                : "Browse the approved polo shirt designs submitted by BSINFO students. Voting opens on October 5, 2026."}
           </p>
           
-          <div className="pt-2">
-            <CountdownPill />
-          </div>
+          {!votingEnded && (
+            <div className="pt-2">
+              <CountdownPill />
+            </div>
+          )}
         </div>
+
+        {/* Winner Banner — shown after voting ends */}
+        {votingEnded && winner && (
+          <WinnerBanner
+            winner={winner}
+            totalVotes={totalVotes}
+            onOpenLightbox={(entry) => setLightboxCustomEntry(entry)}
+          />
+        )}
 
         {/* Gallery Grid Container */}
         <div className="max-w-6xl mx-auto">
@@ -722,10 +914,11 @@ export default function ViewGalleryPage() {
       </div>
 
       {/* Lightbox */}
-      {lightboxIndex !== null && (
+      {(lightboxIndex !== null || lightboxCustomEntry !== null) && (
         <Lightbox
           entries={entries}
-          currentIndex={lightboxIndex}
+          currentIndex={lightboxIndex ?? 0}
+          customEntry={lightboxCustomEntry}
           onClose={closeLightbox}
           onPrev={prevLightbox}
           onNext={nextLightbox}

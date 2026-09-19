@@ -82,106 +82,133 @@ interface AnalyticsData {
 }
 
 // ============================================================================
-// Pie Chart Component
+// ============================================================================
+// Vote Chart Color Palette (Vibrant, high-contrast, non-dark)
+// ============================================================================
+const VOTE_CHART_COLORS = [
+  "#F59E0B", // Amber / Gold
+  "#3B82F6", // Royal Blue
+  "#10B981", // Emerald Green
+  "#8B5CF6", // Violet
+  "#EC4899", // Rose Pink
+  "#06B6D4", // Electric Cyan
+  "#F97316", // Bright Orange
+  "#14B8A6", // Teal
+  "#6366F1", // Indigo
+  "#84CC16", // Lime Green
+];
+
+// ============================================================================
+// Pie / Donut Chart Component
 // ============================================================================
 
 function PieChart({ data }: { data: VotingAnalytics[] }) {
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground-theme">
+      <div className="flex items-center justify-center h-64 text-muted-foreground-theme text-xs font-mono">
         No voting data available
       </div>
     );
   }
 
-  const total = data.reduce((sum, item) => sum + item.vote_count, 0);
-  
+  const sortedData = [...data].sort((a, b) => b.vote_count - a.vote_count);
+  const total = sortedData.reduce((sum, item) => sum + item.vote_count, 0);
+
   if (total === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground-theme">
-        No votes cast yet
+      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground-theme text-xs font-mono gap-2">
+        <div className="w-12 h-12 rounded-full border-2 border-dashed border-border-theme flex items-center justify-center text-muted-foreground-theme">
+          0
+        </div>
+        <p>No votes cast yet</p>
       </div>
     );
   }
 
-  // Generate colors for pie chart
-  const colors = [
-    "#F5A623", // gold
-    "#4A90E2", // blue
-    "#7ED321", // green
-    "#BD10E0", // purple
-    "#F8E71C", // yellow
-    "#50E3C2", // cyan
-    "#FF6B6B", // red
-    "#4ECDC4", // teal
-    "#FFB6C1", // pink
-    "#DDA15E", // brown
-  ];
+  const activeItems = sortedData.filter((item) => item.vote_count > 0);
+  const radius = 68;
+  const strokeWidth = 26;
+  const circumference = 2 * Math.PI * radius;
 
-  let currentAngle = -90; // Start from top
+  let currentOffset = 0;
 
   return (
-    <div className="flex items-center justify-center p-8">
-      <svg viewBox="0 0 200 200" className="w-full max-w-md">
-        {data.map((item, index) => {
-          const percentage = (item.vote_count / total) * 100;
-          const angle = (percentage / 100) * 360;
-          const endAngle = currentAngle + angle;
+    <div className="flex items-center justify-center p-6">
+      <svg viewBox="0 0 200 200" className="w-full max-w-[280px] drop-shadow-xs">
+        {/* Subtle background ring */}
+        <circle
+          cx="100"
+          cy="100"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-slate-200/60 dark:text-white/[0.06]"
+        />
 
-          // Calculate pie slice path
-          const startX = 100 + 80 * Math.cos((Math.PI * currentAngle) / 180);
-          const startY = 100 + 80 * Math.sin((Math.PI * currentAngle) / 180);
-          const endX = 100 + 80 * Math.cos((Math.PI * endAngle) / 180);
-          const endY = 100 + 80 * Math.sin((Math.PI * endAngle) / 180);
+        {/* If only 1 item has votes, draw full ring cleanly without arc collapse */}
+        {activeItems.length === 1 ? (
+          <circle
+            cx="100"
+            cy="100"
+            r={radius}
+            fill="none"
+            stroke={VOTE_CHART_COLORS[0]}
+            strokeWidth={strokeWidth}
+            className="transition-all duration-300 hover:opacity-90 cursor-pointer"
+          >
+            <title>{`${activeItems[0].title || activeItems[0].designer_name}: ${activeItems[0].vote_count} votes (100.0%)`}</title>
+          </circle>
+        ) : (
+          activeItems.map((item, index) => {
+            const percentage = (item.vote_count / total) * 100;
+            const strokeLength = (percentage / 100) * circumference;
+            // Add subtle gap between slices
+            const gap = activeItems.length > 1 ? 2.5 : 0;
+            const dashLength = Math.max(1, strokeLength - gap);
+            const strokeDash = `${dashLength} ${circumference - dashLength}`;
+            const strokeOffset = -currentOffset;
+            currentOffset += strokeLength;
 
-          const largeArcFlag = angle > 180 ? 1 : 0;
-
-          const pathData = [
-            `M 100 100`,
-            `L ${startX} ${startY}`,
-            `A 80 80 0 ${largeArcFlag} 1 ${endX} ${endY}`,
-            `Z`,
-          ].join(" ");
-
-          const slice = (
-            <g key={item.id}>
-              <path
-                d={pathData}
-                fill={colors[index % colors.length]}
-                stroke="white"
-                strokeWidth="2"
-                className="hover:opacity-80 transition-opacity cursor-pointer"
+            return (
+              <circle
+                key={item.id}
+                cx="100"
+                cy="100"
+                r={radius}
+                fill="none"
+                stroke={VOTE_CHART_COLORS[index % VOTE_CHART_COLORS.length]}
+                strokeWidth={strokeWidth}
+                strokeDasharray={strokeDash}
+                strokeDashoffset={strokeOffset}
+                strokeLinecap="butt"
+                transform="rotate(-90 100 100)"
+                className="transition-all duration-300 hover:opacity-85 cursor-pointer"
               >
                 <title>{`${item.title || item.designer_name}: ${item.vote_count} votes (${percentage.toFixed(1)}%)`}</title>
-              </path>
-            </g>
-          );
+              </circle>
+            );
+          })
+        )}
 
-          currentAngle = endAngle;
-          return slice;
-        })}
-
-        {/* Center circle for donut effect */}
-        <circle cx="100" cy="100" r="50" fill="hsl(var(--surface))" />
-        
-        {/* Center text */}
+        {/* Center counter text - uses theme CSS variables for light & dark mode */}
         <text
           x="100"
           y="95"
           textAnchor="middle"
-          className="text-2xl font-bold fill-foreground-theme"
-          style={{ fill: 'hsl(var(--foreground))' }}
+          className="text-3xl font-extrabold font-display select-none pointer-events-none"
+          style={{ fill: "var(--color-text, currentColor)" }}
         >
           {total}
         </text>
         <text
           x="100"
-          y="110"
+          y="112"
           textAnchor="middle"
-          className="text-xs fill-muted-foreground-theme"
-          style={{ fill: 'hsl(var(--muted-foreground))' }}
+          className="text-[10px] font-mono font-bold tracking-wider uppercase select-none pointer-events-none"
+          style={{ fill: "var(--color-muted, #7A8394)" }}
         >
-          Total Votes
+          {total === 1 ? "Vote Cast" : "Total Votes"}
         </text>
       </svg>
     </div>
@@ -193,39 +220,48 @@ function PieChart({ data }: { data: VotingAnalytics[] }) {
 // ============================================================================
 
 function ChartLegend({ data }: { data: VotingAnalytics[] }) {
-  const colors = [
-    "#F5A623", "#4A90E2", "#7ED321", "#BD10E0", "#F8E71C",
-    "#50E3C2", "#FF6B6B", "#4ECDC4", "#FFB6C1", "#DDA15E",
-  ];
-
   const sortedData = [...data].sort((a, b) => b.vote_count - a.vote_count);
 
+  if (sortedData.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground-theme text-xs font-mono">
+        No designs available
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-2 max-h-96 overflow-y-auto">
-      {sortedData.map((item, index) => (
-        <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-canvas-theme/50 transition-colors">
+    <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+      {sortedData.map((item, index) => {
+        const color = VOTE_CHART_COLORS[index % VOTE_CHART_COLORS.length];
+        return (
           <div
-            className="w-4 h-4 rounded shrink-0"
-            style={{ backgroundColor: colors[index % colors.length] }}
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-foreground-theme truncate">
-              {item.title || item.designer_name}
-            </p>
-            <p className="text-[10px] text-muted-foreground-theme">
-              {item.designer_name}
-            </p>
+            key={item.id}
+            className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-canvas-theme/50 transition-colors border border-transparent hover:border-border-theme/40"
+          >
+            <div
+              className="w-3.5 h-3.5 rounded-md shrink-0 shadow-xs"
+              style={{ backgroundColor: color }}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-foreground-theme truncate">
+                {item.title || item.designer_name}
+              </p>
+              <p className="text-[10px] text-muted-foreground-theme truncate">
+                {item.designer_name}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-xs font-bold text-foreground-theme tabular-nums">
+                {item.vote_count} {item.vote_count === 1 ? "vote" : "votes"}
+              </p>
+              <p className="text-[10px] text-muted-foreground-theme font-mono">
+                {item.vote_percentage.toFixed(1)}%
+              </p>
+            </div>
           </div>
-          <div className="text-right shrink-0">
-            <p className="text-xs font-bold text-foreground-theme">
-              {item.vote_count}
-            </p>
-            <p className="text-[10px] text-muted-foreground-theme">
-              {item.vote_percentage.toFixed(1)}%
-            </p>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

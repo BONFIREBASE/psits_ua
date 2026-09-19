@@ -14,8 +14,10 @@ import {
   Info,
   Edit3,
   ArrowLeft,
+  ShieldAlert,
 } from "lucide-react";
 import { SubmissionAuthSkeleton } from "@/components/PublicSkeletonPreloader";
+import SubmissionLockWrapper from "@/components/SubmissionLockWrapper";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -55,6 +57,7 @@ export default function SubmissionPage() {
 
   // Submission State
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [uploadStepText, setUploadStepText] = useState("Uploading design...");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedData, setSubmittedData] = useState<SubmissionResult | null>(null);
@@ -274,6 +277,11 @@ export default function SubmissionPage() {
       return;
     }
 
+    if (!title.trim()) {
+      setSubmitError("Please enter a design title for your polo shirt entry.");
+      return;
+    }
+
     if (!courseYear.trim()) {
       setSubmitError("Please enter your BSINFO Year & Section (e.g., BSINFO 3-A).");
       return;
@@ -370,8 +378,8 @@ export default function SubmissionPage() {
     }
   };
 
-  // Submit Handler for First-Time Entry
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Pre-Submit Handler: Validate fields and trigger confirmation modal
+  const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
 
@@ -390,10 +398,23 @@ export default function SubmissionPage() {
       return;
     }
 
+    if (!title.trim()) {
+      setSubmitError("Please enter a design title for your polo shirt entry.");
+      return;
+    }
+
     if (!courseYear.trim()) {
       setSubmitError("Please enter your BSINFO Year & Section (e.g., BSINFO 3-A).");
       return;
     }
+
+    setShowConfirmModal(true);
+  };
+
+  // Submit Handler for First-Time Entry after confirmation
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmModal(false);
+    if (!file || !sessionToken) return;
 
     setIsSubmitting(true);
     setUploadStepText("Connecting to storage...");
@@ -509,7 +530,8 @@ export default function SubmissionPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-canvas-theme text-foreground-theme overflow-hidden">
+    <SubmissionLockWrapper>
+      <div className="relative min-h-screen bg-canvas-theme text-foreground-theme overflow-hidden">
       {/* Background glow */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[450px] bg-navy/20 dark:bg-navy/40 rounded-full blur-[140px]" />
@@ -643,10 +665,6 @@ export default function SubmissionPage() {
                 </div>
 
                 <div className="flex items-center gap-2.5">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-gold/15 text-amber-700 dark:text-gold border border-gold/30">
-                    BSINFO
-                  </span>
-
                   <button
                     type="button"
                     onClick={handleSignOut}
@@ -881,10 +899,11 @@ export default function SubmissionPage() {
                     {/* Design Title */}
                     <div>
                       <label className="block text-xs font-mono font-medium text-foreground-theme uppercase tracking-wider mb-1.5">
-                        Design Title <span className="text-muted-foreground-theme text-[11px] normal-case">(Optional)</span>
+                        Design Title <span className="text-gold">*</span>
                       </label>
                       <input
                         type="text"
+                        required
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="e.g., Cyber Antique Blue Edition"
@@ -962,7 +981,7 @@ export default function SubmissionPage() {
                 /* ────────────────────────────────────────────────────────── */
                 /* FIRST-TIME SUBMISSION FORM                                 */
                 /* ────────────────────────────────────────────────────────── */
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handlePreSubmit} className="space-y-6">
                   {/* Upload Zone */}
                   <div>
                     <label className="block text-xs font-mono font-medium text-foreground-theme uppercase tracking-wider mb-2">
@@ -1036,10 +1055,11 @@ export default function SubmissionPage() {
                     {/* Design Title */}
                     <div>
                       <label className="block text-xs font-mono font-medium text-foreground-theme uppercase tracking-wider mb-1.5">
-                        Design Title <span className="text-muted-foreground-theme text-[11px] normal-case">(Optional)</span>
+                        Design Title <span className="text-gold">*</span>
                       </label>
                       <input
                         type="text"
+                        required
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="e.g., Cyber Antique Blue Edition"
@@ -1087,28 +1107,48 @@ export default function SubmissionPage() {
                     </div>
                   )}
 
-                  <button
-                    type="submit"
-                    disabled={isSubmitting || !file}
-                    className="w-full py-3.5 px-4 rounded-xl text-xs font-mono font-bold uppercase tracking-wider text-[#0D1117] bg-gold hover:bg-gold-light disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 active:scale-[0.99] shadow-[0_0_20px_rgba(245,166,35,0.25)] hover:shadow-[0_0_30px_rgba(245,166,35,0.4)] cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>{uploadStepText}</span>
-                      </>
-                    ) : (
-                      <>
-                        <UploadCloud className="w-4 h-4" />
-                        <span>Submit Official Polo Design</span>
-                      </>
-                    )}
-                  </button>
+                  {/* Quote-style Confirmation */}
+                  {showConfirmModal && !isSubmitting ? (
+                    <div className="border-l-2 border-gold/70 pl-4 py-3 bg-canvas-theme/50 rounded-r-2xl space-y-3 animate-in fade-in duration-200">
+                      <blockquote className="space-y-1">
+                        <p className="text-xs sm:text-[13px] text-foreground-theme/90 italic leading-relaxed">
+                          &ldquo;Limit 1 entry per BSINFO student. You can edit your entry anytime before review. AI-generated content is strictly prohibited &mdash; all submissions must be original work created by the student.&rdquo;
+                        </p>
+                      </blockquote>
 
-                  <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground-theme font-mono">
-                    <Info className="w-3.5 h-3.5" />
-                    <span>Limit: 1 entry per BSINFO student. You can edit your entry anytime before review.</span>
-                  </div>
+                      <div className="flex items-center gap-2.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleConfirmedSubmit}
+                          className="py-2.5 px-5 rounded-xl bg-gold hover:bg-gold-light text-[#0D1117] text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-[0.99] shadow-sm cursor-pointer"
+                        >
+                          Confirm &amp; Submit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmModal(false)}
+                          className="py-2.5 px-4 rounded-xl border border-border-theme bg-surface-theme hover:bg-surface-theme/80 text-xs font-medium text-muted-foreground-theme hover:text-foreground-theme transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={isSubmitting || !file}
+                      className="w-full py-3.5 px-4 rounded-xl text-xs font-mono font-bold uppercase tracking-wider text-[#0D1117] bg-gold hover:bg-gold-light disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 active:scale-[0.99] shadow-[0_0_20px_rgba(245,166,35,0.25)] hover:shadow-[0_0_30px_rgba(245,166,35,0.4)] cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>{uploadStepText}</span>
+                        </>
+                      ) : (
+                        <span>Submit</span>
+                      )}
+                    </button>
+                  )}
                 </form>
               )}
             </div>
@@ -1116,5 +1156,6 @@ export default function SubmissionPage() {
         </div>
       </div>
     </div>
+    </SubmissionLockWrapper>
   );
 }

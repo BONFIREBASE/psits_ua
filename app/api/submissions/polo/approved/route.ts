@@ -14,9 +14,10 @@ export async function GET() {
     const { data, error } = await supabaseAdmin
       .from("polo_submissions")
       .select(
-        "id, student_name, student_course_year, title, description, file_url, created_at"
+        "id, student_name, student_course_year, title, description, file_url, vote_count, created_at"
       )
       .eq("status", "approved")
+      .order("vote_count", { ascending: false })
       .order("created_at", { ascending: false });
 
     if (error) {

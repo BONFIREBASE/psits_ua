@@ -6,6 +6,38 @@ export const runtime = "nodejs";
 const ALLOWED_DOMAIN = "@antiquespride.edu.ph";
 
 // ============================================================================
+// In-Memory Rate Limiter (no external dependency)
+// 5 requests per 30 seconds per IP — prevents endpoint spam
+// ============================================================================
+
+const RATE_LIMIT_WINDOW = 30_000; // 30 seconds
+const RATE_LIMIT_MAX = 5;
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+// Cleanup stale entries every 60s to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of rateLimitMap) {
+    if (now > val.resetAt) rateLimitMap.delete(key);
+  }
+}, 60_000);
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+
+  entry.count++;
+  return true;
+}
+
+// ============================================================================
 // HELPER: Authenticate Student
 // ============================================================================
 
@@ -68,7 +100,14 @@ async function getVotingConfig() {
 // HELPER: Check if Voting is Currently Allowed
 // ============================================================================
 
-function isVotingAllowed(config: any): { allowed: boolean; reason?: string } {
+interface VotingConfig {
+  voting_enabled?: boolean;
+  voting_start_date?: string | null;
+  voting_end_date?: string | null;
+  allow_vote_change?: boolean;
+}
+
+function isVotingAllowed(config: VotingConfig | null): { allowed: boolean; reason?: string } {
   if (!config) {
     return { allowed: false, reason: "Voting configuration not found." };
   }
@@ -155,6 +194,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit check (before auth to block spam cheaply)
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+    if (!checkRateLimit(clientIp)) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment before trying again." },
+        { status: 429 }
+      );
+    }
+
     const auth = await authenticateStudent(req);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
