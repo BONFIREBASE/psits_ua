@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import CookieConsent from '@/components/CookieConsent'
 import MaintenanceWrapper from '@/components/MaintenanceWrapper'
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
       <Navbar />
       <main>{children}</main>
       <Footer />
+      <CookieConsent />
     </MaintenanceWrapper>
   )
 }

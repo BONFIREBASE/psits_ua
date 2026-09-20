@@ -54,20 +54,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 border backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)]
                 min-w-[280px] max-w-[400px]
                 ${t.type === 'success'
-                  ? 'bg-[#0a1a0f]/90 border-emerald-500/30 text-emerald-200'
-                  : 'bg-[#1a0a0a]/90 border-red-500/30 text-red-200'
+                  ? 'bg-emerald-50 dark:bg-[#0a1a0f]/90 border-emerald-500/30 text-emerald-900 dark:text-emerald-200 shadow-lg'
+                  : 'bg-red-50 dark:bg-[#1a0a0a]/90 border-red-500/30 text-red-900 dark:text-red-200 shadow-lg'
                 }
               `}
             >
               {t.type === 'success' ? (
-                <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
+                <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
               ) : (
-                <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+                <AlertCircle size={16} className="text-red-600 dark:text-red-400 flex-shrink-0" />
               )}
               <span className="text-sm font-medium flex-1">{t.message}</span>
               <button
                 onClick={() => dismiss(t.id)}
-                className="text-white/40 hover:text-white/80 transition-colors flex-shrink-0"
+                className="text-slate-400 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/80 transition-colors flex-shrink-0"
               >
                 <X size={14} />
               </button>

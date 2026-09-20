@@ -1,0 +1,23 @@
+name: Weekly Storage & Blog Cleanup
+
+on:
+  schedule:
+    # Runs every Sunday at 00:00 UTC (08:00 AM PHT)
+    - cron: '0 0 * * 0'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  cleanup:
+    name: Purge Dispatches & R2 Media Older than 365 Days
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Cleanup Endpoint
+        env:
+          TARGET_URL: "https://psits-ua.vercel.app"
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "Sending automated cleanup request to $TARGET_URL/api/cron/cleanup..."
+          RESPONSE=$(curl -s -X GET "$TARGET_URL/api/cron/cleanup" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+          echo "Cleanup response: $RESPONSE"

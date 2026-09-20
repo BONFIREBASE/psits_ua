@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { AuthProvider, useAuth } from './_context/auth-context'
 import { ToastProvider } from './_components/Toast'
@@ -30,8 +30,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 function RedirectToLogin() {
   const router = useRouter()
-  router.replace('/management')
-  return null
+  useEffect(() => {
+    router.replace('/management')
+  }, [router])
+  return <ManagementShellSkeleton />
 }
 
 function AdminShell({ children }: { children: React.ReactNode }) {
@@ -45,7 +47,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0a0e17]">
+    <div className="flex min-h-screen bg-slate-100 dark:bg-[#0a0e17] text-slate-900 dark:text-white transition-colors duration-200">
       <AdminSidebar />
       <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">

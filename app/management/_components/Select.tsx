@@ -70,20 +70,20 @@ export default function Select({
         onClick={toggleOpen}
         className={`
           w-full flex items-center justify-between gap-2
-          bg-white/[0.04] border rounded-lg px-3.5 py-2.5
+          bg-slate-50 dark:bg-white/[0.04] border rounded-lg px-3.5 py-2.5
           text-sm text-left outline-none min-h-[42px]
           transition-all duration-200
           ${open
             ? 'border-gold/50 ring-1 ring-gold/20'
-            : 'border-white/10 hover:border-white/20'
+            : 'border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20'
           }
-          ${selected ? 'text-white' : 'text-white/25'}
+          ${selected ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-400 dark:text-white/25'}
         `}
       >
         <span className="truncate">{selected?.label || placeholder}</span>
         <ChevronDown
           size={14}
-          className={`flex-shrink-0 text-white/30 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          className={`flex-shrink-0 text-slate-400 dark:text-white/30 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -96,8 +96,8 @@ export default function Select({
             exit={{ opacity: 0, y: openUpwards ? 4 : -4, scale: 0.98 }}
             transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
             className={`
-              absolute z-[70] left-0 right-0 py-1 rounded-lg border border-white/10
-              bg-[#0d1219]/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.6)]
+              absolute z-[70] left-0 right-0 py-1 rounded-lg border border-black/10 dark:border-white/10
+              bg-white/95 dark:bg-[#0d1219]/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)]
               max-h-56 overflow-y-auto scrollbar-minimal overscroll-contain
               ${openUpwards ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}
             `}
@@ -115,10 +115,10 @@ export default function Select({
                   className={`
                     w-full flex items-center justify-between gap-2
                     px-3.5 py-2.5 sm:py-2 text-sm text-left min-h-[38px]
-                    transition-colors duration-150 active:bg-white/[0.08]
+                    transition-colors duration-150 active:bg-black/5 dark:active:bg-white/[0.08]
                     ${isSelected
-                      ? 'text-gold bg-gold/[0.08] font-medium'
-                      : 'text-white/60 hover:text-white/90 hover:bg-white/[0.04]'
+                      ? 'text-gold bg-gold/[0.08] font-semibold'
+                      : 'text-slate-700 hover:text-slate-900 hover:bg-black/5 dark:text-white/60 dark:hover:text-white/90 dark:hover:bg-white/[0.04]'
                     }
                   `}
                 >

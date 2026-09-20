@@ -20,6 +20,7 @@ import {
   type Meeting,
 } from '../management/_context/attendance-store'
 import { AuthProvider, useAuth } from '../management/_context/auth-context'
+import { CameraSkeleton } from '../management/_components/SkeletonPreloader'
 
 /* ═══════════════════════════════════════════════════
    FEEDBACK TOAST TYPE
@@ -237,11 +238,7 @@ function MinimalScannerInner() {
 
   // 1. Loading State
   if (authLoading) {
-    return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center">
-        <RefreshCw size={24} className="text-white/40 animate-spin" />
-      </div>
-    )
+    return <CameraSkeleton />
   }
 
   // 2. Host Access Only Gate

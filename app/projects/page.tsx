@@ -1,266 +1,95 @@
-'use client'
-
-import { useState } from 'react'
-import Image from 'next/image'
+import { getProjects } from '@/lib/supabase'
 import {
-  FolderGit2,
-  GraduationCap,
-  Sparkles,
-  Search,
-  ExternalLink,
-  Layers,
-  ArrowUpRight,
-  Radio,
-  type LucideIcon,
-} from 'lucide-react'
-import UseAnimations from 'react-useanimations'
-import github from 'react-useanimations/lib/github'
-import {
-  projectsData,
+  projectsData as initialProjects,
   Project,
-  ProjectCategory,
+  ProjectStatus,
 } from '@/data/projects'
+import ProjectsClient from '@/components/ProjectsClient'
 
-const categories: { label: ProjectCategory; icon: LucideIcon }[] = [
-  { label: 'All', icon: Layers },
-  { label: 'Capstone', icon: GraduationCap },
-  { label: 'Open Source', icon: FolderGit2 },
-  { label: 'Campus Utility', icon: Sparkles },
-  { label: 'Hackathon', icon: Radio },
-]
+export const revalidate = 60
 
-export default function ProjectsPage() {
-  const [selectedCategory, setSelectedCategory] =
-    useState<ProjectCategory>('All')
-  const [searchQuery, setSearchQuery] = useState('')
+export default async function ProjectsPage() {
+  let projects: Project[] = initialProjects
 
-  const filteredProjects = projectsData.filter((project) => {
-    const matchesCategory =
-      selectedCategory === 'All' || project.category === selectedCategory
+  try {
+    const dbProjects = await getProjects()
+    if (dbProjects && dbProjects.length > 0) {
+      // Filter out any unapproved / pending submissions
+      const publicList: Project[] = dbProjects
+        .filter((p) => p.status !== 'Pending')
+        .map((p) => {
+          const matchedInitial = initialProjects.find(
+            (init) =>
+              init.title.toLowerCase().trim() === p.title.toLowerCase().trim() ||
+              init.id === p.id
+          )
+          const teamTag = p.tags?.find((t) => t.toLowerCase().startsWith('by:'))
+          const teamName =
+            teamTag ? teamTag.replace(/^by:\s*/i, '') : matchedInitial?.team || 'PSITS-UA Student Developers'
+          const displayTags = (p.tags || []).filter((t) => !t.toLowerCase().startsWith('by:'))
+          return {
+            id: p.id,
+            title: p.title,
+            category: (p.category as Project['category']) || matchedInitial?.category || 'Campus Utility',
+            description: p.description,
+            problemStatement: matchedInitial?.problemStatement,
+            tags: displayTags.length > 0 ? displayTags : matchedInitial?.tags || ['PSITS-UA'],
+            team: teamName,
+            year: matchedInitial?.year || '2026',
+            status: (p.status as ProjectStatus) || 'Active',
+            featured: matchedInitial?.featured ?? true,
+            imageUrl: p.image_url || matchedInitial?.imageUrl || undefined,
+            liveUrl: p.demo_url || matchedInitial?.liveUrl || undefined,
+            githubUrl: p.github_url || matchedInitial?.githubUrl || undefined,
+          }
+        })
 
-    const query = searchQuery.toLowerCase().trim()
-    const matchesSearch =
-      query === '' ||
-      project.title.toLowerCase().includes(query) ||
-      project.description.toLowerCase().includes(query) ||
-      project.team.toLowerCase().includes(query) ||
-      project.tags.some((tag) => tag.toLowerCase().includes(query))
+      // Guarantee flagship projects like Sugalaw PSITS Photobooth are always present
+      const merged = [...publicList]
+      for (const init of initialProjects) {
+        if (!merged.some((p) => p.title.toLowerCase().trim() === init.title.toLowerCase().trim())) {
+          merged.unshift(init)
+        }
+      }
+      projects = merged
+    }
+  } catch (err) {
+    console.error('Failed to load server projects for SEO:', err)
+  }
 
-    return matchesCategory && matchesSearch
-  })
+  // Generate dynamic Schema.org ItemList with SoftwareApplication & Author credits
+  const projectSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'PSITS-UA Student Software & Capstone Repository',
+    description:
+      'Student-engineered software systems, capstone research, and campus utilities built by IT majors at the University of Antique College of Computing and Information Sciences.',
+    itemListElement: projects.map((p, idx) => ({
+      '@type': 'ListItem',
+      position: idx + 1,
+      item: {
+        '@type': 'SoftwareApplication',
+        name: p.title,
+        description: p.description,
+        applicationCategory: p.category,
+        author: {
+          '@type': 'Person',
+          name: p.team,
+        },
+        ...(p.liveUrl ? { url: p.liveUrl } : {}),
+        ...(p.githubUrl ? { codeRepository: p.githubUrl } : {}),
+        ...(p.imageUrl ? { image: p.imageUrl } : {}),
+      },
+    })),
+  }
 
   return (
-    <div className="pt-32 pb-28 max-w-6xl mx-auto px-6 space-y-12">
-      <header className="space-y-4 border-b border-white/10 pb-10">
-        <p className="font-mono text-xs text-gold tracking-widest uppercase">
-          04 / Student Innovations · Showcase
-        </p>
-        <h1 className="font-display font-black text-4xl sm:text-5xl md:text-6xl text-white tracking-tight uppercase leading-[1.08]">
-          Projects & <span className="text-gold">Innovations</span>
-        </h1>
-        <p className="text-white/80 text-base max-w-2xl font-normal leading-relaxed">
-          Explore capstone systems, open-source utilities, and competition
-          builds engineered by Bachelor of Science in Information Technology
-          students of the University of Antique.
-        </p>
-      </header>
-
-      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-surface border border-white/10 rounded-xl">
-          {categories.map(({ label, icon: Icon }) => {
-            const isActive = selectedCategory === label
-            return (
-              <button
-                key={label}
-                type="button"
-                onClick={() => setSelectedCategory(label)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
-                  isActive
-                    ? 'bg-gold text-base font-bold shadow-[0_0_15px_rgba(245,166,35,0.35)]'
-                    : 'text-muted hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Icon size={14} className={isActive ? 'text-base' : 'text-gold'} />
-                {label}
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="relative min-w-[260px] md:w-72">
-          <Search
-            size={16}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
-          />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search stack, title, team..."
-            className="w-full bg-surface border border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder:text-muted/60 focus:outline-none focus:border-gold/50 transition-colors"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted hover:text-white"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      </div>
-
-      {filteredProjects.length === 0 ? (
-        <div className="text-center py-20 bg-surface border border-white/5 rounded-2xl p-8">
-          <p className="text-gold font-display font-bold text-lg mb-2">
-            No projects matched your criteria
-          </p>
-          <p className="text-muted text-sm">
-            Try resetting your search query or selecting another category filter.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedCategory('All')
-              setSearchQuery('')
-            }}
-            className="mt-5 px-4 py-2 bg-white/10 hover:bg-white/15 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-          >
-            Reset Filters
-          </button>
-        </div>
-      ) : (
-        <div className={`grid grid-cols-1 ${filteredProjects.length === 1 ? 'max-w-2xl' : 'md:grid-cols-2'} gap-6`}>
-          {filteredProjects.map((project: Project) => (
-            <div
-              key={project.id}
-              className="group bg-surface border border-white/5 hover:border-gold/30 rounded-2xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,166,35,0.08)]"
-            >
-              <div className="space-y-4">
-                {project.imageUrl && (
-                  <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-[#0a0e17] border border-white/10 mb-2">
-                    <Image
-                      src={project.imageUrl}
-                      alt={project.title}
-                      fill
-                      className="object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                      sizes="(max-width: 768px) 100vw, 700px"
-                    />
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-gold bg-gold/10 px-2.5 py-1 rounded-md border border-gold/20">
-                    {project.category}
-                  </span>
-                  <span className="text-[11px] font-mono text-muted">
-                    {project.year}
-                  </span>
-                </div>
-
-                <div>
-                  <h3 className="font-display font-bold text-xl sm:text-2xl text-white group-hover:text-gold transition-colors">
-                    {project.title}
-                  </h3>
-                  <p className="text-xs text-muted font-mono mt-1">
-                    By {project.team}
-                  </p>
-                </div>
-
-                <p className="text-muted text-sm leading-relaxed">
-                  {project.description}
-                </p>
-
-                {project.problemStatement && (
-                  <div className="p-3 bg-base/60 border-l-2 border-gold/50 rounded-r-lg">
-                    <p className="text-xs text-white/80 leading-relaxed italic">
-                      <span className="text-gold font-semibold not-italic">
-                        Impact:
-                      </span>{' '}
-                      {project.problemStatement}
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-1.5 pt-2">
-                  {project.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-white/[0.04] text-muted border border-white/5"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-6 mt-6 border-t border-white/5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  {project.githubUrl && (
-                    <a
-                      href={project.githubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-white transition-colors"
-                      aria-label="View Source Code on GitHub"
-                    >
-                      <UseAnimations
-                        animation={github}
-                        size={18}
-                        strokeColor="#F5A623"
-                        className="cursor-pointer"
-                      />
-                      <span>Repository</span>
-                    </a>
-                  )}
-
-                  {project.liveUrl && (
-                    <a
-                      href={project.liveUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-gold hover:text-gold/80 transition-colors"
-                      aria-label="Visit Live Project"
-                    >
-                      <ExternalLink size={13} />
-                      <span>Live Site</span>
-                    </a>
-                  )}
-                </div>
-
-                <div className="text-[11px] font-mono text-muted/60">
-                  {project.id.toUpperCase()}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <section className="border border-white/10 bg-surface/30 rounded-2xl p-8 sm:p-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-        <div className="max-w-xl space-y-2.5">
-          <p className="font-mono text-xs text-gold uppercase tracking-[0.2em] font-bold">
-            Showcase Your Work
-          </p>
-          <h2 className="font-display font-black text-2xl sm:text-3xl text-white tracking-tight leading-tight">
-            Built something impactful for UA or Antique?
-          </h2>
-          <p className="text-white/60 text-sm leading-relaxed font-normal">
-            We feature approved BSIT capstones, community open-source utilities, and competition prototypes built by CCIS students and alumni.
-          </p>
-        </div>
-
-        <div className="shrink-0">
-          <a
-            href="mailto:psits-ua@antiquespride.edu.ph?subject=Project%20Showcase%20Submission%20-%20PSITS%20Portal"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gold text-[#0D1117] font-mono font-bold text-xs uppercase tracking-wider hover:bg-white transition-all duration-200 active:scale-95 shadow-sm"
-          >
-            <span>Submit Project for Review</span>
-            <ArrowUpRight size={14} />
-          </a>
-        </div>
-      </section>
-    </div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(projectSchema) }}
+      />
+      <ProjectsClient initialProjects={projects} />
+    </>
   )
 }

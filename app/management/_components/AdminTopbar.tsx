@@ -2,11 +2,13 @@
 
 import { usePathname } from 'next/navigation'
 import { Menu } from 'lucide-react'
+import ThemeToggle from '@/components/ThemeToggle'
 
 const breadcrumbMap: Record<string, string> = {
   '/management/dashboard': 'Dashboard',
   '/management/blog': 'Blog / Dispatches',
   '/management/blog/new': 'New Post',
+  '/management/banners': 'Banners',
   '/management/officers': 'Officers',
   '/management/events': 'Events & Calendar',
   '/management/projects': 'Projects Showcase',
@@ -34,34 +36,40 @@ export default function AdminTopbar({
   })
 
   return (
-    <header className="sticky top-0 z-40 h-14 flex items-center gap-4 px-4 sm:px-6 bg-[#0a0e17]/80 backdrop-blur-xl border-b border-white/6">
-      <button
-        onClick={onMenuToggle}
-        className="lg:hidden p-2 -ml-2 rounded-lg text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors"
-        aria-label="Toggle sidebar"
-      >
-        <Menu size={20} />
-      </button>
+    <header className="sticky top-0 z-40 h-14 flex items-center justify-between gap-4 px-4 sm:px-6 bg-white/85 dark:bg-[#0a0e17]/80 backdrop-blur-xl border-b border-black/8 dark:border-white/6 transition-colors duration-200">
+      <div className="flex items-center gap-4 min-w-0">
+        <button
+          onClick={onMenuToggle}
+          className="lg:hidden p-2 -ml-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-white/50 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/[0.06] transition-colors"
+          aria-label="Toggle sidebar"
+        >
+          <Menu size={20} />
+        </button>
 
-      <nav className="flex items-center gap-1.5 text-[12px] font-mono">
-        {crumbs.map((crumb, i) => (
-          <span key={crumb.path} className="flex items-center gap-1.5">
-            {i > 0 && <span className="text-white/15">/</span>}
-            <span
-              className={
-                i === crumbs.length - 1
-                  ? 'text-white/80 font-semibold'
-                  : 'text-white/30'
-              }
-            >
-              {crumb.label}
+        <nav className="flex items-center gap-1.5 text-[12px] font-mono truncate">
+          {crumbs.map((crumb, i) => (
+            <span key={crumb.path} className="flex items-center gap-1.5">
+              {i > 0 && <span className="text-slate-300 dark:text-white/15">/</span>}
+              <span
+                className={
+                  i === crumbs.length - 1
+                    ? 'text-slate-900 dark:text-white/80 font-semibold'
+                    : 'text-slate-400 dark:text-white/30'
+                }
+              >
+                {crumb.label}
+              </span>
             </span>
-          </span>
-        ))}
-        {crumbs.length === 0 && (
-          <span className="text-white/80 font-semibold">{title}</span>
-        )}
-      </nav>
+          ))}
+          {crumbs.length === 0 && (
+            <span className="text-slate-900 dark:text-white/80 font-semibold">{title}</span>
+          )}
+        </nav>
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        <ThemeToggle size={18} />
+      </div>
     </header>
   )
 }

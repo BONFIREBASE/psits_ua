@@ -60,9 +60,9 @@ export default function FileUpload({
   return (
     <div className="space-y-2">
       {hasFile ? (
-        <div className="relative rounded-lg border border-white/10 bg-white/[0.03] overflow-hidden">
+        <div className="relative rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] overflow-hidden">
           {preview && isImage ? (
-            <div className="relative aspect-video bg-black/30">
+            <div className="relative aspect-video bg-slate-100 dark:bg-black/30">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={preview}
@@ -72,11 +72,11 @@ export default function FileUpload({
             </div>
           ) : (
             <div className="flex items-center gap-3 px-4 py-3">
-              <FileText size={18} className="text-gold/60 flex-shrink-0" />
-              <span className="text-sm text-white/70 truncate flex-1">
+              <FileText size={18} className="text-amber-600 dark:text-gold/60 flex-shrink-0" />
+              <span className="text-sm text-foreground-theme truncate flex-1">
                 {value?.name || 'Uploaded file'}
               </span>
-              <span className="text-[10px] text-white/30 font-mono flex-shrink-0">
+              <span className="text-[10px] text-muted-foreground-theme font-mono flex-shrink-0">
                 {value ? `${(value.size / 1024).toFixed(1)} KB` : ''}
               </span>
             </div>
@@ -84,7 +84,7 @@ export default function FileUpload({
           <button
             type="button"
             onClick={handleClear}
-            className="absolute top-2 right-2 w-7 h-7 rounded-md bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:border-white/25 transition-all"
+            className="absolute top-2 right-2 w-7 h-7 rounded-md bg-white/80 dark:bg-black/60 backdrop-blur-sm border border-slate-200 dark:border-white/10 flex items-center justify-center text-muted-foreground-theme hover:text-foreground-theme hover:border-slate-300 dark:hover:border-white/25 transition-all"
           >
             <X size={14} />
           </button>
@@ -100,20 +100,20 @@ export default function FileUpload({
             flex flex-col items-center justify-center py-8 px-4
             transition-all duration-200
             ${isDragging
-              ? 'border-gold/50 bg-gold/[0.04]'
-              : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
+              ? 'border-gold/60 bg-gold/[0.08]'
+              : 'border-slate-300 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02] hover:border-slate-400 dark:hover:border-white/20 hover:bg-slate-100/60 dark:hover:bg-white/[0.04]'
             }
           `}
         >
-          <div className="w-10 h-10 rounded-lg bg-white/[0.06] border border-white/8 flex items-center justify-center mb-3">
+          <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-white/[0.06] border border-slate-200 dark:border-white/8 flex items-center justify-center mb-3">
             {isImage ? (
-              <ImageIcon size={18} className="text-white/30" />
+              <ImageIcon size={18} className="text-slate-500 dark:text-white/30" />
             ) : (
-              <Upload size={18} className="text-white/30" />
+              <Upload size={18} className="text-slate-500 dark:text-white/30" />
             )}
           </div>
-          <p className="text-sm text-white/50 mb-1">{label}</p>
-          <p className="text-[10px] text-white/25 font-mono">
+          <p className="text-sm text-foreground-theme/75 mb-1">{label}</p>
+          <p className="text-[10px] text-muted-foreground-theme font-mono">
             Drag and drop or click to browse · Max {maxSizeMB}MB
           </p>
         </div>

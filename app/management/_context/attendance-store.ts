@@ -1,12 +1,11 @@
 'use client'
 
-/**
- * Attendance Store — localStorage-backed data layer
- * 
- * Abstracted interface for future backend migration.
- * All functions are synchronous (localStorage) but designed to
- * be easily swapped for async Firestore/Supabase calls.
- */
+import {
+  createMeetingAction,
+  deleteMeetingAction,
+  recordAttendanceScanAction,
+} from '../attendance/actions'
+import { getMeetings, getAttendanceRecords } from '@/lib/supabase'
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -110,6 +109,7 @@ export const MeetingStore = {
     const all = this.getAll()
     all.push(newMeeting)
     setToStorage(STORAGE_KEYS.meetings, all)
+    createMeetingAction(meeting).catch(() => {})
     return newMeeting
   },
 
@@ -130,7 +130,36 @@ export const MeetingStore = {
     // Also delete related attendance records
     const records = getFromStorage<AttendanceRecord>(STORAGE_KEYS.records)
     setToStorage(STORAGE_KEYS.records, records.filter((r) => r.meetingId !== id))
+    deleteMeetingAction(id).catch(() => {})
     return true
+  },
+
+  async syncWithSupabase(): Promise<void> {
+    try {
+      const dbMeetings = await getMeetings()
+      if (dbMeetings && dbMeetings.length > 0) {
+        const local = this.getAll()
+        const merged = [...local]
+        for (const dbm of dbMeetings) {
+          if (!merged.some((m) => m.id === dbm.id)) {
+            merged.push({
+              id: dbm.id,
+              title: dbm.title,
+              type: dbm.type,
+              date: dbm.date,
+              startTime: dbm.start_time,
+              endTime: dbm.end_time,
+              location: dbm.location,
+              description: dbm.description,
+              status: dbm.status as any,
+              createdAt: dbm.created_at,
+              createdBy: dbm.created_by,
+            })
+          }
+        }
+        setToStorage(STORAGE_KEYS.meetings, merged)
+      }
+    } catch {}
   },
 
   /** Get the currently active meeting (explicitly active or within scheduled time window) */
@@ -325,7 +354,40 @@ export const AttendanceStore = {
     const all = this.getAll()
     all.push(newRecord)
     setToStorage(STORAGE_KEYS.records, all)
+    recordAttendanceScanAction({
+      meetingId: record.meetingId,
+      officerName: record.officerName,
+      position: record.position,
+      qrToken: record.qrToken,
+      status: newRecord.status,
+      method: newRecord.method,
+    }).catch(() => {})
     return newRecord
+  },
+
+  async syncWithSupabase(): Promise<void> {
+    try {
+      const dbRecords = await getAttendanceRecords()
+      if (dbRecords && dbRecords.length > 0) {
+        const local = this.getAll()
+        const merged = [...local]
+        for (const dbr of dbRecords) {
+          if (!merged.some((r) => r.id === dbr.id)) {
+            merged.push({
+              id: dbr.id,
+              meetingId: dbr.meeting_id,
+              officerName: dbr.officer_name,
+              position: dbr.position,
+              scannedAt: dbr.scanned_at,
+              qrToken: dbr.qr_token,
+              status: dbr.status as any,
+              method: dbr.method as any,
+            })
+          }
+        }
+        setToStorage(STORAGE_KEYS.records, merged)
+      }
+    } catch {}
   },
 }
 
