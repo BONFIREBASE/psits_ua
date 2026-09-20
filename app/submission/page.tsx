@@ -11,10 +11,8 @@ import {
   X,
   Loader2,
   LogOut,
-  Info,
   Edit3,
   ArrowLeft,
-  ShieldAlert,
 } from "lucide-react";
 import { SubmissionAuthSkeleton } from "@/components/PublicSkeletonPreloader";
 import SubmissionLockWrapper from "@/components/SubmissionLockWrapper";
@@ -1134,20 +1132,33 @@ export default function SubmissionPage() {
                       </div>
                     </div>
                   ) : (
-                    <button
-                      type="submit"
-                      disabled={isSubmitting || !file}
-                      className="w-full py-3.5 px-4 rounded-xl text-xs font-mono font-bold uppercase tracking-wider text-[#0D1117] bg-gold hover:bg-gold-light disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 active:scale-[0.99] shadow-[0_0_20px_rgba(245,166,35,0.25)] hover:shadow-[0_0_30px_rgba(245,166,35,0.4)] cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>{uploadStepText}</span>
-                        </>
-                      ) : (
-                        <span>Submit</span>
-                      )}
-                    </button>
+                    <div className="space-y-3">
+                      <button
+                        type="submit"
+                        disabled={isSubmitting || !file}
+                        className="w-full py-3.5 px-4 rounded-xl text-xs font-mono font-bold uppercase tracking-wider text-[#0D1117] bg-gold hover:bg-gold-light disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 active:scale-[0.99] shadow-[0_0_20px_rgba(245,166,35,0.25)] hover:shadow-[0_0_30px_rgba(245,166,35,0.4)] cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>{uploadStepText}</span>
+                          </>
+                        ) : (
+                          <span>Submit</span>
+                        )}
+                      </button>
+
+                      <p className="text-[11px] text-center text-muted-foreground-theme/70 leading-relaxed px-1">
+                        By submitting, you certify that this is your original work and agree to the{' '}
+                        <Link href="/terms" target="_blank" className="text-gold underline underline-offset-2 hover:text-gold-light">
+                          Terms of Service
+                        </Link>{' '}
+                        and{' '}
+                        <Link href="/privacy" target="_blank" className="text-gold underline underline-offset-2 hover:text-gold-light">
+                          Privacy Policy
+                        </Link>.
+                      </p>
+                    </div>
                   )}
                 </form>
               )}

@@ -43,6 +43,47 @@ export async function createEventAction(formData: FormData) {
   }
 }
 
+export async function updateEventAction(id: string, formData: FormData) {
+  try {
+    const title = (formData.get('title') as string)?.trim();
+    const date = (formData.get('date') as string)?.trim();
+    const time = (formData.get('time') as string)?.trim() || 'TBA';
+    const location = (formData.get('location') as string)?.trim() || 'CCIS Building';
+    const category = (formData.get('category') as string)?.trim() || 'Department';
+    const description = (formData.get('description') as string)?.trim() || '';
+    const status = (formData.get('status') as string)?.trim() || 'Upcoming';
+
+    if (!id || !title || !date) {
+      return { success: false, error: 'Event ID, title, and date are required.' };
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('events')
+      .update({
+        title,
+        date,
+        time,
+        location,
+        category,
+        description,
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/management/events');
+    revalidatePath('/events');
+    revalidatePath('/management/dashboard');
+    return { success: true, data };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to update event' };
+  }
+}
+
 export async function deleteEventAction(id: string) {
   try {
     const { error } = await supabaseAdmin.from('events').delete().eq('id', id);

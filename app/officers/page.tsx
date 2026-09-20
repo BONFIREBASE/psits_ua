@@ -1,5 +1,7 @@
+import type { Metadata } from 'next'
 import Image from 'next/image'
 import {
+  dean,
   adviser,
   officers as initialOfficers,
   pubmatTeam as initialPubmat,
@@ -16,10 +18,54 @@ import {
 import { getOfficers } from '@/lib/supabase'
 import ScrollReveal from '@/components/ScrollReveal'
 
-export const metadata = {
-  title: 'Officers & Administration | PSITS-UA',
+export const metadata: Metadata = {
+  title: 'Officers & Leadership Directory | PSITS-UA',
   description:
-    'Official directory of PSITS-UA Executive Officers and Faculty Adviser for Academic Year 2026–2027.',
+    'Meet the PSITS-UA Executive Council, CCIS Dean Dr. John C. Amar, BSIT Program Head Carl Spence Percy, and student leaders for Academic Year 2026–2027.',
+  keywords: [
+    'PSITS Officers',
+    'PSITS-UA Leadership Directory',
+    'University of Antique IT Officers',
+    'College of Computing and Information Sciences Leaders',
+    'Student Council Antique',
+    // Dean & Adviser
+    'Dr. John C. Amar',
+    'Carl Spence Percy',
+    // Executive Council & Year Representatives
+    'Arvin James Balquin',
+    'Jared Patrick Evangelio',
+    'Kimberly Ann Erispe',
+    'Jin Sung Jung',
+    'Charyl Naldo',
+    'John Vincent Peniero',
+    'Johnric Ysulat',
+    'Vhonn Gabriel Habulin',
+    'Louise Jan Carlo Tabaldo',
+    'Bon Jury Pecaoco',
+    'Elijah Arevalo',
+    'Angel Nicole Albuera',
+    'Christine Sumande',
+    'Rona Mae Sangcap',
+    'Ramel Azar Jr.',
+    'Carmelo Dapar II',
+    // Pubmat Creative Team
+    'Ma. Echel Vicencio',
+    'Aizelle Binoy',
+    'Blessy Bielle P. Odango',
+    'Mark Gelo S. Wieldt',
+    'Rheinheart Masuay',
+    'Li Joshua Ramos',
+    'Jairoh Noe Bachicha Bremon',
+    'Dainielle Zyd Samalague',
+    'Clarence Morales',
+    'Precious Rhyza S. Ricasio',
+    'Ellen June Cardinal',
+    // Historical Founder
+    'Mrs. Nelly E. Mistio',
+  ],
+  alternates: {
+    canonical: '/officers',
+  },
 }
 
 function getInitials(name: string) {
@@ -108,8 +154,78 @@ export default async function OfficersPage() {
     (o) => o.roleGroup === 'Year Representatives'
   )
 
+  const leadershipSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'PSITS-UA Leadership Directory (AY 2026–2027)',
+    description:
+      'Executive Council, Faculty Advisers, and Student Leaders of PSITS at the University of Antique College of Computing and Information Sciences.',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        item: {
+          '@type': 'Person',
+          name: dean.name,
+          jobTitle: `${dean.title}, ${dean.college}`,
+          affiliation: {
+            '@type': 'CollegeOrUniversity',
+            name: dean.institution,
+          },
+        },
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        item: {
+          '@type': 'Person',
+          name: adviser.name,
+          jobTitle: adviser.title,
+          affiliation: {
+            '@type': 'CollegeOrUniversity',
+            name: adviser.institution,
+          },
+        },
+      },
+      ...officersList.map((o, idx) => ({
+        '@type': 'ListItem',
+        position: idx + 3,
+        item: {
+          '@type': 'Person',
+          name: o.name,
+          jobTitle: `${o.position} — PSITS-UA`,
+          worksFor: {
+            '@type': 'Organization',
+            name: 'PSITS-UA',
+          },
+          affiliation: {
+            '@type': 'CollegeOrUniversity',
+            name: 'University of Antique',
+          },
+        },
+      })),
+      ...pubmatMembers.map((p, idx) => ({
+        '@type': 'ListItem',
+        position: officersList.length + idx + 3,
+        item: {
+          '@type': 'Person',
+          name: p.name,
+          jobTitle: `${p.position} — Creative Pubmat Team`,
+          worksFor: {
+            '@type': 'Organization',
+            name: 'PSITS-UA',
+          },
+        },
+      })),
+    ],
+  }
+
   return (
     <div className="pt-32 pb-28 max-w-7xl mx-auto px-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(leadershipSchema) }}
+      />
       <ScrollReveal>
         <header className="space-y-4 pb-16 text-center">
           <p className="font-mono text-xs sm:text-sm text-gold font-bold tracking-widest uppercase">

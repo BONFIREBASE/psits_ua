@@ -9,14 +9,14 @@ import facebook from 'react-useanimations/lib/facebook'
 import github from 'react-useanimations/lib/github'
 import mail from 'react-useanimations/lib/mail'
 
-import { X, ArrowUpRight } from 'lucide-react'
-
 const navLinks = [
   { href: '/', label: 'Home' },
+  { href: '/about', label: 'About & History' },
   { href: '/officers', label: 'Leadership Directory' },
   { href: '/events', label: 'Calendar of Activities' },
   { href: '/projects', label: 'Student Projects' },
   { href: '/submission', label: 'Polo Shirt Contest' },
+  { href: '/merch', label: 'Official Merch' },
   { href: '/management', label: 'Management' },
 ]
 
@@ -33,7 +33,6 @@ const footerLogos = [
 
 export default function Footer() {
   const [activeLogoIndex, setActiveLogoIndex] = useState(0)
-  const [isProBonoOpen, setIsProBonoOpen] = useState(false)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -42,24 +41,12 @@ export default function Footer() {
     return () => clearInterval(timer)
   }, [])
 
-  useEffect(() => {
-    if (!isProBonoOpen) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsProBonoOpen(false)
-    }
-    const timer = setTimeout(() => setIsProBonoOpen(false), 8000)
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      clearTimeout(timer)
-    }
-  }, [isProBonoOpen])
 
   return (
     <footer className="relative border-t border-black/5 dark:border-white/5 bg-surface mt-24 overflow-hidden">
       <div
         aria-hidden="true"
-        className="absolute -right-20 sm:-right-16 md:-right-10 lg:-right-6 top-1/3 -translate-y-1/2 pointer-events-none select-none opacity-[0.04] md:opacity-[0.06]"
+        className="absolute -right-20 sm:-right-16 md:-right-10 lg:-right-6 top-[60%] -translate-y-1/2 pointer-events-none select-none opacity-[0.04] md:opacity-[0.06]"
       >
         <Image
           src="/assets/logo/ccis new logo.png"
@@ -84,6 +71,32 @@ export default function Footer() {
               {link.label}
             </Link>
           ))}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <p className="text-[11px] font-mono font-medium text-slate-500 dark:text-white/40 uppercase tracking-[0.2em] mb-1">
+            Policies & Legal
+          </p>
+          <Link
+            href="/terms"
+            className="text-xs text-muted hover:text-gold transition-colors duration-200"
+          >
+            Terms of Service
+          </Link>
+          <Link
+            href="/privacy"
+            className="text-xs text-muted hover:text-gold transition-colors duration-200"
+          >
+            Privacy Policy
+          </Link>
+          <a
+            href="/sitemap.xml"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-muted hover:text-gold transition-colors duration-200"
+          >
+            Sitemap
+          </a>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -165,87 +178,32 @@ export default function Footer() {
           </span>
         </div>
 
-        <div className="text-muted/80 flex items-center justify-center sm:justify-start gap-2 flex-wrap text-center sm:text-left">
+        <div className="text-muted/80 flex items-center justify-center sm:justify-start gap-2 sm:gap-2.5 flex-wrap text-center sm:text-left">
           <span>© {new Date().getFullYear()} PSITS-UA.</span>
-          <span className="inline-flex items-center gap-1.5">
+          <span className="text-muted/40">·</span>
+          <Link href="/terms" className="hover:text-gold transition-colors">
+            Terms
+          </Link>
+          <span className="text-muted/40">·</span>
+          <Link href="/privacy" className="hover:text-gold transition-colors">
+            Privacy
+          </Link>
+          <span className="text-muted/40">·</span>
+            <span className="inline-flex items-center gap-1.5">
             <span className="text-slate-500 dark:text-white/45">Built by</span>
-            <button
-              type="button"
-              onClick={() => setIsProBonoOpen(true)}
+            <a
+              href="https://bonfire.base69.studio/whatweoffer"
+              target="_blank"
+              rel="noopener noreferrer"
               className="group inline-flex items-center font-bold cursor-pointer transition-transform duration-200 active:scale-95"
             >
               <span className="animate-orange-gradient text-xs sm:text-[13px] tracking-wide underline underline-offset-4 decoration-[#FF6F00]/40 group-hover:decoration-[#FF6F00] transition-all drop-shadow-[0_0_14px_rgba(255,111,0,0.35)]">
                 Bonfire Base Studio
               </span>
-            </button>
+            </a>
           </span>
         </div>
       </div>
-
-      <AnimatePresence>
-        {isProBonoOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.94, filter: 'blur(6px)' }}
-            animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, y: 16, scale: 0.96, filter: 'blur(4px)' }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            role="status"
-            aria-live="polite"
-            className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 z-50 sm:w-92 sm:max-w-md rounded-2xl p-4 sm:p-5 overflow-hidden backdrop-blur-2xl bg-[#0D1117]/70 border border-white/15 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.22),0_20px_50px_rgba(0,0,0,0.75)]"
-          >
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/[0.09] via-transparent to-white/[0.02]"
-            />
-
-            <div
-              aria-hidden="true"
-              className="absolute -top-8 -right-8 w-24 h-24 bg-[#FF6F00]/15 rounded-full blur-2xl pointer-events-none"
-            />
-
-            <div className="relative z-10 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-baseline gap-2">
-                  <h4 className="font-display font-black text-sm text-white tracking-tight">
-                    Bonfire Base Studio
-                  </h4>
-                  <span className="font-mono text-[9px] text-white/35 uppercase tracking-wider">
-                    · San Jose, Antique
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsProBonoOpen(false)}
-                  className="p-1 rounded-md text-white/40 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                  aria-label="Dismiss notification"
-                >
-                  <X size={13} />
-                </button>
-              </div>
-
-              <p className="text-white/80 text-xs leading-relaxed font-normal">
-                Engineered with pride in Antique by <span className="text-white font-medium">Bonfire Base Studio</span> to give PSITS-UA and CCIS an official, modern platform celebrating student tech innovation.
-              </p>
-
-              <div className="pt-2.5 border-t border-white/10 flex items-center justify-between">
-                <span className="font-mono text-[10px] text-[#FFA726]/85 italic">
-                  &ldquo;Ignite Ideas, Survive the Future&rdquo;
-                </span>
-                <a
-                  href="https://bonfire.base69.studio/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[11px] font-mono font-medium text-white/90 hover:text-[#FFA726] transition-colors py-1 px-2.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 shadow-sm"
-                >
-                  <span>Visit Studio</span>
-                  <ArrowUpRight size={12} className="text-[#FF8C00]" />
-                </a>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </footer>
   )
 }

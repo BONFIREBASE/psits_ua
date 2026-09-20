@@ -63,7 +63,7 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
                 setShowCredit((prev) => !prev)
               }}
               className="w-7 h-7 rounded-full flex items-center justify-center bg-black/50 hover:bg-black/80 active:scale-95 backdrop-blur-md border border-white/15 text-white/70 hover:text-white transition-all shadow-md cursor-pointer"
-              title="Artwork credit"
+              title="Thumbnail credit"
               aria-label="Thumbnail creator credit"
             >
               <Info size={13} className="text-gold" />
@@ -75,7 +75,7 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
                 onClick={(e) => e.stopPropagation()}
                 className="absolute left-0 top-full mt-1.5 z-50 px-3 py-1.5 rounded-lg bg-[#0d1117]/95 backdrop-blur-md border border-white/15 shadow-2xl text-[11px] font-mono text-white whitespace-nowrap animate-in fade-in zoom-in-95 duration-150"
               >
-                <span className="text-white/50">Artwork: </span>
+                <span className="text-white/50">Thumbnail: </span>
                 <span className="text-gold font-semibold">{creditName || 'PSITS Pubmat'}</span>
               </div>
             )}

@@ -25,7 +25,7 @@ import EmptyState from '../_components/EmptyState'
 import { ManagementCardGridSkeleton } from '../_components/SkeletonPreloader'
 import { useToast } from '../_components/Toast'
 import { getEvents, supabase } from '@/lib/supabase'
-import { createEventAction, deleteEventAction } from './actions'
+import { createEventAction, updateEventAction, deleteEventAction } from './actions'
 
 export type EventStatus = 'Scheduled' | 'Completed' | 'Postponed' | 'Cancelled'
 
@@ -222,9 +222,24 @@ export default function EventsManagementPage() {
     toast('Event saved to Supabase database!')
   }
 
-  function handleSaveEdit(e: FormEvent) {
+  async function handleSaveEdit(e: FormEvent) {
     e.preventDefault()
     if (!editingEvent) return
+
+    const formData = new FormData()
+    formData.append('title', formActivity.trim())
+    formData.append('date', formMonth.trim())
+    formData.append('time', 'TBA')
+    formData.append('location', formVenue.trim() || 'CCIS Lobby')
+    formData.append('category', formCategory)
+    formData.append('description', formInvolved.trim() || 'CCIS IT Students')
+    formData.append('status', formStatus)
+
+    const res = await updateEventAction(editingEvent.id, formData)
+    if (!res.success) {
+      toast(res.error || 'Failed to update event')
+      return
+    }
 
     const updated: ManagedActivity = {
       ...editingEvent,
@@ -240,7 +255,7 @@ export default function EventsManagementPage() {
 
     setEvents(events.map((e) => (e.id === editingEvent.id ? updated : e)))
     setEditingEvent(null)
-    toast('Event updated successfully.')
+    toast('Event updated successfully in database!')
   }
 
   async function handleDelete(id: string) {

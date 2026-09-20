@@ -183,6 +183,84 @@ export async function approveProjectAction(id: string) {
 }
 
 /**
+ * Management: Update Existing Project
+ */
+export async function updateProjectAction(id: string, formData: FormData) {
+  try {
+    const title = (formData.get('title') as string)?.trim();
+    const category = (formData.get('category') as string)?.trim() || 'Capstone';
+    const description = (formData.get('description') as string)?.trim() || '';
+    const demoUrl = (formData.get('demoUrl') as string)?.trim() || (formData.get('demo_url') as string)?.trim() || null;
+    const githubUrl = (formData.get('githubUrl') as string)?.trim() || (formData.get('github_url') as string)?.trim() || null;
+    const status = (formData.get('status') as string)?.trim() || 'Active';
+    const tagsRaw = (formData.get('tags') as string)?.trim() || '';
+    const team = (formData.get('team') as string)?.trim() || 'PSITS-UA Student Developers';
+    const existingImageUrl = (formData.get('existingImageUrl') as string)?.trim() || (formData.get('existing_image_url') as string)?.trim() || null;
+    const thumbnail = formData.get('thumbnail') as File | null;
+
+    if (!id || !title) {
+      return { success: false, error: 'Project ID and title are required.' };
+    }
+
+    const tags = tagsRaw
+      ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean)
+      : [];
+
+    if (team && !tags.some((t) => t.toLowerCase().startsWith('by:'))) {
+      tags.push(`By: ${team}`);
+    }
+
+    let imageUrl = existingImageUrl;
+    if (thumbnail && thumbnail.size > 0) {
+      const sanitized = thumbnail.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const r2Key = `projects/${Date.now()}-${sanitized}`;
+      const arrayBuffer = await thumbnail.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      const r2Upload = await uploadToR2({
+        key: r2Key,
+        body: buffer,
+        contentType: thumbnail.type || 'application/octet-stream',
+      });
+      imageUrl = r2Upload.url;
+
+      if (existingImageUrl && existingImageUrl.includes('.r2.dev')) {
+        try {
+          const parsed = new URL(existingImageUrl);
+          const oldKey = parsed.pathname.replace(/^\//, '');
+          if (oldKey) await deleteFromR2(oldKey);
+        } catch {}
+      }
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('projects')
+      .update({
+        title,
+        category,
+        description,
+        tags,
+        image_url: imageUrl,
+        demo_url: demoUrl,
+        github_url: githubUrl,
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/management/projects');
+    revalidatePath('/projects');
+    return { success: true, data };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to update project' };
+  }
+}
+
+/**
  * 4. Management: Delete / Reject Project
  */
 export async function deleteProjectAction(id: string, imageUrl?: string | null) {

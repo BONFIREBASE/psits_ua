@@ -1,17 +1,57 @@
+import type { Metadata } from 'next'
 import SectionHeader from '@/components/SectionHeader'
 import ArchiveStack from '@/components/ArchiveStack'
 import ScrollReveal from '@/components/ScrollReveal'
 import { archivePhotos } from '@/data/archive'
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'About PSITS-UA | History & Archive',
   description:
-    'Discover the history of PSITS-UA — established in 1993 at the University of Antique — and explore the PSITS Archive.',
+    'Discover the three-decade heritage of PSITS-UA — founded on January 8, 1993 by Mrs. Nelly E. Mistio at the Polytechnic State College of Antique (now University of Antique).',
+  keywords: [
+    'About PSITS-UA',
+    'PSITS History',
+    'Mrs. Nelly E. Mistio',
+    'Computer Society 1993',
+    'Polytechnic State College of Antique',
+    'PSCA',
+    'University of Antique History',
+    'College of Computing and Information Sciences Heritage',
+  ],
+  alternates: {
+    canonical: '/about',
+  },
+}
+
+const aboutSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'AboutPage',
+  name: 'About PSITS-UA | History & Archive',
+  description:
+    'Discover the three-decade heritage of PSITS-UA — founded on January 8, 1993 by Mrs. Nelly E. Mistio at the Polytechnic State College of Antique (now University of Antique).',
+  mainEntity: {
+    '@type': 'EducationalOrganization',
+    name: 'Philippine Society of Information Technology Students — University of Antique',
+    foundingDate: '1993-01-08',
+    founder: {
+      '@type': 'Person',
+      name: 'Mrs. Nelly E. Mistio',
+      jobTitle: 'Founder, Computer Society (1993)',
+      affiliation: {
+        '@type': 'CollegeOrUniversity',
+        name: 'University of Antique (formerly Polytechnic State College of Antique)',
+      },
+    },
+  },
 }
 
 export default function AboutPage() {
   return (
     <main className="min-h-screen bg-canvas text-text">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutSchema) }}
+      />
 
       {/* ── Section 1: Our Story ────────────────────────────────────────── */}
       <section className="relative min-h-[60vh] lg:min-h-[65vh] flex flex-col justify-center pt-32 pb-16 lg:py-20 px-6 overflow-hidden">

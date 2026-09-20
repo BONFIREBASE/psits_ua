@@ -148,15 +148,21 @@ export default function BannersManagementPage() {
       formData.append('title', formTitle.trim())
       formData.append('subtitle', finalSubtitle)
       formData.append('type', formType)
+      formData.append('linkText', formLinkText.trim())
       formData.append('link_text', formLinkText.trim())
+      formData.append('linkUrl', formLinkUrl.trim())
       formData.append('link_url', formLinkUrl.trim())
+      formData.append('secondaryLinkText', formSecondaryLinkText.trim())
       formData.append('secondary_link_text', formSecondaryLinkText.trim())
+      formData.append('secondaryLinkUrl', formSecondaryLinkUrl.trim())
       formData.append('secondary_link_url', formSecondaryLinkUrl.trim())
+      formData.append('isActive', String(formIsActive))
       formData.append('is_active', String(formIsActive))
 
       if (formThumbnail) {
         formData.append('thumbnail', formThumbnail)
       } else if (editingBanner?.image_url) {
+        formData.append('existingImageUrl', editingBanner.image_url)
         formData.append('existing_image_url', editingBanner.image_url)
       }
 

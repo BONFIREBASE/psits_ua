@@ -64,8 +64,43 @@ export default function HomePage() {
       supabase.removeChannel(channel)
     }
   }, [])
+
+  const articlesSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'PSITS-UA Community Dispatches & Announcements',
+    itemListElement: dispatches.map((d, idx) => {
+      const contributors = []
+      if (d.credits?.photographer) contributors.push({ '@type': 'Person', name: d.credits.photographer, jobTitle: 'Photographer' })
+      if (d.credits?.pubmat) contributors.push({ '@type': 'Person', name: d.credits.pubmat, jobTitle: 'Pubmat Designer' })
+      if (d.credits?.videographer) contributors.push({ '@type': 'Person', name: d.credits.videographer, jobTitle: 'Videographer' })
+      if (d.credits?.prepared_by) contributors.push({ '@type': 'Person', name: d.credits.prepared_by, jobTitle: 'Prepared By' })
+
+      return {
+        '@type': 'ListItem',
+        position: idx + 1,
+        item: {
+          '@type': 'NewsArticle',
+          headline: d.title,
+          description: d.excerpt,
+          url: d.postUrl || 'https://psits-ua.antiquespride.edu.ph',
+          ...(d.credits?.writer ? { author: { '@type': 'Person', name: d.credits.writer, jobTitle: 'Writer' } } : {}),
+          ...(contributors.length > 0 ? { contributor: contributors } : {}),
+          publisher: {
+            '@type': 'EducationalOrganization',
+            name: 'PSITS-UA',
+          },
+        },
+      }
+    }),
+  }
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articlesSchema) }}
+      />
       <section className="relative min-h-[65vh] sm:min-h-[75vh] lg:min-h-[84vh] flex flex-col items-center justify-center pt-24 sm:pt-32 pb-8 sm:pb-14 lg:py-20 overflow-hidden bg-base">
         <div className="absolute inset-0 pointer-events-none z-0">
           <Image

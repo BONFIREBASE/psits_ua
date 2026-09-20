@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, ShoppingBag } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 
 const links = [
@@ -18,6 +18,7 @@ const links = [
 
 export default function Navbar() {
   const pathname = usePathname()
+  const isMerchActive = pathname === '/merch' || pathname.startsWith('/merch/')
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [hoveredPath, setHoveredPath] = useState<string | null>(null)
@@ -158,6 +159,25 @@ export default function Navbar() {
             </ul>
 
             <div className="w-[1px] h-4 bg-black/10 dark:bg-white/15 mx-1" />
+
+            {/* Desktop Merch Store Utility Link */}
+            <Link
+              href="/merch"
+              className={`
+                relative p-2 rounded-full transition-all duration-200
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60
+                ${isMerchActive
+                  ? 'text-gold bg-gold/15 drop-shadow-[0_0_10px_rgba(245,166,35,0.4)]'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-white/75 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/[0.08]'
+                }
+              `}
+              title="Official Merch Store"
+              aria-label="Official Merch Store"
+            >
+              <ShoppingBag size={17} />
+              <span className="sr-only">Official Merch Store</span>
+            </Link>
+
             <ThemeToggle size={17} />
           </div>
 
@@ -259,6 +279,33 @@ export default function Navbar() {
                     </li>
                   )
                 })}
+
+                {/* Mobile Drawer Official Merch Link */}
+                <div className="my-1 border-t border-black/5 dark:border-white/10" />
+                <li>
+                  <Link
+                    href="/merch"
+                    onClick={() => setOpen(false)}
+                    className={`
+                      flex items-center justify-between px-4 py-3 rounded-xl text-[15px] font-medium
+                      transition-all duration-200
+                      ${isMerchActive
+                        ? 'bg-gradient-to-r from-[#F5A623] to-[#FFA726] text-[#0D1117] font-semibold shadow-[0_4px_14px_rgba(245,166,35,0.35)]'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-black/[0.04] dark:text-white/85 dark:hover:text-white dark:hover:bg-white/[0.06]'
+                      }
+                    `}
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <ShoppingBag size={17} className={isMerchActive ? 'text-slate-950' : 'text-gold'} />
+                      <span>Official Merch</span>
+                    </span>
+                    <span className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded-full font-bold ${
+                      isMerchActive ? 'bg-slate-950/15 text-slate-950' : 'bg-gold/15 text-gold'
+                    }`}>
+                      Store
+                    </span>
+                  </Link>
+                </li>
               </ul>
             </div>
           </motion.div>

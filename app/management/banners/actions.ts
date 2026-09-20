@@ -15,12 +15,12 @@ export async function createBannerAction(formData: FormData): Promise<BannerActi
     const title = (formData.get('title') as string)?.trim()
     const subtitle = (formData.get('subtitle') as string)?.trim() || ''
     const type = (formData.get('type') as string)?.trim() || 'general'
-    const linkUrl = (formData.get('linkUrl') as string)?.trim() || null
-    const linkText = (formData.get('linkText') as string)?.trim() || 'Learn More'
-    const secondaryLinkUrl = (formData.get('secondaryLinkUrl') as string)?.trim() || null
-    const secondaryLinkText = (formData.get('secondaryLinkText') as string)?.trim() || null
-    const isActive = formData.get('isActive') === 'true'
-    const displayOrder = parseInt((formData.get('displayOrder') as string) || '0', 10)
+    const linkUrl = ((formData.get('linkUrl') || formData.get('link_url')) as string)?.trim() || null
+    const linkText = ((formData.get('linkText') || formData.get('link_text')) as string)?.trim() || 'Learn More'
+    const secondaryLinkUrl = ((formData.get('secondaryLinkUrl') || formData.get('secondary_link_url')) as string)?.trim() || null
+    const secondaryLinkText = ((formData.get('secondaryLinkText') || formData.get('secondary_link_text')) as string)?.trim() || null
+    const isActive = formData.get('isActive') === 'true' || formData.get('is_active') === 'true'
+    const displayOrder = parseInt(((formData.get('displayOrder') || formData.get('display_order')) as string) || '0', 10)
     const thumbnail = formData.get('thumbnail') as File | null
 
     if (!title) {
@@ -79,13 +79,13 @@ export async function updateBannerAction(id: string, formData: FormData): Promis
     const title = (formData.get('title') as string)?.trim()
     const subtitle = (formData.get('subtitle') as string)?.trim() || ''
     const type = (formData.get('type') as string)?.trim() || 'general'
-    const linkUrl = (formData.get('linkUrl') as string)?.trim() || null
-    const linkText = (formData.get('linkText') as string)?.trim() || 'Learn More'
-    const secondaryLinkUrl = (formData.get('secondaryLinkUrl') as string)?.trim() || null
-    const secondaryLinkText = (formData.get('secondaryLinkText') as string)?.trim() || null
-    const isActive = formData.get('isActive') === 'true'
-    const displayOrder = parseInt((formData.get('displayOrder') as string) || '0', 10)
-    const existingImageUrl = (formData.get('existingImageUrl') as string)?.trim() || null
+    const linkUrl = ((formData.get('linkUrl') || formData.get('link_url')) as string)?.trim() || null
+    const linkText = ((formData.get('linkText') || formData.get('link_text')) as string)?.trim() || 'Learn More'
+    const secondaryLinkUrl = ((formData.get('secondaryLinkUrl') || formData.get('secondary_link_url')) as string)?.trim() || null
+    const secondaryLinkText = ((formData.get('secondaryLinkText') || formData.get('secondary_link_text')) as string)?.trim() || null
+    const isActive = formData.get('isActive') === 'true' || formData.get('is_active') === 'true'
+    const displayOrder = parseInt(((formData.get('displayOrder') || formData.get('display_order')) as string) || '0', 10)
+    const existingImageUrl = ((formData.get('existingImageUrl') || formData.get('existing_image_url')) as string)?.trim() || null
     const thumbnail = formData.get('thumbnail') as File | null
 
     if (!id || !title) {

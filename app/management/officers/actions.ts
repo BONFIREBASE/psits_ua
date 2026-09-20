@@ -77,7 +77,7 @@ export async function updateOfficerAction(id: string, formData: FormData) {
     const isPubmat = formData.get('isPubmat') === 'true';
     const pubmatRole = (formData.get('pubmatRole') as string)?.trim() || null;
     const photo = formData.get('photo') as File | null;
-    const existingImageUrl = (formData.get('existingImageUrl') as string)?.trim() || null;
+    const existingImageUrl = (formData.get('existingImageUrl') as string)?.trim() || (formData.get('existing_image_url') as string)?.trim() || null;
 
     if (!id || !name || !position) {
       return { success: false, error: 'Officer ID, name, and position are required.' };

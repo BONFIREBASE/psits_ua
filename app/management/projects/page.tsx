@@ -40,7 +40,7 @@ import StatusBadge from '../_components/StatusBadge'
 import EmptyState from '../_components/EmptyState'
 import { useToast } from '../_components/Toast'
 import { getProjects } from '@/lib/supabase'
-import { createProjectAction, deleteProjectAction, approveProjectAction } from './actions'
+import { createProjectAction, updateProjectAction, deleteProjectAction, approveProjectAction } from './actions'
 
 const categoryOptions = [
   { value: 'Campus Utility', label: 'Campus Utility' },
@@ -201,6 +201,7 @@ export default function ProjectsManagementPage() {
     formData.append('title', formTitle.trim())
     formData.append('category', formCategory)
     formData.append('description', formDescription.trim())
+    formData.append('team', formTeam.trim())
     formData.append('tags', formTags)
     formData.append('status', formStatus)
     formData.append('demoUrl', formLiveUrl.trim())
@@ -239,9 +240,31 @@ export default function ProjectsManagementPage() {
     toast('Project saved successfully!')
   }
 
-  function handleSaveEdit(e: FormEvent) {
+  async function handleSaveEdit(e: FormEvent) {
     e.preventDefault()
     if (!editingProject) return
+
+    const formData = new FormData()
+    formData.append('title', formTitle.trim())
+    formData.append('category', formCategory)
+    formData.append('description', formDescription.trim())
+    formData.append('team', formTeam.trim())
+    formData.append('tags', formTags)
+    formData.append('status', formStatus)
+    formData.append('demoUrl', formLiveUrl.trim())
+    formData.append('githubUrl', formGithubUrl.trim())
+    if (editingProject.imageUrl) {
+      formData.append('existingImageUrl', editingProject.imageUrl)
+    }
+    if (formImage) {
+      formData.append('thumbnail', formImage)
+    }
+
+    const res = await updateProjectAction(editingProject.id, formData)
+    if (!res.success) {
+      toast(res.error || 'Failed to update project')
+      return
+    }
 
     const tagsArray = formTags
       .split(',')
@@ -259,15 +282,14 @@ export default function ProjectsManagementPage() {
       year: formYear.trim(),
       status: formStatus,
       featured: formFeatured,
-      imageUrl: formImagePreview || undefined,
+      imageUrl: (res.data as { image_url?: string })?.image_url || formImagePreview || editingProject.imageUrl,
       liveUrl: formLiveUrl.trim() || undefined,
       githubUrl: formGithubUrl.trim() || undefined,
     }
 
     setProjects(projects.map((p) => (p.id === editingProject.id ? updated : p)))
     setEditingProject(null)
-    toast('Project updated successfully. (Placeholder)')
-    console.log('[Management] Updated project:', updated)
+    toast('Project updated successfully in database!')
   }
 
   async function handleDelete(id: string) {
