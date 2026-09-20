@@ -172,6 +172,9 @@ export const metadata: Metadata = {
     shortcut: "/assets/logo/PSITS%20logo.png",
     apple: "/assets/logo/PSITS%20logo.png",
   },
+  verification: {
+    google: "sw9iscqYtp_JIyfnQO64H-GH6MqDJ9X2R14XJdLLwYY",
+  },
 };
 
 export default function RootLayout({
