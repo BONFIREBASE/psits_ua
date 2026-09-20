@@ -56,7 +56,10 @@ const organizationSchema = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "https://psits-ua.antiquespride.edu.ph"
+    (process.env.NEXT_PUBLIC_SITE_URL || "https://psitsua.vercel.app").replace(
+      "psits-ua.vercel.app",
+      "psitsua.vercel.app"
+    )
   ),
   title: {
     default:
