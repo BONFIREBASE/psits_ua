@@ -43,6 +43,16 @@ export default function ManagementLoginPage() {
     }
   }, [authLoading, isAuthenticated, router])
 
+  // Check for auth errors from OAuth redirects or session resolution
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const storedError = sessionStorage.getItem('psits_auth_error')
+    if (storedError) {
+      setError(storedError)
+      sessionStorage.removeItem('psits_auth_error')
+    }
+  }, [])
+
   // Reset token and clear errors when switching modes
   function switchMode(newMode: LoginMode) {
     setMode(newMode)

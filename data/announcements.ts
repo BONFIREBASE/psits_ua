@@ -117,7 +117,7 @@ You are not alone. You are loved. You are valued. And you matter.`,
 
   {
     id: 'fb-photobooth',
-    imageUrl: '/assets/photobooth.jpg',
+    imageUrl: 'https://pub-1813fa24f4b74f44896e886714f409db.r2.dev/projects/sugalaw.jpg',
     date: 'August 24, 2026',
     venue: 'In front of TiripUnAn Hall',
     category: 'Campus Event',

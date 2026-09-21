@@ -22,6 +22,9 @@ function getTimeSnapshot() {
 }
 
 function subscribeSecondTimer(callback: () => void) {
+  if (LIFT_OFF_TIMESTAMP - Date.now() <= 0) {
+    return () => {}
+  }
   const interval = setInterval(callback, 1000)
   return () => clearInterval(interval)
 }
@@ -59,7 +62,7 @@ export default function MaintenanceWrapper({
   const timeSnapshot = useSyncExternalStore(
     subscribeSecondTimer,
     getTimeSnapshot,
-    () => '0:0:0:0:0'
+    getTimeSnapshot
   )
 
   const [days, hours, minutes, seconds, passedFlag] = timeSnapshot.split(':')
