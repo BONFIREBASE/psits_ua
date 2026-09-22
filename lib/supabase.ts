@@ -226,6 +226,96 @@ export interface OfficerRow {
   created_at: string;
 }
 
+export const ROLE_GROUP_ORDER: Record<string, number> = {
+  'Executive': 1,
+  'Secretariat & Finance': 2,
+  'Operations & PR': 3,
+  'Year Representatives': 4,
+};
+
+export function getOfficerPositionRank(position: string): number {
+  const norm = (position || '').toLowerCase().replace(/[\(\)\.]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (norm === 'president') return 1;
+  if (norm === 'vice president') return 2;
+  if (norm === 'secretary') return 10;
+  if (norm === 'assistant secretary') return 11;
+  if (norm === 'treasurer') return 12;
+  if (norm === 'assistant treasurer') return 13;
+  if (norm === 'auditor') return 14;
+  if (norm === 'assistant auditor') return 15;
+  if (norm.includes('public information officer 1') || norm.includes('pio 1')) return 20;
+  if (norm.includes('public information officer 2') || norm.includes('pio 2')) return 21;
+  if (norm.includes('business manager 1') || norm.includes('bm 1')) return 22;
+  if (norm.includes('business manager 2') || norm.includes('bm 2')) return 23;
+  if (norm.includes('1st year')) return 30;
+  if (norm.includes('2nd year')) return 31;
+  if (norm.includes('3rd year')) return 32;
+  if (norm.includes('4th year')) return 33;
+  return 99;
+}
+
+export function getPubmatRoleRank(roleOrPos: string): number {
+  const norm = (roleOrPos || '').toLowerCase();
+  const isLead = norm.includes('lead') || norm.includes('head');
+  let categoryRank = 50;
+  if (norm.includes('writer')) categoryRank = 10;
+  else if (norm.includes('graphic') || norm.includes('designer')) categoryRank = 20;
+  else if (norm.includes('photo') || norm.includes('video')) categoryRank = 30;
+  else if (norm.includes('dev') || norm.includes('program')) categoryRank = 40;
+  return (isLead ? 0 : 100) + categoryRank;
+}
+
+export function sortOfficersByHierarchy<T extends {
+  name: string;
+  position: string;
+  role_group?: string;
+  roleGroup?: string;
+  is_pubmat?: boolean;
+  isPubmat?: boolean;
+  pubmat_role?: string | null;
+  pubmatRole?: string | null;
+}>(list: T[]): T[] {
+  return [...list].sort((a, b) => {
+    const aIsPubmat = !!(a.is_pubmat ?? a.isPubmat);
+    const bIsPubmat = !!(b.is_pubmat ?? b.isPubmat);
+
+    // If both are pubmat, sort by pubmat rank then name
+    if (aIsPubmat && bIsPubmat) {
+      const aPubRole = a.pubmat_role || a.pubmatRole || a.position;
+      const bPubRole = b.pubmat_role || b.pubmatRole || b.position;
+      const rankA = getPubmatRoleRank(aPubRole);
+      const rankB = getPubmatRoleRank(bPubRole);
+      if (rankA !== rankB) return rankA - rankB;
+      return a.name.localeCompare(b.name);
+    }
+
+    // If one is pubmat and one is not
+    if (aIsPubmat !== bIsPubmat) {
+      return aIsPubmat ? 1 : -1;
+    }
+
+    // Role group hierarchy
+    const groupA = a.role_group || a.roleGroup || '';
+    const groupB = b.role_group || b.roleGroup || '';
+    const groupRankA = ROLE_GROUP_ORDER[groupA] ?? 99;
+    const groupRankB = ROLE_GROUP_ORDER[groupB] ?? 99;
+
+    if (groupRankA !== groupRankB) {
+      return groupRankA - groupRankB;
+    }
+
+    // Position rank within the same role group
+    const posRankA = getOfficerPositionRank(a.position);
+    const posRankB = getOfficerPositionRank(b.position);
+
+    if (posRankA !== posRankB) {
+      return posRankA - posRankB;
+    }
+
+    return a.name.localeCompare(b.name);
+  });
+}
+
 export async function getOfficers(): Promise<OfficerRow[]> {
   try {
     const { data, error } = await supabase
@@ -233,7 +323,8 @@ export async function getOfficers(): Promise<OfficerRow[]> {
       .select('*')
       .order('created_at', { ascending: true });
     if (error) return [];
-    return (data as OfficerRow[]) || [];
+    const rows = (data as OfficerRow[]) || [];
+    return sortOfficersByHierarchy(rows);
   } catch {
     return [];
   }
@@ -247,7 +338,8 @@ export async function getPubmatMembers(): Promise<OfficerRow[]> {
       .eq('is_pubmat', true)
       .order('name', { ascending: true });
     if (error) return [];
-    return (data as OfficerRow[]) || [];
+    const rows = (data as OfficerRow[]) || [];
+    return sortOfficersByHierarchy(rows);
   } catch {
     return [];
   }

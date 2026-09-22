@@ -24,7 +24,13 @@ export default function FileUpload({
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const isImage = accept.includes('image')
+  const isImageAccept = accept.includes('image')
+  const isSelectedImage = Boolean(
+    value?.type?.startsWith('image/') ||
+    (value?.name && /\.(png|jpe?g|webp|gif|svg)$/i.test(value.name)) ||
+    (preview && (preview.startsWith('data:image/') || /\.(png|jpe?g|webp|gif|svg)($|\?)/i.test(preview)))
+  )
+  const isImage = isImageAccept || isSelectedImage
 
   function handleFile(file: File) {
     setError(null)

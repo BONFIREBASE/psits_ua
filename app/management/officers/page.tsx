@@ -24,7 +24,7 @@ import FileUpload from '../_components/FileUpload'
 import Select from '../_components/Select'
 import { ManagementCardGridSkeleton } from '../_components/SkeletonPreloader'
 import { useToast } from '../_components/Toast'
-import { getOfficers, supabase } from '@/lib/supabase'
+import { getOfficers, supabase, sortOfficersByHierarchy } from '@/lib/supabase'
 import {
   createOfficerAction,
   updateOfficerAction,
@@ -71,16 +71,21 @@ function getInitials(name: string) {
     .toUpperCase()
 }
 
+function getOfficerKey(o: OfficerWithMeta): string {
+  return o.id || `${o.name}-${o.position}-${o.isPubmat ? 'pubmat' : 'officer'}`
+}
+
 export default function OfficersManagementPage() {
   const { toast } = useToast()
   const { user } = useAuth()
-  const canManage = !user || user.role === 'admin' || user.role === 'officer'
+  const isAdmin = user?.role === 'admin'
+  const isOfficer = user?.role === 'officer'
 
   const [officersList, setOfficersList] = useState<OfficerWithMeta[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('All')
   const [search, setSearch] = useState('')
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [savingAdd, setSavingAdd] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
@@ -102,7 +107,7 @@ export default function OfficersManagementPage() {
           isPubmat: o.is_pubmat,
           pubmatRole: o.pubmat_role || undefined,
         }))
-        setOfficersList(mapped)
+        setOfficersList(sortOfficersByHierarchy(mapped))
       } else {
         // Fallback to static seeds
         const staticList: OfficerWithMeta[] = [
@@ -117,7 +122,7 @@ export default function OfficersManagementPage() {
             pubmatRole: p.role,
           })),
         ]
-        setOfficersList(staticList)
+        setOfficersList(sortOfficersByHierarchy(staticList))
       }
     } catch {
       toast('Failed to load officers directory')
@@ -175,8 +180,18 @@ export default function OfficersManagementPage() {
     return matchesTab && matchesSearch
   })
 
-  function startEdit(index: number) {
-    const officer = officersList[index]
+  function startEdit(officer: OfficerWithMeta) {
+    const isOwn = Boolean(
+      user &&
+      ((officer.email && user.email && officer.email.trim().toLowerCase() === user.email.trim().toLowerCase()) ||
+       (officer.name && user.displayName && officer.name.trim().toLowerCase() === user.displayName.trim().toLowerCase()))
+    )
+    if (!isAdmin && !isOwn) {
+      toast('Only Super Admin can edit other profiles.')
+      return
+    }
+
+    const key = getOfficerKey(officer)
     setForm({
       name: officer.name,
       position: officer.position,
@@ -188,13 +203,13 @@ export default function OfficersManagementPage() {
     })
     setFormImage(null)
     setFormImagePreview(officer.image || null)
-    setEditingIndex(index)
+    setEditingId(key)
     setShowAdd(false)
     setConfirmDeleteId(null)
   }
 
   function cancelEdit() {
-    setEditingIndex(null)
+    setEditingId(null)
     setForm({
       name: '',
       position: '',
@@ -208,12 +223,36 @@ export default function OfficersManagementPage() {
     setFormImagePreview(null)
   }
 
-  async function saveEdit() {
-    if (editingIndex === null) return
-    const target = officersList[editingIndex]
+  function getRequesterAuthData() {
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('psits_mgmt_token') || '' : ''
+    const stored = typeof window !== 'undefined' ? sessionStorage.getItem('psits_mgmt_session') : null
+    let fallbackRole = ''
+    let fallbackEmail = ''
+    try {
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        fallbackRole = parsed.role || ''
+        fallbackEmail = parsed.email || ''
+      }
+    } catch {}
 
-    if (!form.name || !form.position) {
-      toast('Name and position are required.')
+    const requesterRole = user?.role || fallbackRole || (user?.email === 'psits-ua@antiquespride.edu.ph' ? 'admin' : '')
+    const requesterEmail = user?.email || fallbackEmail || ''
+    return { token, requesterRole, requesterEmail }
+  }
+
+  async function saveEdit() {
+    if (!editingId) return
+    const target = officersList.find((o) => getOfficerKey(o) === editingId)
+    if (!target) return
+
+    if (!form.name) {
+      toast('Name is required.')
+      return
+    }
+
+    if (isAdmin && !form.position) {
+      toast('Position is required.')
       return
     }
 
@@ -224,6 +263,8 @@ export default function OfficersManagementPage() {
 
     setSavingEdit(true)
     try {
+      const { token, requesterRole, requesterEmail } = getRequesterAuthData()
+
       if (target.id) {
         const formData = new FormData()
         formData.append('name', form.name)
@@ -233,6 +274,9 @@ export default function OfficersManagementPage() {
         formData.append('email', form.email)
         formData.append('isPubmat', form.isPubmat ? 'true' : 'false')
         formData.append('pubmatRole', form.pubmatRole || '')
+        formData.append('sessionToken', token)
+        formData.append('requesterRole', requesterRole)
+        formData.append('requesterEmail', requesterEmail)
         if (target.image) {
           formData.append('existingImageUrl', target.image)
         }
@@ -243,6 +287,30 @@ export default function OfficersManagementPage() {
         const res = await updateOfficerAction(target.id, formData)
         if (!res.success) {
           toast(res.error || 'Failed to update officer')
+          return
+        }
+      } else {
+        if (!isAdmin) {
+          toast('Only Super Admin can create records.')
+          return
+        }
+        const formData = new FormData()
+        formData.append('name', form.name)
+        formData.append('position', form.position)
+        formData.append('roleGroup', form.roleGroup)
+        formData.append('yearSection', form.department || 'BSIT · CCIS')
+        formData.append('email', form.email)
+        formData.append('isPubmat', form.isPubmat ? 'true' : 'false')
+        formData.append('pubmatRole', form.pubmatRole || '')
+        formData.append('sessionToken', token)
+        formData.append('requesterRole', requesterRole)
+        formData.append('requesterEmail', requesterEmail)
+        if (formImage) {
+          formData.append('photo', formImage)
+        }
+        const res = await createOfficerAction(formData)
+        if (!res.success) {
+          toast(res.error || 'Failed to save officer')
           return
         }
       }
@@ -259,7 +327,7 @@ export default function OfficersManagementPage() {
 
   function startAdd() {
     setShowAdd(true)
-    setEditingIndex(null)
+    setEditingId(null)
     setConfirmDeleteId(null)
     const isAddingPubmat = activeTab === 'Pubmat'
     setForm({
@@ -287,6 +355,7 @@ export default function OfficersManagementPage() {
 
     setSavingAdd(true)
     try {
+      const { token, requesterRole, requesterEmail } = getRequesterAuthData()
       const formData = new FormData()
       formData.append('name', form.name)
       formData.append('position', form.position)
@@ -295,6 +364,9 @@ export default function OfficersManagementPage() {
       formData.append('email', form.email)
       formData.append('isPubmat', form.isPubmat ? 'true' : 'false')
       formData.append('pubmatRole', form.pubmatRole || '')
+      formData.append('sessionToken', token)
+      formData.append('requesterRole', requesterRole)
+      formData.append('requesterEmail', requesterEmail)
       if (formImage) {
         formData.append('photo', formImage)
       }
@@ -316,8 +388,9 @@ export default function OfficersManagementPage() {
   }
 
   async function handleDelete(officer: OfficerWithMeta) {
+    const officerKey = getOfficerKey(officer)
     if (!officer.id) {
-      setOfficersList(officersList.filter((o) => o !== officer))
+      setOfficersList(officersList.filter((o) => getOfficerKey(o) !== officerKey))
       toast('Officer removed from list.')
       setConfirmDeleteId(null)
       return
@@ -325,7 +398,14 @@ export default function OfficersManagementPage() {
 
     setDeletingId(officer.id)
     try {
-      const res = await deleteOfficerAction(officer.id, officer.image)
+      const { token, requesterRole, requesterEmail } = getRequesterAuthData()
+      const res = await deleteOfficerAction(
+        officer.id,
+        officer.image,
+        requesterRole,
+        token,
+        requesterEmail
+      )
       if (res.success) {
         toast('Officer deleted successfully.')
         await loadOfficers()
@@ -357,7 +437,7 @@ export default function OfficersManagementPage() {
             Manage student officers and Pubmat creative members, edit profiles, and configure access.
           </p>
         </div>
-        {canManage && (
+        {isAdmin && (
           <button
             onClick={startAdd}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-gold to-[#FFA726] text-[#0D1117] font-display font-bold text-sm hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)] active:scale-[0.97] transition-all duration-200 w-fit cursor-pointer"
@@ -492,13 +572,20 @@ export default function OfficersManagementPage() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((officer, i) => {
-          const realIndex = officersList.indexOf(officer)
-          const isEditing = editingIndex === realIndex
-          const isConfirmingDelete = confirmDeleteId === (officer.id || officer.name)
+          const officerKey = getOfficerKey(officer)
+          const isEditing = editingId === officerKey
+          const isConfirmingDelete = confirmDeleteId === (officer.id || officerKey)
+          const isOwnProfile = Boolean(
+            user &&
+            ((officer.email && user.email && officer.email.trim().toLowerCase() === user.email.trim().toLowerCase()) ||
+             (officer.name && user.displayName && officer.name.trim().toLowerCase() === user.displayName.trim().toLowerCase()))
+          )
+          const canEdit = isAdmin || isOwnProfile
+          const canDelete = isAdmin
 
           return (
             <div
-              key={`${officer.name}-${officer.id || i}`}
+              key={officerKey}
               className={`
                 group relative border rounded-xl overflow-hidden transition-all duration-300 shadow-xs
                 ${isEditing
@@ -511,50 +598,78 @@ export default function OfficersManagementPage() {
                 <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between pb-2 border-b border-border-theme">
                     <h4 className="text-xs font-display font-bold text-amber-600 dark:text-gold uppercase tracking-wider">
-                      Edit Profile
+                      {isAdmin ? 'Edit Profile' : 'Edit Your Profile'}
                     </h4>
                     <button onClick={cancelEdit} className="text-muted-foreground-theme hover:text-foreground-theme cursor-pointer">
                       <X size={14} />
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2 py-1">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground-theme select-none">
-                      <input
-                        type="checkbox"
-                        checked={form.isPubmat}
-                        onChange={(e) => setForm({ ...form, isPubmat: e.target.checked })}
-                        className="w-3.5 h-3.5 rounded border-border-theme text-gold focus:ring-gold/30 bg-surface-theme"
-                      />
-                      <span className="text-[11px] text-muted-foreground-theme">Pubmat Member</span>
-                    </label>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center gap-2 py-1">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground-theme select-none">
+                        <input
+                          type="checkbox"
+                          checked={form.isPubmat}
+                          onChange={(e) => setForm({ ...form, isPubmat: e.target.checked })}
+                          className="w-3.5 h-3.5 rounded border-border-theme text-gold focus:ring-gold/30 bg-surface-theme"
+                        />
+                        <span className="text-[11px] text-muted-foreground-theme">Pubmat Member</span>
+                      </label>
+                    </div>
+                  )}
 
                   <FormField label="Name" htmlFor={`edit-name-${i}`} required>
                     <input id={`edit-name-${i}`} type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputStyles} required />
                   </FormField>
 
                   <FormField label="Position / Title" htmlFor={`edit-pos-${i}`} required>
-                    <input id={`edit-pos-${i}`} type="text" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} className={inputStyles} required />
+                    {isAdmin ? (
+                      <input id={`edit-pos-${i}`} type="text" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} className={inputStyles} required />
+                    ) : (
+                      <div>
+                        <input id={`edit-pos-${i}`} type="text" value={form.position} disabled className={`${inputStyles} opacity-60 cursor-not-allowed bg-slate-50 dark:bg-white/[0.02]`} />
+                        <span className="text-[10px] font-mono text-muted-foreground-theme/70 mt-1 block">Role assigned by Super Admin</span>
+                      </div>
+                    )}
                   </FormField>
 
                   {!form.isPubmat ? (
                     <FormField label="Role Group">
-                      <Select
-                        value={form.roleGroup}
-                        onChange={(val) => setForm({ ...form, roleGroup: val as RoleGroup })}
-                        options={roleGroupOptions}
-                      />
+                      {isAdmin ? (
+                        <Select
+                          value={form.roleGroup}
+                          onChange={(val) => setForm({ ...form, roleGroup: val as RoleGroup })}
+                          options={roleGroupOptions}
+                        />
+                      ) : (
+                        <div>
+                          <input type="text" value={form.roleGroup} disabled className={`${inputStyles} opacity-60 cursor-not-allowed bg-slate-50 dark:bg-white/[0.02]`} />
+                          <span className="text-[10px] font-mono text-muted-foreground-theme/70 mt-1 block">Role group assigned by Super Admin</span>
+                        </div>
+                      )}
                     </FormField>
                   ) : (
                     <FormField label="Pubmat Role Specialty">
-                      <input
-                        type="text"
-                        value={form.pubmatRole}
-                        onChange={(e) => setForm({ ...form, pubmatRole: e.target.value })}
-                        placeholder="e.g. Graphic Designer, Videographer"
-                        className={inputStyles}
-                      />
+                      {isAdmin ? (
+                        <input
+                          type="text"
+                          value={form.pubmatRole}
+                          onChange={(e) => setForm({ ...form, pubmatRole: e.target.value })}
+                          placeholder="e.g. Graphic Designer, Videographer"
+                          className={inputStyles}
+                        />
+                      ) : (
+                        <div>
+                          <input
+                            type="text"
+                            value={form.pubmatRole}
+                            disabled
+                            className={`${inputStyles} opacity-60 cursor-not-allowed bg-slate-50 dark:bg-white/[0.02]`}
+                          />
+                          <span className="text-[10px] font-mono text-muted-foreground-theme/70 mt-1 block">Specialty assigned by Super Admin</span>
+                        </div>
+                      )}
                     </FormField>
                   )}
 
@@ -563,7 +678,14 @@ export default function OfficersManagementPage() {
                   </FormField>
 
                   <FormField label="Assigned Email (@antiquespride.edu.ph)" htmlFor={`edit-email-${i}`}>
-                    <input id={`edit-email-${i}`} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@antiquespride.edu.ph" className={inputStyles} />
+                    {isAdmin ? (
+                      <input id={`edit-email-${i}`} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@antiquespride.edu.ph" className={inputStyles} />
+                    ) : (
+                      <div>
+                        <input id={`edit-email-${i}`} type="email" value={form.email} disabled className={`${inputStyles} opacity-60 cursor-not-allowed bg-slate-50 dark:bg-white/[0.02]`} />
+                        <span className="text-[10px] font-mono text-muted-foreground-theme/70 mt-1 block">Assigned SSO email managed by Super Admin</span>
+                      </div>
+                    )}
                   </FormField>
 
                   <FormField label="Photo">
@@ -600,6 +722,11 @@ export default function OfficersManagementPage() {
                           Pubmat
                         </span>
                       )}
+                      {isOwnProfile && (
+                        <span className="px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-gold text-[8px] font-mono font-bold uppercase tracking-wider border border-amber-500/30">
+                          You
+                        </span>
+                      )}
                     </div>
 
                     <h4 className="font-display font-bold text-sm text-foreground-theme leading-tight truncate mt-0.5">
@@ -622,9 +749,9 @@ export default function OfficersManagementPage() {
                     )}
                   </div>
 
-                  {canManage && (
+                  {(canEdit || canDelete) && (
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {isConfirmingDelete ? (
+                      {canDelete && isConfirmingDelete ? (
                         <div className="flex items-center gap-1 bg-red-500/10 border border-red-500/25 p-1 rounded-lg">
                           <button
                             onClick={() => handleDelete(officer)}
@@ -644,21 +771,25 @@ export default function OfficersManagementPage() {
                         </div>
                       ) : (
                         <>
-                          <button
-                            onClick={() => startEdit(realIndex)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-foreground-theme bg-slate-100 dark:bg-white/[0.05] border border-border-theme hover:text-amber-600 dark:hover:text-gold hover:border-gold/40 hover:bg-gold/10 transition-all shadow-xs cursor-pointer"
-                            title="Edit profile"
-                          >
-                            <Edit2 size={12} />
-                            <span>Edit</span>
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteId(officer.id || officer.name)}
-                            className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-red-500 hover:bg-red-500/10 border border-border-theme hover:border-red-500/20 transition-all cursor-pointer"
-                            title="Delete officer"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => startEdit(officer)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-foreground-theme bg-slate-100 dark:bg-white/[0.05] border border-border-theme hover:text-amber-600 dark:hover:text-gold hover:border-gold/40 hover:bg-gold/10 transition-all shadow-xs cursor-pointer"
+                              title={isOwnProfile && !isAdmin ? 'Edit your profile' : 'Edit profile'}
+                            >
+                              <Edit2 size={12} />
+                              <span>{isOwnProfile && !isAdmin ? 'Edit Mine' : 'Edit'}</span>
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => setConfirmDeleteId(officer.id || officerKey)}
+                              className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-red-500 hover:bg-red-500/10 border border-border-theme hover:border-red-500/20 transition-all cursor-pointer"
+                              title="Delete officer"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </>
                       )}
                     </div>

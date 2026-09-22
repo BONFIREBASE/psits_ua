@@ -15,7 +15,7 @@ import {
   BookOpen,
   Palette,
 } from 'lucide-react'
-import { getOfficers } from '@/lib/supabase'
+import { getOfficers, sortOfficersByHierarchy } from '@/lib/supabase'
 import ScrollReveal from '@/components/ScrollReveal'
 
 export const metadata: Metadata = {
@@ -117,7 +117,7 @@ function Avatar({
 export default async function OfficersPage() {
   const dbOfficers = await getOfficers()
 
-  const pubmatMembers: Officer[] =
+  const pubmatMembers: Officer[] = sortOfficersByHierarchy(
     dbOfficers && dbOfficers.length > 0
       ? dbOfficers.filter((o) => o.is_pubmat).map((o) => ({
           name: o.name,
@@ -125,6 +125,8 @@ export default async function OfficersPage() {
           roleGroup: 'Operations & PR' as Officer['roleGroup'],
           department: o.year_section || 'Pubmat Creative Team',
           image: o.image_url || undefined,
+          isPubmat: true,
+          pubmatRole: o.pubmat_role || o.position,
         }))
       : initialPubmat.map((p) => ({
           name: p.name,
@@ -132,9 +134,12 @@ export default async function OfficersPage() {
           roleGroup: 'Operations & PR' as Officer['roleGroup'],
           department: 'Pubmat Creative Team',
           image: p.image || undefined,
+          isPubmat: true,
+          pubmatRole: p.role,
         }))
+  )
 
-  const officersList: Officer[] =
+  const officersList: Officer[] = sortOfficersByHierarchy(
     dbOfficers && dbOfficers.length > 0
       ? dbOfficers.filter((o) => !o.is_pubmat).map((o) => ({
           name: o.name,
@@ -142,8 +147,10 @@ export default async function OfficersPage() {
           roleGroup: o.role_group as Officer['roleGroup'],
           department: o.year_section,
           image: o.image_url || undefined,
+          isPubmat: false,
         }))
       : initialOfficers
+  )
 
   const executives = officersList.filter((o) => o.roleGroup === 'Executive')
   const secretariat = officersList.filter(
