@@ -86,12 +86,23 @@ export default function DocumentsManagementPage() {
   }
 
   function handleFile(f: File | null) {
-    if (f && f.size > 20 * 1024 * 1024) {
+    if (!f) {
+      setFile(null)
+      setFilePreview(null)
+      return
+    }
+    if (f.size > 20 * 1024 * 1024) {
       toast('Selected document exceeds the 20MB limit. Please choose a smaller file.')
       return
     }
+    const allowed = ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg']
+    const hasValidExt = allowed.some((ext) => f.name.toLowerCase().endsWith(ext))
+    if (!hasValidExt) {
+      toast('Please upload a valid document: PDF, Word (.docx, .doc), or Image (.png, .jpg).')
+      return
+    }
     setFile(f)
-    setFilePreview(f ? URL.createObjectURL(f) : null)
+    setFilePreview(URL.createObjectURL(f))
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -259,14 +270,14 @@ export default function DocumentsManagementPage() {
               />
             </FormField>
 
-            <FormField label="Document File (PDF / DOCX)" hint="Uploads directly to cloud storage">
+            <FormField label="Document File (PDF / Word / PNG / JPG)" hint="Uploads directly to cloud storage">
               <FileUpload
-                accept=".pdf,.doc,.docx"
-                label="Choose PDF or DOCX file"
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
+                label="Choose PDF, Word, PNG, or JPG file"
                 value={file}
                 preview={filePreview}
                 onChange={handleFile}
-                maxSizeMB={15}
+                maxSizeMB={20}
               />
             </FormField>
 

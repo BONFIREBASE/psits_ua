@@ -73,8 +73,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
+    // Safety timeout to prevent indefinite loading in rare network freeze cases
+    const safetyTimer = setTimeout(() => {
+      if (mounted) setIsLoading(false)
+    }, 4500)
+
     async function initSession() {
       try {
+        const hasOAuthPayload =
+          typeof window !== 'undefined' &&
+          (window.location.hash.includes('access_token=') ||
+            window.location.search.includes('code='))
+
+        // If an OAuth PKCE code is present in query parameters, exchange it
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search)
+          const code = params.get('code')
+          if (code) {
+            try {
+              await supabase.auth.exchangeCodeForSession(code)
+            } catch (err) {
+              console.warn('OAuth exchange code error:', err)
+            }
+          }
+        }
+
         // 1. Validate server-side session token
         const token = sessionStorage.getItem(TOKEN_KEY)
         if (token) {
@@ -111,13 +134,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               sessionStorage.setItem(TOKEN_KEY, sessionRes.token)
             }
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
-            if (mounted) setUser(resolved)
+            if (mounted) {
+              setUser(resolved)
+              setIsLoading(false)
+            }
+            sessionStorage.removeItem('psits_auth_redirect')
+            localStorage.removeItem('psits_auth_redirect')
+            return
           } else {
             await supabase.auth.signOut()
             sessionStorage.removeItem(TOKEN_KEY)
             sessionStorage.removeItem(STORAGE_KEY)
-            if (mounted) setUser(null)
+            if (mounted) {
+              setUser(null)
+              setIsLoading(false)
+            }
+            sessionStorage.setItem(
+              'psits_auth_error',
+              `Access Denied: ${session.user.email} is not registered as an active PSITS-UA officer.`
+            )
+            return
           }
+        } else if (hasOAuthPayload) {
+          // Allow onAuthStateChange to finish token processing
+          return
         }
       } catch (err) {
         console.error('Session initialization error:', err)
@@ -141,23 +181,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               sessionStorage.setItem(TOKEN_KEY, sessionRes.token)
             }
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
-            setUser(resolved)
+            if (mounted) {
+              setUser(resolved)
+              setIsLoading(false)
+            }
+            sessionStorage.removeItem('psits_auth_redirect')
+            localStorage.removeItem('psits_auth_redirect')
           } else {
             await supabase.auth.signOut()
             sessionStorage.removeItem(TOKEN_KEY)
             sessionStorage.removeItem(STORAGE_KEY)
-            setUser(null)
+            if (mounted) {
+              setUser(null)
+              setIsLoading(false)
+            }
+            sessionStorage.setItem(
+              'psits_auth_error',
+              `Access Denied: ${session.user.email} is not registered as an active PSITS-UA officer.`
+            )
           }
         } else if (event === 'SIGNED_OUT') {
           sessionStorage.removeItem(TOKEN_KEY)
           sessionStorage.removeItem(STORAGE_KEY)
-          setUser(null)
+          if (mounted) {
+            setUser(null)
+            setIsLoading(false)
+          }
         }
       }
     )
 
     return () => {
       mounted = false
+      clearTimeout(safetyTimer)
       subscription.unsubscribe()
     }
   }, [resolveUserSession])
@@ -216,7 +272,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ─── Officer Google SSO ───
   const loginWithGoogle = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     try {
-      const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/management` : ''
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('psits_auth_redirect', '/management/dashboard')
+        localStorage.setItem('psits_auth_redirect', '/management/dashboard')
+      }
+
+      const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/management/dashboard` : ''
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

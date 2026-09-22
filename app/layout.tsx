@@ -56,7 +56,10 @@ const organizationSchema = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "https://psits-ua.antiquespride.edu.ph"
+    (process.env.NEXT_PUBLIC_SITE_URL || "https://psitsua.vercel.app").replace(
+      "psits-ua.vercel.app",
+      "psitsua.vercel.app"
+    )
   ),
   title: {
     default:
@@ -171,6 +174,9 @@ export const metadata: Metadata = {
     icon: "/assets/logo/PSITS%20logo.png",
     shortcut: "/assets/logo/PSITS%20logo.png",
     apple: "/assets/logo/PSITS%20logo.png",
+  },
+  verification: {
+    google: "sw9iscqYtp_JIyfnQO64H-GH6MqDJ9X2R14XJdLLwYY",
   },
 };
 

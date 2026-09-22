@@ -46,7 +46,7 @@ export async function verifyTurnstileToken(
     secretKey.startsWith('3x0000')
 
   const expectedHostnames = new Set(
-    (process.env.TURNSTILE_HOSTNAMES ?? 'localhost,127.0.0.1,psits-ua.vercel.app,psits-ua.antiquespride.edu.ph')
+    (process.env.TURNSTILE_HOSTNAMES ?? 'localhost,127.0.0.1,psitsua.vercel.app,psits-ua.vercel.app,psits-ua.antiquespride.edu.ph')
       .split(',')
       .map((h) => h.trim())
       .filter(Boolean)

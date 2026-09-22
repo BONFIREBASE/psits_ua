@@ -22,6 +22,12 @@ export async function createDocument(formData: FormData) {
     let fileName: string | null = null;
 
     if (file && file.size > 0) {
+      const allowedExtensions = ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg'];
+      const hasAllowedExt = allowedExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
+      if (!hasAllowedExt) {
+        return { success: false, error: 'Only PDF, DOCX, DOC, PNG, and JPG files are supported.' };
+      }
+
       fileName = file.name;
       const sanitized = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
       const r2Key = `documents/${Date.now()}-${sanitized}`;

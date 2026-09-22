@@ -1,7 +1,8 @@
 import { MetadataRoute } from 'next'
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://psits-ua.antiquespride.edu.ph'
+  const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://psitsua.vercel.app'
+  const baseUrl = rawUrl.replace('psits-ua.vercel.app', 'psitsua.vercel.app')
 
   return {
     rules: {

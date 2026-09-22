@@ -32,7 +32,7 @@ export const projectsData: Project[] = [
     year: '2026',
     status: 'Active',
     featured: true,
-    imageUrl: '/assets/photobooth.jpg',
+    imageUrl: 'https://pub-1813fa24f4b74f44896e886714f409db.r2.dev/projects/sugalaw.jpg',
     liveUrl:
       'https://www.facebook.com/permalink.php?story_fbid=pfbid022pzu1p5hxva4affPjag7srv5pGweRnA1JJJscknxyqKb6aobMLWgeDTnrDH7sFHAl&id=100086983023496',
   },
