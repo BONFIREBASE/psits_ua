@@ -18,6 +18,7 @@ export const isUpstashConfigured = Boolean(redisUrl && redisToken)
 let redis: Redis | null = null
 let authRateLimiter: Ratelimit | null = null
 let cronRateLimiter: Ratelimit | null = null
+let voteRateLimiter: Ratelimit | null = null
 
 if (isUpstashConfigured && redisUrl && redisToken) {
   try {
@@ -41,6 +42,14 @@ if (isUpstashConfigured && redisUrl && redisToken) {
       prefix: 'psits:rl:cron',
       analytics: true,
     })
+
+    // Student voting endpoints: 10 requests per 30 seconds per student email
+    voteRateLimiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, '30 s'),
+      prefix: 'psits:rl:vote',
+      analytics: true,
+    })
   } catch (err) {
     console.warn('[Upstash Redis Init Warning]:', err)
     redis = null
@@ -50,9 +59,14 @@ if (isUpstashConfigured && redisUrl && redisToken) {
 
 export async function checkRateLimit(
   identifier: string = 'anonymous',
-  type: 'auth' | 'cron' = 'auth'
+  type: 'auth' | 'cron' | 'vote' = 'auth'
 ): Promise<RateLimitResult> {
-  const limiter = type === 'auth' ? authRateLimiter : cronRateLimiter
+  const limiter =
+    type === 'auth'
+      ? authRateLimiter
+      : type === 'cron'
+      ? cronRateLimiter
+      : voteRateLimiter
 
 
   if (!limiter) {

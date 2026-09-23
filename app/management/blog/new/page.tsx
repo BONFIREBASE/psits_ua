@@ -149,15 +149,15 @@ export default function NewBlogPostPage() {
       <div className="flex items-center gap-3">
         <Link
           href="/management/blog"
-          className="p-2 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.04] transition-colors"
+          className="p-2 rounded-lg text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors"
         >
           <ArrowLeft size={18} />
         </Link>
         <div>
-          <h1 className="font-display font-black text-2xl text-white tracking-tight">
+          <h1 className="font-display font-black text-2xl text-foreground-theme tracking-tight">
             Create New Post
           </h1>
-          <p className="text-sm text-white/35 mt-0.5">
+          <p className="text-sm text-muted-foreground-theme mt-0.5">
             Write a new blog post or social dispatch.
           </p>
         </div>
@@ -167,13 +167,13 @@ export default function NewBlogPostPage() {
       <div className="flex gap-2">
         <button
           onClick={() => setShowPreview(false)}
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${!showPreview ? 'bg-gold/15 text-gold border border-gold/25' : 'text-white/40 border border-white/8 hover:text-white/60'}`}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${!showPreview ? 'bg-amber-500/10 text-amber-600 dark:text-gold border border-amber-500/20 dark:border-gold/25 font-semibold' : 'text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04]'}`}
         >
           Editor
         </button>
         <button
           onClick={() => setShowPreview(true)}
-          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${showPreview ? 'bg-gold/15 text-gold border border-gold/25' : 'text-white/40 border border-white/8 hover:text-white/60'}`}
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${showPreview ? 'bg-amber-500/10 text-amber-600 dark:text-gold border border-amber-500/20 dark:border-gold/25 font-semibold' : 'text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04]'}`}
         >
           <Eye size={12} />
           Preview
@@ -215,7 +215,7 @@ export default function NewBlogPostPage() {
                 type="date"
                 value={form.date}
                 onChange={(e) => update('date', e.target.value)}
-                className={`${inputStyles} [color-scheme:dark]`}
+                className={`${inputStyles} [color-scheme:light] dark:[color-scheme:dark]`}
                 required
               />
             </FormField>
@@ -237,7 +237,7 @@ export default function NewBlogPostPage() {
           <FormField label="Full Content" htmlFor="blog-content" required>
             <div className="space-y-0">
               {/* Formatting Toolbar */}
-              <div className="flex items-center gap-0.5 px-2 py-1.5 bg-white/[0.03] border border-white/10 border-b-0 rounded-t-lg">
+              <div className="flex items-center gap-0.5 px-2 py-1.5 bg-slate-50 dark:bg-white/[0.03] border border-border-theme border-b-0 rounded-t-lg">
                 {[
                   { icon: Bold, type: 'bold', label: 'Bold' },
                   { icon: Italic, type: 'italic', label: 'Italic' },
@@ -251,7 +251,7 @@ export default function NewBlogPostPage() {
                     type="button"
                     onClick={() => insertFormatting(btn.type)}
                     title={btn.label}
-                    className="p-1.5 rounded text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+                    className="p-1.5 rounded text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-200 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
                   >
                     <btn.icon size={14} />
                   </button>
@@ -318,15 +318,15 @@ export default function NewBlogPostPage() {
           </FormField>
 
           {/* Credits Section */}
-          <div className="space-y-4 pt-4 border-t border-white/10">
+          <div className="space-y-4 pt-4 border-t border-border-theme">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-mono uppercase tracking-wider text-white/70">
+              <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme font-semibold">
                 Content Credits (Optional)
               </label>
               <button
                 type="button"
                 onClick={addCredit}
-                className="text-xs text-gold hover:text-gold-light font-mono"
+                className="text-xs text-amber-600 dark:text-gold hover:text-amber-700 dark:hover:text-gold-light font-mono cursor-pointer"
               >
                 + Add Credit
               </button>
@@ -363,7 +363,7 @@ export default function NewBlogPostPage() {
                 <button
                   type="button"
                   onClick={() => removeCredit(index)}
-                  className="mb-2 p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                  className="mb-2 p-2 text-muted-foreground-theme hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
                   title="Remove credit"
                 >
                   <X size={16} />
@@ -372,16 +372,16 @@ export default function NewBlogPostPage() {
             ))}
             
             {credits.length === 0 && (
-              <p className="text-xs text-white/40 text-center py-4">No credits added yet. Click &quot;+ Add Credit&quot; to add team members.</p>
+              <p className="text-xs text-muted-foreground-theme text-center py-4">No credits added yet. Click &quot;+ Add Credit&quot; to add team members.</p>
             )}
             
             {isLoadingMembers && (
-              <p className="text-xs text-white/40 font-mono">Loading team members...</p>
+              <p className="text-xs text-muted-foreground-theme font-mono">Loading team members...</p>
             )}
           </div>
 
           {/* Submit */}
-          <div className="flex items-center gap-3 pt-4 border-t border-white/6">
+          <div className="flex items-center gap-3 pt-4 border-t border-border-theme">
             <button
               type="submit"
               disabled={isSubmitting}
@@ -401,7 +401,7 @@ export default function NewBlogPostPage() {
             </button>
             <Link
               href="/management/blog"
-              className="px-4 py-2.5 rounded-lg text-sm text-white/40 hover:text-white/70 border border-white/8 hover:border-white/15 transition-all"
+              className="px-4 py-2.5 rounded-lg text-sm text-muted-foreground-theme hover:text-foreground-theme border border-border-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-all"
             >
               Cancel
             </Link>
@@ -433,11 +433,11 @@ function PreviewPanel({
   credits: Array<{ role: string; name: string }>
 }) {
   return (
-    <div className="border border-white/8 rounded-xl overflow-hidden bg-white/[0.02]">
+    <div className="border border-border-theme rounded-xl overflow-hidden bg-surface-theme shadow-sm">
       {/* Preview Header */}
-      <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/6 flex items-center gap-2">
-        <Eye size={13} className="text-white/30" />
-        <span className="text-[11px] text-white/35 font-mono uppercase tracking-wider">
+      <div className="px-4 py-2.5 bg-slate-50 dark:bg-white/[0.03] border-b border-border-theme flex items-center gap-2">
+        <Eye size={13} className="text-muted-foreground-theme" />
+        <span className="text-[11px] text-muted-foreground-theme font-mono uppercase tracking-wider font-semibold">
           Preview
         </span>
       </div>
@@ -445,7 +445,7 @@ function PreviewPanel({
       <div className="p-6 sm:p-8 space-y-5 max-w-2xl">
         {/* Thumbnail */}
         {thumbnailPreview && (
-          <div className="aspect-video rounded-lg overflow-hidden bg-surface/50 border border-white/6">
+          <div className="aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-white/[0.04] border border-border-theme">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={thumbnailPreview} alt="Preview" className="w-full h-full object-cover" />
           </div>
@@ -454,26 +454,26 @@ function PreviewPanel({
         {/* Category + Date */}
         <div className="flex items-center gap-2 text-[11px] font-mono">
           {form.category && (
-            <span className="px-2 py-0.5 rounded bg-gold/10 text-gold border border-gold/20">
+            <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-gold border border-amber-500/20 dark:border-gold/20 font-semibold">
               {form.category}
             </span>
           )}
-          {form.date && <span className="text-white/30">{form.date}</span>}
+          {form.date && <span className="text-muted-foreground-theme">{form.date}</span>}
         </div>
 
         {/* Title */}
-        <h2 className="font-display font-black text-xl sm:text-2xl text-white tracking-tight leading-tight">
+        <h2 className="font-display font-black text-xl sm:text-2xl text-foreground-theme tracking-tight leading-tight">
           {form.title || 'Untitled Post'}
         </h2>
 
         {/* Quote */}
         {form.highlightQuote && (
-          <blockquote className="border-l-2 border-gold/30 pl-4 py-2">
-            <p className="text-sm text-white/70 italic">
+          <blockquote className="border-l-2 border-amber-500/50 dark:border-gold/50 pl-4 py-2">
+            <p className="text-sm text-foreground-theme/80 italic">
               &ldquo;{form.highlightQuote}&rdquo;
             </p>
             {form.quoteAuthor && (
-              <cite className="text-[11px] text-white/35 mt-1 block not-italic">
+              <cite className="text-[11px] text-muted-foreground-theme mt-1 block not-italic">
                 — {form.quoteAuthor}
               </cite>
             )}
@@ -482,31 +482,31 @@ function PreviewPanel({
 
         {/* Content */}
         {form.fullContent && (
-          <div className="prose prose-invert prose-sm max-w-none">
+          <div className="prose dark:prose-invert prose-sm max-w-none">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                h1: ({ children }) => <h1 className="text-2xl font-display font-bold text-white mt-6 mb-3">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-xl font-display font-bold text-white mt-5 mb-2.5">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-lg font-display font-bold text-white mt-4 mb-2">{children}</h3>,
-                p: ({ children }) => <p className="text-sm text-white/70 leading-relaxed mb-3">{children}</p>,
-                strong: ({ children }) => <strong className="text-white font-bold">{children}</strong>,
-                em: ({ children }) => <em className="text-white/80 italic">{children}</em>,
-                ul: ({ children }) => <ul className="list-disc list-inside text-sm text-white/70 space-y-1 mb-3">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-white/70 space-y-1 mb-3">{children}</ol>,
-                li: ({ children }) => <li className="text-sm text-white/70">{children}</li>,
+                h1: ({ children }) => <h1 className="text-2xl font-display font-bold text-foreground-theme mt-6 mb-3">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-xl font-display font-bold text-foreground-theme mt-5 mb-2.5">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-lg font-display font-bold text-foreground-theme mt-4 mb-2">{children}</h3>,
+                p: ({ children }) => <p className="text-sm text-foreground-theme/80 leading-relaxed mb-3">{children}</p>,
+                strong: ({ children }) => <strong className="text-foreground-theme font-bold">{children}</strong>,
+                em: ({ children }) => <em className="text-foreground-theme/90 italic">{children}</em>,
+                ul: ({ children }) => <ul className="list-disc list-inside text-sm text-foreground-theme/80 space-y-1 mb-3">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-foreground-theme/80 space-y-1 mb-3">{children}</ol>,
+                li: ({ children }) => <li className="text-sm text-foreground-theme/80">{children}</li>,
                 blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-gold/40 pl-4 py-2 my-4 bg-gold/5 rounded-r">
-                    <div className="text-sm text-white/75 italic">{children}</div>
+                  <blockquote className="border-l-4 border-amber-500/40 dark:border-gold/40 pl-4 py-2 my-4 bg-amber-500/5 dark:bg-gold/5 rounded-r">
+                    <div className="text-sm text-foreground-theme/80 italic">{children}</div>
                   </blockquote>
                 ),
                 a: ({ href, children }) => (
-                  <a href={href} className="text-gold hover:text-gold-light underline" target="_blank" rel="noopener noreferrer">
+                  <a href={href} className="text-amber-600 dark:text-gold hover:underline" target="_blank" rel="noopener noreferrer">
                     {children}
                   </a>
                 ),
                 code: ({ children }) => (
-                  <code className="px-1.5 py-0.5 rounded bg-white/10 text-gold text-xs font-mono">{children}</code>
+                  <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-amber-600 dark:text-gold text-xs font-mono">{children}</code>
                 ),
               }}
             >
@@ -517,11 +517,11 @@ function PreviewPanel({
 
         {/* Tags */}
         {form.tags && (
-          <div className="flex flex-wrap gap-1.5 pt-3 border-t border-white/6">
+          <div className="flex flex-wrap gap-1.5 pt-3 border-t border-border-theme">
             {form.tags.split(',').map((tag, i) => (
               <span
                 key={i}
-                className="px-2 py-0.5 rounded text-[10px] font-mono text-white/30 bg-white/[0.04] border border-white/6"
+                className="px-2 py-0.5 rounded text-[10px] font-mono text-muted-foreground-theme bg-slate-100 dark:bg-white/[0.04] border border-border-theme"
               >
                 {tag.trim()}
               </span>
@@ -531,13 +531,13 @@ function PreviewPanel({
 
         {/* Credits */}
         {credits && credits.length > 0 && (
-          <div className="pt-4 border-t border-white/10">
-            <p className="text-[10px] font-mono uppercase tracking-wider text-white/40 mb-2">Credits</p>
+          <div className="pt-4 border-t border-border-theme">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground-theme mb-2">Credits</p>
             <div className="flex flex-wrap gap-3 text-xs">
               {credits.filter(c => c.role && c.name).map((c, i) => (
                 <div key={i} className="flex items-center gap-1.5">
-                  <span className="text-white/40">{c.role}:</span>
-                  <span className="text-white/70">{c.name}</span>
+                  <span className="text-muted-foreground-theme">{c.role}:</span>
+                  <span className="text-foreground-theme font-medium">{c.name}</span>
                 </div>
               ))}
             </div>

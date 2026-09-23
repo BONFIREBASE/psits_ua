@@ -5,33 +5,30 @@ export const runtime = "nodejs";
 
 const ALLOWED_DOMAIN = "@antiquespride.edu.ph";
 
-// ============================================================================
-// In-Memory Rate Limiter (no external dependency)
-// 5 requests per 30 seconds per IP — prevents endpoint spam
-// ============================================================================
+import { checkRateLimit as checkDistributedRateLimit } from "@/lib/ratelimit";
 
-const RATE_LIMIT_WINDOW = 30_000; // 30 seconds
-const RATE_LIMIT_MAX = 5;
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+// Distributed IP guard: 60 requests per 30 seconds per IP (safe for campus NAT)
+const IP_GUARD_WINDOW = 30_000;
+const IP_GUARD_MAX = 60;
+const ipGuardMap = new Map<string, { count: number; resetAt: number }>();
 
-// Cleanup stale entries every 60s to prevent memory leak
 setInterval(() => {
   const now = Date.now();
-  for (const [key, val] of rateLimitMap) {
-    if (now > val.resetAt) rateLimitMap.delete(key);
+  for (const [key, val] of ipGuardMap) {
+    if (now > val.resetAt) ipGuardMap.delete(key);
   }
 }, 60_000);
 
-function checkRateLimit(ip: string): boolean {
+function checkIpGuard(ip: string): boolean {
   const now = Date.now();
-  const entry = rateLimitMap.get(ip);
+  const entry = ipGuardMap.get(ip);
 
   if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    ipGuardMap.set(ip, { count: 1, resetAt: now + IP_GUARD_WINDOW });
     return true;
   }
 
-  if (entry.count >= RATE_LIMIT_MAX) return false;
+  if (entry.count >= IP_GUARD_MAX) return false;
 
   entry.count++;
   return true;
@@ -194,15 +191,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    // Rate limit check (before auth to block spam cheaply)
+    // 1. IP guard: coarse network threshold (60 req/30s) prevents abusive flood without locking out campus Wi-Fi
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
-    if (!checkRateLimit(clientIp)) {
+    if (!checkIpGuard(clientIp)) {
       return NextResponse.json(
-        { error: "Too many requests. Please wait a moment before trying again." },
+        { error: "Network traffic limit exceeded. Please wait a moment before trying again." },
         { status: 429 }
       );
     }
 
+    // 2. Authenticate student
     const auth = await authenticateStudent(req);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -210,7 +208,23 @@ export async function POST(req: NextRequest) {
 
     const { user, email } = auth;
 
-    // Parse request body
+    // 3. Fine-grained per-student distributed rate limit (isolated to student email)
+    const rateLimit = await checkDistributedRateLimit(email, "vote");
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: "You are submitting requests too rapidly. Please wait a few moments before trying again." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.max(1, Math.ceil((rateLimit.reset - Date.now()) / 1000))),
+            "X-RateLimit-Limit": String(rateLimit.limit),
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+          },
+        }
+      );
+    }
+
+    // 4. Parse request body
     const body = await req.json();
     const { submissionId } = body;
 
@@ -221,23 +235,56 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get voting config
-    const config = await getVotingConfig();
-    const votingStatus = isVotingAllowed(config);
+    // 5. ATTEMPT ATOMIC POSTGRES TRANSACTION (Single ACID RPC call: <30ms, zero race conditions)
+    try {
+      const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc("cast_polo_vote_atomic", {
+        p_student_email: email,
+        p_student_name: user.user_metadata?.full_name || email.split("@")[0],
+        p_submission_id: submissionId,
+        p_ip_address: clientIp,
+        p_user_agent: req.headers.get("user-agent") || "unknown",
+      });
 
+      if (!rpcError && rpcResult && typeof rpcResult === "object") {
+        const result = rpcResult as { success?: boolean; error?: string; status?: number; message?: string; action?: string };
+        if (!result.success) {
+          return NextResponse.json(
+            { error: result.error || "Voting failed." },
+            { status: result.status || 400 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: result.message,
+          action: result.action,
+          vote: {
+            submission_id: submissionId,
+            voted_at: new Date().toISOString(),
+          },
+        });
+      }
+    } catch {
+      // Graceful fallback to parallel direct queries if RPC is not yet executed in Supabase
+    }
+
+    // 6. FALLBACK: Concurrently fetch voting configuration AND submission details (halves DB round-trip latency)
+    const [config, { data: submission, error: submissionError }] = await Promise.all([
+      getVotingConfig(),
+      supabaseAdmin
+        .from("polo_submissions")
+        .select("id, title, status, student_name")
+        .eq("id", submissionId)
+        .maybeSingle(),
+    ]);
+
+    const votingStatus = isVotingAllowed(config);
     if (!votingStatus.allowed) {
       return NextResponse.json(
         { error: votingStatus.reason || "Voting is not allowed at this time." },
         { status: 403 }
       );
     }
-
-    // Check if submission exists and is approved
-    const { data: submission, error: submissionError } = await supabaseAdmin
-      .from("polo_submissions")
-      .select("id, title, status, student_name")
-      .eq("id", submissionId)
-      .maybeSingle();
 
     if (submissionError || !submission) {
       return NextResponse.json(

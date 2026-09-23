@@ -25,10 +25,19 @@ export async function GET() {
       return NextResponse.json({ entries: [] });
     }
 
-    return NextResponse.json({
-      entries: data || [],
-      count: data?.length || 0,
-    });
+    return NextResponse.json(
+      {
+        entries: data || [],
+        count: data?.length || 0,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+          "CDN-Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+          "Vercel-CDN-Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+        },
+      }
+    );
   } catch (err) {
     console.error("Approved submissions endpoint error:", err);
     return NextResponse.json({ entries: [], count: 0 });

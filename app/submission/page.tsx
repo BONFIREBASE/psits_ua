@@ -18,6 +18,7 @@ import { SubmissionAuthSkeleton } from "@/components/PublicSkeletonPreloader";
 import SubmissionLockWrapper from "@/components/SubmissionLockWrapper";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import { compressImageToWebP } from "@/lib/image-compress";
 
 const ALLOWED_DOMAIN = "@antiquespride.edu.ph";
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
@@ -191,8 +192,8 @@ export default function SubmissionPage() {
     setAuthError(null);
   };
 
-  // Handle File Selection (JPG, PNG, WEBP only)
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle File Selection (JPG, PNG, WEBP with automatic client-side WebP optimization)
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setSubmitError(null);
     const selected = e.target.files?.[0];
     if (!selected) return;
@@ -209,12 +210,13 @@ export default function SubmissionPage() {
       return;
     }
 
-    setFile(selected);
+    const optimized = await compressImageToWebP(selected);
+    setFile(optimized);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(URL.createObjectURL(selected));
+    setPreviewUrl(URL.createObjectURL(optimized));
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setSubmitError(null);
     const dropped = e.dataTransfer.files?.[0];
@@ -232,9 +234,10 @@ export default function SubmissionPage() {
       return;
     }
 
-    setFile(dropped);
+    const optimized = await compressImageToWebP(dropped);
+    setFile(optimized);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(URL.createObjectURL(dropped));
+    setPreviewUrl(URL.createObjectURL(optimized));
   };
 
   const removeFile = () => {
