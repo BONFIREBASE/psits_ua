@@ -219,7 +219,7 @@ export default function EventsManagementPage() {
 
     setEvents([newActivity, ...events])
     setShowAddModal(false)
-    toast('Event saved to Supabase database!')
+    toast('Event saved to database!')
   }
 
   async function handleSaveEdit(e: FormEvent) {
@@ -263,7 +263,7 @@ export default function EventsManagementPage() {
     setDeleteConfirmId(null)
     try {
       await deleteEventAction(id)
-      toast('Event removed from Supabase database.')
+      toast('Event removed from database.')
     } catch {
       toast('Event removed from view.')
     }

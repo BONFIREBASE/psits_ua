@@ -519,7 +519,7 @@ export default function DocumentsManagementPage() {
                   />
                 </FormField>
 
-                <FormField label="Document File (PDF / Word / PNG / JPG)" hint="Uploads directly to Cloudflare R2">
+                <FormField label="Document File (PDF / Word / PNG / JPG)" hint="Uploads directly to encrypted cloud storage">
                   <FileUpload
                     accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
                     label="Choose PDF, Word, PNG, or JPG file"

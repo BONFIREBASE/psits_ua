@@ -258,13 +258,13 @@ export default function TermsOfServicePage() {
             </h2>
             <p>
               Bonfire Base Studio monitors anonymized, aggregated platform traffic, voting turnout metrics, and server
-              performance diagnostics via Vercel Analytics and Google Search telemetry. This telemetry is strictly
+              performance diagnostics via privacy-preserving telemetry and search indexing. This telemetry is strictly
               non-monetized and used solely to maintain uptime during high-concurrency voting events and prevent system
               disruptions.
             </p>
             <p>Users agree to respect platform stability and security. You must not:</p>
             <ul className="list-disc list-outside pl-5 space-y-1.5">
-              <li>Bypass rate-limiting controls or Cloudflare Turnstile human verification.</li>
+              <li>Bypass rate-limiting controls or automated bot verification safeguards.</li>
               <li>Upload malicious executables, corrupted files, or offensive content to cloud storage.</li>
               <li>Attempt unauthorized administrative access to officer dashboards or database endpoints.</li>
               <li>Distribute counterfeit QR attendance tokens or scan tokens on behalf of absent peers.</li>

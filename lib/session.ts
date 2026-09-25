@@ -1,5 +1,6 @@
 'use server'
 
+import crypto from 'crypto'
 import { supabaseAdmin } from './supabase'
 
 export interface SessionData {
@@ -12,9 +13,7 @@ export interface SessionData {
   expiresAt: string
 }
 
-/**
- * Server Action: Create a new server-side session token
- */
+
 export async function createSessionAction(
   user: {
     email: string
@@ -24,7 +23,7 @@ export async function createSessionAction(
     avatarUrl?: string
   },
   expiresInHours = 8
-): Promise<{ success: boolean; token?: string; error?: string }> {
+): Promise<{ success: boolean; token?: string; expiresAt?: string; error?: string }> {
   try {
     const token = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + expiresInHours * 3600 * 1000).toISOString()
@@ -42,21 +41,20 @@ export async function createSessionAction(
 
     if (error) {
       console.warn('[Session Warning]: Could not persist session to DB:', error.message)
-      return { success: true, token }
+      return { success: true, token, expiresAt }
     }
 
-    return { success: true, token }
+    return { success: true, token, expiresAt }
   } catch (err) {
     console.error('[Create Session Error]:', err)
     return { success: false, error: err instanceof Error ? err.message : 'Failed to create session' }
   }
 }
 
-/**
- * Server Action: Validate an active session token against Supabase
- */
+
 export async function validateSessionAction(token: string): Promise<{
   valid: boolean
+  expiresAt?: string
   user?: {
     email: string
     displayName: string
@@ -95,6 +93,7 @@ export async function validateSessionAction(token: string): Promise<{
 
     return {
       valid: true,
+      expiresAt: data.expires_at,
       user: {
         email: data.email,
         displayName: data.display_name,
@@ -135,15 +134,17 @@ export async function verifyAdminPasswordAction(password: string): Promise<{
       return { success: false, error: 'Server authentication configuration missing.' }
     }
 
-    if (password !== adminPassword) {
+    const hashA = crypto.createHash('sha256').update(password).digest()
+    const hashB = crypto.createHash('sha256').update(adminPassword).digest()
+    if (!crypto.timingSafeEqual(hashA, hashB)) {
       return { success: false, error: 'Invalid administrator password.' }
     }
 
     return { success: true }
-  } catch (err) {
+  } catch {
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Admin authentication failed.',
+      error: 'Admin authentication failed.',
     }
   }
 }

@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized: Invalid cron authorization token.' },
         { status: 401 }
@@ -46,8 +46,9 @@ export async function GET(request: Request) {
       .lt('created_at', thresholdIso);
 
     if (fetchError) {
+      console.error('[Cron Cleanup Database Error]:', fetchError.message);
       return NextResponse.json(
-        { success: false, error: fetchError.message },
+        { success: false, error: 'Failed to query expired records.' },
         { status: 500 }
       );
     }
@@ -114,7 +115,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'Internal Server Error during cleanup.',
+        error: 'Internal server error occurred during cleanup operation.',
       },
       { status: 500 }
     );

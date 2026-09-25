@@ -31,6 +31,40 @@ const ALLOWED_DOMAIN = '@antiquespride.edu.ph'
 const ADMIN_EMAIL = 'psits-ua@antiquespride.edu.ph'
 const STORAGE_KEY = 'psits_mgmt_session'
 const TOKEN_KEY = 'psits_mgmt_token'
+const EXPIRY_KEY = 'psits_mgmt_expires_at'
+
+function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY)
+}
+
+function getStoredExpiry(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(EXPIRY_KEY) || sessionStorage.getItem(EXPIRY_KEY)
+}
+
+function persistSession(token: string, user: AuthUser, expiresAt?: string) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
+  if (expiresAt) {
+    localStorage.setItem(EXPIRY_KEY, expiresAt)
+  }
+  // Clear legacy sessionStorage
+  sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(STORAGE_KEY)
+  sessionStorage.removeItem(EXPIRY_KEY)
+}
+
+function clearSessionStorage() {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(EXPIRY_KEY)
+  sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(STORAGE_KEY)
+  sessionStorage.removeItem(EXPIRY_KEY)
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -69,6 +103,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null
   }, [])
 
+  // Handle session expiration
+  const handleExpire = useCallback(async (message?: string) => {
+    const token = getStoredToken()
+    if (token) {
+      try {
+        await destroySessionAction(token)
+      } catch {}
+    }
+    try {
+      await supabase.auth.signOut()
+    } catch {}
+
+    clearSessionStorage()
+    setUser(null)
+
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(
+        'psits_auth_error',
+        message || 'Your session has expired. Please sign in again.'
+      )
+      if (window.location.pathname.startsWith('/management') && window.location.pathname !== '/management') {
+        window.location.href = '/management?expired=1'
+      }
+    }
+  }, [])
+
   // Initialize session from server-backed session token or OAuth
   useEffect(() => {
     let mounted = true
@@ -98,29 +158,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // 1. Validate server-side session token
-        const token = sessionStorage.getItem(TOKEN_KEY)
+        const token = getStoredToken()
+        const expiry = getStoredExpiry()
+
+        // 1. Client-side expiration pre-check
+        if (expiry && Date.now() > new Date(expiry).getTime()) {
+          clearSessionStorage()
+          if (mounted) {
+            setUser(null)
+            setIsLoading(false)
+          }
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('psits_auth_error', 'Your session has expired. Please sign in again.')
+          }
+          return
+        }
+
+        // 2. Validate server-side session token
         if (token) {
-          const { valid, user: sessionUser } = await validateSessionAction(token)
+          const { valid, user: sessionUser, expiresAt: refreshedExpiry } = await validateSessionAction(token)
           if (valid && sessionUser) {
+            persistSession(token, sessionUser, refreshedExpiry || expiry || undefined)
             if (mounted) setUser(sessionUser)
             setIsLoading(false)
             return
           } else {
             // Token expired or invalid on server
-            sessionStorage.removeItem(TOKEN_KEY)
-            sessionStorage.removeItem(STORAGE_KEY)
-          }
-        }
-
-        // 2. Check cached fallback
-        const stored = sessionStorage.getItem(STORAGE_KEY)
-        if (stored) {
-          const parsed = JSON.parse(stored) as AuthUser
-          if (parsed.email?.endsWith(ALLOWED_DOMAIN)) {
-            if (mounted) setUser(parsed)
-            setIsLoading(false)
-            return
+            clearSessionStorage()
+            if (mounted) setUser(null)
           }
         }
 
@@ -131,9 +196,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (resolved) {
             const sessionRes = await createSessionAction(resolved)
             if (sessionRes.token) {
-              sessionStorage.setItem(TOKEN_KEY, sessionRes.token)
+              persistSession(sessionRes.token, resolved, sessionRes.expiresAt)
             }
-            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
             if (mounted) {
               setUser(resolved)
               setIsLoading(false)
@@ -143,8 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return
           } else {
             await supabase.auth.signOut()
-            sessionStorage.removeItem(TOKEN_KEY)
-            sessionStorage.removeItem(STORAGE_KEY)
+            clearSessionStorage()
             if (mounted) {
               setUser(null)
               setIsLoading(false)
@@ -161,8 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.error('Session initialization error:', err)
-        sessionStorage.removeItem(TOKEN_KEY)
-        sessionStorage.removeItem(STORAGE_KEY)
+        clearSessionStorage()
       } finally {
         if (mounted) setIsLoading(false)
       }
@@ -178,9 +240,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (resolved) {
             const sessionRes = await createSessionAction(resolved)
             if (sessionRes.token) {
-              sessionStorage.setItem(TOKEN_KEY, sessionRes.token)
+              persistSession(sessionRes.token, resolved, sessionRes.expiresAt)
             }
-            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
             if (mounted) {
               setUser(resolved)
               setIsLoading(false)
@@ -189,8 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.removeItem('psits_auth_redirect')
           } else {
             await supabase.auth.signOut()
-            sessionStorage.removeItem(TOKEN_KEY)
-            sessionStorage.removeItem(STORAGE_KEY)
+            clearSessionStorage()
             if (mounted) {
               setUser(null)
               setIsLoading(false)
@@ -201,8 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             )
           }
         } else if (event === 'SIGNED_OUT') {
-          sessionStorage.removeItem(TOKEN_KEY)
-          sessionStorage.removeItem(STORAGE_KEY)
+          clearSessionStorage()
           if (mounted) {
             setUser(null)
             setIsLoading(false)
@@ -217,6 +276,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe()
     }
   }, [resolveUserSession])
+
+  // Active Real-Time Watchdog: Heartbeat and Multi-Tab Synchronization
+  useEffect(() => {
+    if (!user) return
+
+    const checkSession = async () => {
+      const token = getStoredToken()
+      const expiry = getStoredExpiry()
+
+      if (!token) {
+        setUser(null)
+        return
+      }
+
+      // Check client-side expiry
+      if (expiry && Date.now() > new Date(expiry).getTime()) {
+        await handleExpire('Your session has expired. Please sign in again.')
+        return
+      }
+
+      // Heartbeat with server to verify token validity and touch last_active_at
+      const { valid, user: refreshedUser, expiresAt: refreshedExpiry } = await validateSessionAction(token)
+      if (!valid) {
+        await handleExpire('Your session is no longer active. Please sign in again.')
+      } else if (refreshedExpiry && refreshedUser) {
+        persistSession(token, refreshedUser, refreshedExpiry)
+      }
+    }
+
+    // Check every 60 seconds
+    const interval = setInterval(checkSession, 60 * 1000)
+
+    // Check immediately on tab focus or visibility change
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkSession()
+      }
+    }
+    const onFocus = () => checkSession()
+
+    // Synchronize across multiple tabs
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === TOKEN_KEY || e.key === STORAGE_KEY) {
+        if (!e.newValue) {
+          setUser(null)
+        } else if (e.key === STORAGE_KEY && e.newValue) {
+          try {
+            setUser(JSON.parse(e.newValue))
+          } catch {}
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('storage', onStorage)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [user, handleExpire])
 
   // ─── Super Admin Password Login ───
   const loginWithAdminPassword = useCallback(
@@ -251,10 +374,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Create server-side session token
         const sessionRes = await createSessionAction(adminUser)
         if (sessionRes.token) {
-          sessionStorage.setItem(TOKEN_KEY, sessionRes.token)
+          persistSession(sessionRes.token, adminUser, sessionRes.expiresAt)
         }
 
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(adminUser))
         setUser(adminUser)
         return { success: true }
       } catch (err) {
@@ -345,10 +467,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Create server-side session token
         const sessionRes = await createSessionAction(officerUser)
         if (sessionRes.token) {
-          sessionStorage.setItem(TOKEN_KEY, sessionRes.token)
+          persistSession(sessionRes.token, officerUser, sessionRes.expiresAt)
         }
 
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(officerUser))
         setUser(officerUser)
         return { success: true }
       } catch (err) {
@@ -378,7 +499,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ─── Proper Session-Based Logout ───
   const logout = useCallback(async () => {
     try {
-      const token = sessionStorage.getItem(TOKEN_KEY)
+      const token = getStoredToken()
       if (token) {
         // Destroy the server-side session in Supabase immediately
         await destroySessionAction(token)
@@ -391,8 +512,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut()
     } catch {}
 
-    sessionStorage.removeItem(TOKEN_KEY)
-    sessionStorage.removeItem(STORAGE_KEY)
+    clearSessionStorage()
     setUser(null)
   }, [])
 

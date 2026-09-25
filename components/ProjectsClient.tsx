@@ -114,7 +114,7 @@ export default function ProjectsClient({
       return
     }
     if (!turnstileToken) {
-      setSubmitError('Please complete the Cloudflare security challenge.')
+      setSubmitError('Please complete the security verification challenge.')
       return
     }
 
