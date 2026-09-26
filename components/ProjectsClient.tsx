@@ -2,6 +2,7 @@
 
 import { useState, useRef, type FormEvent } from 'react'
 import Image from 'next/image'
+import ProgressiveImage from './ProgressiveImage'
 import {
   FolderGit2,
   GraduationCap,
@@ -282,12 +283,13 @@ export default function ProjectsClient({
                 <div className="space-y-4">
                   {project.imageUrl && (
                     <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-slate-100 dark:bg-[#0a0e17] border border-border-theme mb-2">
-                      <Image
+                      <ProgressiveImage
                         src={project.imageUrl}
                         alt={project.title}
                         fill
                         className="object-cover group-hover:scale-[1.03] transition-transform duration-500"
                         sizes="(max-width: 768px) 100vw, 700px"
+                        ambientGlow
                       />
                     </div>
                   )}

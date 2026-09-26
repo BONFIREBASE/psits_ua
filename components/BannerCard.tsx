@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowUpRight, Info } from 'lucide-react'
+import { ArrowUpRight, Info, ImageOff } from 'lucide-react'
 import type { BannerRow } from '@/lib/supabase'
 
 interface BannerCardProps {
@@ -13,6 +13,11 @@ interface BannerCardProps {
 
 export default function BannerCard({ banner, isActive = true, onClick }: BannerCardProps) {
   const [showCredit, setShowCredit] = useState(false)
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+
+  const isLoaded = Boolean(banner.image_url && loadedUrl === banner.image_url)
+  const hasError = Boolean(banner.image_url && failedUrl === banner.image_url)
 
   // Parse optional creator credit embedded from management
   const creditMatch = banner.subtitle?.match(/\[by:(.*?)\]/)
@@ -38,14 +43,64 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
       />
 
       {/* ─── Thumbnail Image Canvas (Responsive mobile & desktop presentation) ─── */}
-      {banner.image_url ? (
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+      {banner.image_url && !hasError ? (
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-[#070A11]">
+          {/* Skeleton & Shimmer Layer (Smoothly fades out once image finishes loading) */}
+          <div
+            className={`absolute inset-0 transition-opacity duration-700 ease-out z-10 ${
+              isLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            }`}
+          >
+            {/* Ambient center glow */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 sm:w-96 sm:h-96 bg-gold/[0.08] dark:bg-gold/[0.05] rounded-full blur-[80px] pointer-events-none" />
+
+            {/* Diagonal shimmer sweep */}
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.07] to-transparent animate-banner-shimmer" />
+            </div>
+
+            {/* Subtle micro loader badge (Only displayed on active card to prevent visual clutter in stacked mode) */}
+            {isActive && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-2xl">
+                  <div className="relative w-3.5 h-3.5 flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border border-gold/40 border-t-gold animate-spin" />
+                    <div className="w-1 h-1 rounded-full bg-gold shadow-[0_0_6px_rgba(245,166,35,0.8)]" />
+                  </div>
+                  <span className="text-[10.5px] font-mono tracking-wider uppercase text-white/75 font-semibold">
+                    Loading
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Progressive Blur-Up Image */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={banner.image_url}
             alt={banner.title}
-            className="w-full h-full object-cover object-top sm:object-center transition-transform duration-700 group-hover:scale-[1.02]"
+            decoding="async"
+            loading={isActive ? 'eager' : 'lazy'}
+            onLoad={() => setLoadedUrl(banner.image_url)}
+            onError={() => setFailedUrl(banner.image_url)}
+            className={`w-full h-full object-cover object-top sm:object-center transition-all duration-700 ease-out group-hover:scale-[1.02] ${
+              isLoaded
+                ? 'opacity-100 scale-100 blur-0'
+                : 'opacity-0 scale-[1.04] blur-md'
+            }`}
           />
+        </div>
+      ) : hasError ? (
+        /* Modern Fallback for Broken/Failed Image */
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-[#0c121e] via-[#090d16] to-[#05070c] flex items-center justify-center">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gold/[0.04] rounded-full blur-[100px]" />
+          <div className="flex flex-col items-center gap-2 opacity-35">
+            <ImageOff size={32} className="text-white" />
+            <span className="text-[11px] font-mono uppercase tracking-widest text-white/70">
+              Preview Unavailable
+            </span>
+          </div>
         </div>
       ) : (
         /* Text-only fallback background */
@@ -53,7 +108,7 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
       )}
 
       {/* ─── Minimalist Standalone Info Icon with Micro Tooltip ─── */}
-      {banner.image_url && (
+      {banner.image_url && !hasError && (
         <div className="absolute top-4 left-5 z-30">
           <div className="relative">
             <button

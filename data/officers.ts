@@ -13,6 +13,7 @@ export type Officer = {
   roleGroup: 'Executive' | 'Secretariat & Finance' | 'Operations & PR' | 'Year Representatives'
   department: string
   image?: string
+  quote?: string
 }
 
 export type Dean = {

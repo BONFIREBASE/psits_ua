@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import Image from 'next/image'
+import ProgressiveImage from './ProgressiveImage'
 import { motion, AnimatePresence, PanInfo, type Variants } from 'framer-motion'
 import type { ArchivePhoto } from '@/data/archive'
 
@@ -211,7 +211,7 @@ function PhotoPrint({ photo, isTop }: { photo: ArchivePhoto; isTop: boolean }) {
     >
       {/* Photo frame */}
       <div className="relative w-full aspect-[3/2] overflow-hidden bg-[#151515] rounded-[2px] md:rounded-[3px]">
-        <Image
+        <ProgressiveImage
           src={photo.url}
           alt={photo.alt}
           fill

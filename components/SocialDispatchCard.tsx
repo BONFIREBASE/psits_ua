@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
+import ProgressiveImage from './ProgressiveImage'
 import { X, ArrowUpRight, MapPin, Calendar, Quote, PenTool, Camera, Palette, Clock, Video, FileText } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SocialDispatch } from '@/data/announcements'
@@ -55,13 +56,14 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
       >
         {dispatch.imageUrl && (
           <div className="relative w-full aspect-[16/9] sm:aspect-[16/8.5] md:aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-[#0a0e17] shrink-0">
-            <Image
+            <ProgressiveImage
               src={dispatch.imageUrl}
               alt={dispatch.title}
               fill
               className={`object-cover object-center transition-transform duration-700 ease-out ${isActive ? 'group-hover:scale-[1.03]' : ''}`}
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 650px, 750px"
               priority
+              ambientGlow
             />
           </div>
         )}
@@ -168,13 +170,14 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
 
                     {dispatch.imageUrl && (
                       <div className="relative w-full aspect-[16/9] sm:aspect-[2.2/1] bg-slate-100 dark:bg-[#0a0e17] shrink-0 border-b border-black/10 dark:border-white/10">
-                        <Image
+                        <ProgressiveImage
                           src={dispatch.imageUrl}
                           alt={dispatch.title}
                           fill
                           className="object-cover"
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 800px, 950px"
                           priority
+                          ambientGlow
                         />
                       </div>
                     )}

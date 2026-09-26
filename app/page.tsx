@@ -16,6 +16,7 @@ import coverImage from '@/public/assets/cover.jpg'
 export default function HomePage() {
   const [dispatches, setDispatches] = useState(socialDispatches)
   const [activeBanners, setActiveBanners] = useState<BannerRow[]>([])
+  const [bannersLoading, setBannersLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
@@ -32,6 +33,8 @@ export default function HomePage() {
         }
       } catch {
         // Fall back cleanly to static data
+      } finally {
+        setBannersLoading(false)
       }
     }
     load()
@@ -252,7 +255,7 @@ export default function HomePage() {
       </section>
 
       {/* Dynamic Banner Section - Stacked carousel for multiple banners, flat card for single banner */}
-      <BannerStack banners={activeBanners} />
+      <BannerStack banners={activeBanners} isLoading={bannersLoading} />
     </>
   )
 }
