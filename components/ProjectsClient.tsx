@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useRef, type FormEvent } from 'react'
+import { useState, useRef, useEffect, useSyncExternalStore, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import Image from 'next/image'
+import { motion, AnimatePresence } from 'framer-motion'
 import ProgressiveImage from './ProgressiveImage'
 import {
   FolderGit2,
@@ -18,6 +20,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Trash2,
+  Check,
+  ChevronRight,
+  ChevronLeft,
   type LucideIcon,
 } from 'lucide-react'
 import UseAnimations from 'react-useanimations'
@@ -38,6 +44,20 @@ const categories: { label: ProjectCategory; icon: LucideIcon }[] = [
   { label: 'Hackathon', icon: Radio },
 ]
 
+const SUBMISSION_CATEGORIES: {
+  value: ProjectCategory
+  label: string
+}[] = [
+  { value: 'Capstone', label: 'Capstone' },
+  { value: 'Campus Utility', label: 'Campus Utility' },
+  { value: 'Open Source', label: 'Open Source' },
+  { value: 'Hackathon', label: 'Hackathon' },
+]
+
+const QUICK_TAGS = ['Next.js', 'Flutter', 'Supabase', 'Tailwind', 'Python', 'IoT', 'TypeScript', 'PostgreSQL']
+
+const emptySubscribe = () => () => {}
+
 export default function ProjectsClient({
   initialProjects,
 }: {
@@ -49,6 +69,7 @@ export default function ProjectsClient({
 
   // Submit modal state
   const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1)
   const [submitting, setSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -66,6 +87,41 @@ export default function ProjectsClient({
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
   const turnstileRef = useRef<TurnstileWidgetHandle>(null)
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
+
+  function addTag(tag: string) {
+    const current = formTags
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)
+    if (!current.includes(tag)) {
+      const updated = current.length > 0 ? `${current.join(', ')}, ${tag}` : tag
+      setFormTags(updated)
+    }
+  }
+
+  // Lock body scroll when modal is active
+  useEffect(() => {
+    if (showSubmitModal) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [showSubmitModal])
+
+  // Dismiss on Escape key
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !submitting) {
+        setShowSubmitModal(false)
+      }
+    }
+    if (showSubmitModal) window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [showSubmitModal, submitting])
 
   function resetForm() {
     setFormTitle('')
@@ -80,9 +136,27 @@ export default function ProjectsClient({
     setTurnstileToken(null)
     setSubmitError(null)
     setSubmitSuccess(false)
+    setCurrentStep(1)
     if (turnstileRef.current) {
       turnstileRef.current.reset()
     }
+  }
+
+  function handleNextStep() {
+    setSubmitError(null)
+    if (!formTitle.trim()) {
+      setSubmitError('Please enter a project title.')
+      return
+    }
+    if (!formTeam.trim()) {
+      setSubmitError('Please enter your author or team name.')
+      return
+    }
+    if (!formDescription.trim()) {
+      setSubmitError('Please provide a brief project summary.')
+      return
+    }
+    setCurrentStep(2)
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -415,287 +489,365 @@ export default function ProjectsClient({
       </ScrollReveal>
 
       {/* Submit Project Modal */}
-      {showSubmitModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={() => !submitting && setShowSubmitModal(false)}
-        >
-          <div
-            className="bg-white dark:bg-[#0e1422] border border-border-theme rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border-theme bg-slate-50 dark:bg-[#0a0e17]/60">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center text-amber-600 dark:text-gold">
-                  <Sparkles size={18} />
-                </div>
-                <div>
-                  <h2 className="font-display font-bold text-lg text-foreground-theme">
-                    Submit Project for Review
-                  </h2>
-                  <p className="text-[11px] text-muted-foreground-theme font-mono">
-                    PSITS-UA Student Innovation Showcase
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setShowSubmitModal(false)}
-                className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors disabled:opacity-40"
+      {mounted &&
+        createPortal(
+          <AnimatePresence>
+            {showSubmitModal && (
+              <div
+                className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm"
+                onClick={() => !submitting && setShowSubmitModal(false)}
               >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            {submitSuccess ? (
-              <div className="p-8 sm:p-10 text-center space-y-4 flex flex-col items-center justify-center">
-                <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-2">
-                  <CheckCircle2 size={36} />
-                </div>
-                <h3 className="font-display font-black text-2xl text-foreground-theme">
-                  Submission Received!
-                </h3>
-                <p className="text-muted-foreground-theme text-sm max-w-md leading-relaxed">
-                  Thank you for submitting your project. It is currently placed in the
-                  <span className="text-amber-500 font-semibold"> Pending Review </span>
-                  queue. Once verified and approved by the PSITS-UA management team, it will appear live on the public showcase.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSubmitModal(false)
-                    resetForm()
-                  }}
-                  className="mt-6 px-6 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: 8 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="relative w-full max-w-xl rounded-2xl border border-white/10 bg-[#0C1017] text-white shadow-2xl overflow-hidden flex flex-col my-auto text-left"
                 >
-                  Close Window
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitProject} className="flex flex-col flex-1 overflow-hidden">
-                <div className="overflow-y-auto flex-1 p-6 space-y-4">
-                  {submitError && (
-                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2">
-                      <AlertCircle size={16} className="shrink-0 text-rose-500" />
-                      <span>{submitError}</span>
-                    </div>
-                  )}
-
-                  {/* Project Title */}
-                  <div>
-                    <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme font-medium mb-1.5">
-                      Project Title <span className="text-gold">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. KasUbAy Campus Route Finder"
-                      value={formTitle}
-                      onChange={(e) => setFormTitle(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-[#121929] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/50 focus:outline-none focus:border-gold/50"
-                    />
-                  </div>
-
-                  {/* Authors / Team & Category */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-white/8 bg-[#090D14]">
                     <div>
-                      <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme font-medium mb-1.5">
-                        Authors / Team <span className="text-gold">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. BSIT 3-A Capstone Group 2"
-                        value={formTeam}
-                        onChange={(e) => setFormTeam(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-[#121929] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/50 focus:outline-none focus:border-gold/50"
-                      />
+                      <h2 className="font-display font-bold text-base sm:text-lg text-white tracking-tight">
+                        Submit Project for Showcase
+                      </h2>
+                      <p className="text-xs text-white/50 mt-0.5">
+                        Share your capstone, utility, or open-source build with the CCIS community.
+                      </p>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme font-medium mb-1.5">
-                        Category
-                      </label>
-                      <select
-                        value={formCategory}
-                        onChange={(e) => setFormCategory(e.target.value as ProjectCategory)}
-                        className="w-full bg-slate-50 dark:bg-[#121929] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme focus:outline-none focus:border-gold/50"
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-[11px] font-mono text-white/40">
+                        {currentStep === 1 ? 'Step 1 of 2' : 'Step 2 of 2'}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => setShowSubmitModal(false)}
+                        className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40 cursor-pointer"
+                        aria-label="Close"
                       >
-                        <option value="Capstone">Capstone Project</option>
-                        <option value="Campus Utility">Campus Utility</option>
-                        <option value="Open Source">Open Source Tool</option>
-                        <option value="Hackathon">Hackathon Build</option>
-                      </select>
+                        <X size={16} />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Description */}
-                  <div>
-                    <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme font-medium mb-1.5">
-                      Project Description <span className="text-gold">*</span>
-                    </label>
-                    <textarea
-                      rows={3}
-                      required
-                      placeholder="Summarize the core features, objectives, and campus impact of your system..."
-                      value={formDescription}
-                      onChange={(e) => setFormDescription(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-[#121929] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/50 focus:outline-none focus:border-gold/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Tech Stack Tags */}
-                  <div>
-                    <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme font-medium mb-1.5">
-                      Tech Stack / Tags (Comma-separated)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Next.js, Flutter, Tailwind, Supabase, IoT"
-                      value={formTags}
-                      onChange={(e) => setFormTags(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-[#121929] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/50 focus:outline-none focus:border-gold/50"
-                    />
-                  </div>
-
-                  {/* URLs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme font-medium mb-1.5">
-                        Live Demo / Video URL
-                      </label>
-                      <input
-                        type="url"
-                        placeholder="https://..."
-                        value={formDemoUrl}
-                        onChange={(e) => setFormDemoUrl(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-[#121929] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/50 focus:outline-none focus:border-gold/50"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme font-medium mb-1.5">
-                        GitHub / Source Code URL
-                      </label>
-                      <input
-                        type="url"
-                        placeholder="https://github.com/..."
-                        value={formGithubUrl}
-                        onChange={(e) => setFormGithubUrl(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-[#121929] border border-border-theme rounded-xl px-3.5 py-2.5 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/50 focus:outline-none focus:border-gold/50"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Screenshot / Thumbnail Upload */}
-                  <div>
-                    <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground-theme font-medium mb-1.5">
-                      Project Banner / Screenshot (Max 5MB)
-                    </label>
-                    <div className="flex items-center gap-4">
-                      {thumbnailPreview ? (
-                        <div className="relative w-32 h-20 rounded-xl overflow-hidden border border-border-theme shrink-0">
-                          <Image
-                            src={thumbnailPreview}
-                            alt="Preview"
-                            fill
-                            className="object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFormThumbnail(null)
-                              setThumbnailPreview(null)
-                            }}
-                            className="absolute top-1 right-1 p-1 rounded-full bg-black/70 text-white hover:bg-red-500 transition-colors"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="flex-1 flex flex-col items-center justify-center p-4 border border-dashed border-border-theme hover:border-gold/50 rounded-xl cursor-pointer bg-slate-50/50 dark:bg-white/[0.02] hover:bg-slate-100/50 dark:hover:bg-white/[0.04] transition-all">
-                          <UploadCloud size={20} className="text-amber-600 dark:text-gold/80 mb-1" />
-                          <span className="text-xs text-muted-foreground-theme font-mono">
-                            Click or drag screenshot here
-                          </span>
-                          <span className="text-[10px] text-muted-foreground-theme/70 font-mono mt-0.5">
-                            PNG, JPG, or WebP up to 5MB
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileChange}
-                            className="hidden"
-                          />
-                        </label>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Modal Footer with Seamless Managed Turnstile Verification */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-6 py-4 border-t border-border-theme bg-slate-50 dark:bg-[#0a0e17]/60">
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={() => setShowSubmitModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-mono text-muted-foreground-theme hover:text-foreground-theme transition-colors disabled:opacity-40 order-2 sm:order-1 text-center"
-                  >
-                    Cancel
-                  </button>
-
-                  <div className="flex items-center justify-end gap-3 order-1 sm:order-2">
-                    {/* Turnstile Container */}
-                    <div className={turnstileToken ? 'hidden' : 'block'}>
-                      <TurnstileWidget
-                        ref={turnstileRef}
-                        action="project-submit"
-                        className="scale-[0.9] origin-right"
-                        onVerify={(token) => {
-                          setTurnstileToken(token)
-                          setSubmitError(null)
-                        }}
-                        onExpire={() => setTurnstileToken(null)}
-                        onError={() => setSubmitError('Turnstile verification failed. Please try again.')}
-                      />
-                    </div>
-
-                    {/* Once managed check verifies, replace with prominent Submit button */}
-                    {turnstileToken && (
-                      <div className="flex items-center gap-2.5 animate-in fade-in zoom-in-95 duration-200">
-                        <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
-                          <CheckCircle2 size={12} />
-                          <span>Verified</span>
-                        </span>
-                        <button
-                          type="submit"
-                          disabled={submitting}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md cursor-pointer"
-                        >
-                          {submitting ? (
-                            <>
-                              <Loader2 size={14} className="animate-spin" />
-                              <span>Uploading & Submitting...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Plus size={14} />
-                              <span>Submit Project</span>
-                            </>
-                          )}
-                        </button>
+                  {/* Modal Body */}
+                  {submitSuccess ? (
+                    <div className="p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-1">
+                        <CheckCircle2 size={24} />
                       </div>
-                    )}
-                  </div>
-                </div>
-              </form>
+                      <h3 className="font-display font-bold text-lg text-white">
+                        Submission Received
+                      </h3>
+                      <p className="text-white/60 text-xs max-w-sm leading-relaxed">
+                        Your project has been submitted for verification. It will appear on the showcase once approved by the PSITS team.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSubmitModal(false)
+                          resetForm()
+                        }}
+                        className="mt-4 px-5 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] font-semibold text-xs transition-colors cursor-pointer"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmitProject} className="flex flex-col">
+                      <div className="p-6 space-y-4">
+                        {submitError && (
+                          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+                            <AlertCircle size={15} className="shrink-0 text-rose-400" />
+                            <span>{submitError}</span>
+                          </div>
+                        )}
+
+                        {currentStep === 1 ? (
+                          /* STEP 1: Details */
+                          <motion.div
+                            key="step1"
+                            initial={{ opacity: 0, x: -6 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 6 }}
+                            transition={{ duration: 0.15 }}
+                            className="space-y-4"
+                          >
+                            {/* Track / Category Segmented Control */}
+                            <div>
+                              <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5">
+                                Category Track
+                              </label>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-white/[0.02] border border-white/8 rounded-xl">
+                                {SUBMISSION_CATEGORIES.map((cat) => {
+                                  const isSelected = formCategory === cat.value
+                                  return (
+                                    <button
+                                      key={cat.value}
+                                      type="button"
+                                      onClick={() => setFormCategory(cat.value)}
+                                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all text-center truncate cursor-pointer ${
+                                        isSelected
+                                          ? 'bg-gold text-[#0D1117] font-semibold shadow-sm'
+                                          : 'text-white/60 hover:text-white hover:bg-white/5'
+                                      }`}
+                                    >
+                                      {cat.label}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Title */}
+                            <div>
+                              <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5">
+                                Project Title <span className="text-gold">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. KasUbAy Campus Route Finder"
+                                value={formTitle}
+                                onChange={(e) => setFormTitle(e.target.value)}
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all"
+                              />
+                            </div>
+
+                            {/* Authors / Team */}
+                            <div>
+                              <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5">
+                                Authors / Team <span className="text-gold">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. BSIT 3-A Capstone Group 2"
+                                value={formTeam}
+                                onChange={(e) => setFormTeam(e.target.value)}
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all"
+                              />
+                            </div>
+
+                            {/* Pitch / Description */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-[11px] font-mono uppercase tracking-wider text-white/60">
+                                  Pitch / Description <span className="text-gold">*</span>
+                                </label>
+                                <span className="text-[10px] font-mono text-white/35">
+                                  {formDescription.length}/500
+                                </span>
+                              </div>
+                              <textarea
+                                rows={3}
+                                maxLength={500}
+                                required
+                                placeholder="Briefly describe what your system does and its campus impact..."
+                                value={formDescription}
+                                onChange={(e) => setFormDescription(e.target.value)}
+                                className="w-full p-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all resize-none leading-relaxed"
+                              />
+                            </div>
+                          </motion.div>
+                        ) : (
+                          /* STEP 2: Links & Media */
+                          <motion.div
+                            key="step2"
+                            initial={{ opacity: 0, x: 6 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -6 }}
+                            transition={{ duration: 0.15 }}
+                            className="space-y-4"
+                          >
+                            {/* Tech Stack */}
+                            <div>
+                              <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5">
+                                Tech Stack
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Next.js, Flutter, Tailwind, Supabase"
+                                value={formTags}
+                                onChange={(e) => setFormTags(e.target.value)}
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all"
+                              />
+                              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                <span className="text-[10px] font-mono text-white/35">Quick add:</span>
+                                {QUICK_TAGS.map((t) => (
+                                  <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => addTag(t)}
+                                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.03] hover:bg-gold/15 border border-white/8 hover:border-gold/40 text-white/60 hover:text-gold transition-colors cursor-pointer"
+                                  >
+                                    +{t}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Demo URL & GitHub */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5 truncate">
+                                  Live Demo / Video URL
+                                </label>
+                                <input
+                                  type="url"
+                                  placeholder="https://..."
+                                  value={formDemoUrl}
+                                  onChange={(e) => setFormDemoUrl(e.target.value)}
+                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5 truncate">
+                                  GitHub Repository
+                                </label>
+                                <input
+                                  type="url"
+                                  placeholder="https://github.com/..."
+                                  value={formGithubUrl}
+                                  onChange={(e) => setFormGithubUrl(e.target.value)}
+                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Banner / Screenshot upload */}
+                            <div>
+                              <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5">
+                                Banner / Screenshot <span className="text-white/35 font-normal">(optional)</span>
+                              </label>
+                              {thumbnailPreview ? (
+                                <div className="relative w-full h-24 rounded-xl overflow-hidden border border-white/15 bg-black/40 group">
+                                  <Image
+                                    src={thumbnailPreview}
+                                    alt="Preview"
+                                    fill
+                                    className="object-cover"
+                                  />
+                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between p-3">
+                                    <span className="text-[10px] font-mono text-white truncate max-w-[240px]">
+                                      {formThumbnail?.name}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setFormThumbnail(null)
+                                        setThumbnailPreview(null)
+                                      }}
+                                      className="p-1.5 rounded-lg bg-rose-500/80 hover:bg-rose-500 text-white transition-colors cursor-pointer"
+                                      title="Remove image"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <label className="flex items-center gap-3 p-3.5 border border-dashed border-white/15 hover:border-white/30 rounded-xl cursor-pointer bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+                                  <UploadCloud size={18} className="text-white/40 shrink-0" />
+                                  <div className="text-xs text-white/70">
+                                    <span>Upload screenshot or banner</span>
+                                    <span className="text-[10px] text-white/35 font-mono block mt-0.5">
+                                      PNG, JPG, WebP up to 5MB (16:9 ratio recommended)
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="px-6 py-3.5 border-t border-white/8 bg-[#090D14] flex items-center justify-between gap-3">
+                        {currentStep === 1 ? (
+                          <>
+                            <button
+                              type="button"
+                              disabled={submitting}
+                              onClick={() => setShowSubmitModal(false)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-mono text-white/50 hover:text-white transition-colors cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleNextStep}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] font-semibold text-xs transition-colors cursor-pointer"
+                            >
+                              <span>Continue</span>
+                              <ChevronRight size={13} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled={submitting}
+                              onClick={() => setCurrentStep(1)}
+                              className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-lg text-xs font-mono text-white/60 hover:text-white transition-colors cursor-pointer"
+                            >
+                              <ChevronLeft size={13} />
+                              <span>Back</span>
+                            </button>
+
+                            <div className="flex items-center gap-3">
+                              <div className={turnstileToken ? 'hidden' : 'block'}>
+                                <TurnstileWidget
+                                  ref={turnstileRef}
+                                  action="project-submit"
+                                  className="scale-[0.8] origin-right"
+                                  onVerify={(token) => {
+                                    setTurnstileToken(token)
+                                    setSubmitError(null)
+                                  }}
+                                  onExpire={() => setTurnstileToken(null)}
+                                  onError={() => setSubmitError('Verification failed. Please try again.')}
+                                />
+                              </div>
+
+                              {turnstileToken && (
+                                <button
+                                  type="submit"
+                                  disabled={submitting}
+                                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] font-semibold text-xs transition-colors disabled:opacity-50 cursor-pointer"
+                                >
+                                  {submitting ? (
+                                    <>
+                                      <Loader2 size={13} className="animate-spin" />
+                                      <span>Submitting...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Check size={13} />
+                                      <span>Submit Project</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </form>
+                  )}
+                </motion.div>
+              </div>
             )}
-          </div>
-        </div>
-      )}
+          </AnimatePresence>,
+          document.body
+        )}
     </div>
   )
 }
