@@ -18,6 +18,7 @@ import {
   BookOpen,
   Award,
   CheckCircle2,
+  Images,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../_context/auth-context'
@@ -146,6 +147,11 @@ export default function DashboardPage() {
       label: 'Attendance Check-in',
       icon: ClipboardList,
       href: '/management/attendance',
+    },
+    {
+      label: 'PSITS Archive',
+      icon: Images,
+      href: '/management/archive',
     },
     ...(isAdmin
       ? [

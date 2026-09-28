@@ -17,6 +17,7 @@ const navLinks = [
   { href: '/projects', label: 'Student Projects' },
   { href: '/submission', label: 'Polo Shirt Contest' },
   { href: '/merch', label: 'Official Merch' },
+  { href: '/dues', label: 'Membership Dues' },
   { href: '/management', label: 'Management' },
 ]
 

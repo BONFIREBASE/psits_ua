@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import Image from 'next/image'
-import type { AnimationItem } from 'lottie-web'
+import LottiePlayer from './LottiePlayer'
 
 // Target lift-off timestamp: Monday, September 21, 2026 at 00:00:00 PHT (UTC+8)
 const LIFT_OFF_DATE_STRING = '2026-09-21T00:00:00+08:00'
@@ -74,46 +74,6 @@ export default function MaintenanceWrapper({
     () => process.env.NODE_ENV === 'development'
   )
 
-  const lottieContainerRef = useRef<HTMLDivElement>(null)
-
-  // Load Minimalist Lottie Animation
-  useEffect(() => {
-    if (isPassed || bypassed) return
-
-    let animInstance: AnimationItem | null = null
-    let isCancelled = false
-
-    async function initLottie() {
-      try {
-        const lottieModule = await import('lottie-web')
-        if (isCancelled || !lottieContainerRef.current) return
-
-        const res = await fetch('/assets/Maintenance%20web.json')
-        if (!res.ok) return
-        const animData = await res.json()
-
-        if (isCancelled || !lottieContainerRef.current) return
-
-        animInstance = lottieModule.default.loadAnimation({
-          container: lottieContainerRef.current,
-          renderer: 'svg',
-          loop: true,
-          autoplay: true,
-          animationData: animData,
-        })
-      } catch (err) {
-        console.warn('Lottie maintenance load note:', err)
-      }
-    }
-
-    initLottie()
-
-    return () => {
-      isCancelled = true
-      if (animInstance) animInstance.destroy()
-    }
-  }, [isPassed, bypassed])
-
   // Once Monday September 21, 2026 arrives (or in dev/preview/with ?bypass=true), reveal the application
   if (isPassed || bypassed) {
     return <>{children}</>
@@ -140,9 +100,10 @@ export default function MaintenanceWrapper({
 
         {/* Perfectly Centered Responsive Lottie Animation */}
         <div className="w-full max-w-[520px] sm:max-w-[620px] md:max-w-[680px] aspect-[16/9] flex items-center justify-center shrink-0 mx-auto">
-          <div
-            ref={lottieContainerRef}
-            className="w-full h-full pointer-events-none drop-shadow-[0_15px_35px_rgba(0,0,0,0.5)] flex items-center justify-center"
+          <LottiePlayer
+            src="/assets/Maintenance%20web.json"
+            className="w-full h-full"
+            animationClassName="drop-shadow-[0_15px_35px_rgba(0,0,0,0.5)]"
           />
         </div>
 

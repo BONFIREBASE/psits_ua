@@ -461,3 +461,118 @@ export async function getActiveBanners(): Promise<BannerRow[]> {
     return [];
   }
 }
+
+/* ─── 10. PSITS Archive Photos ─── */
+
+export type ArchivePhotoStatus = 'active' | 'staging' | 'vault';
+
+export interface ArchivePhotoRow {
+  id: string;
+  url: string;
+  alt: string;
+  caption?: string | null;
+  year?: string | null;
+  status: ArchivePhotoStatus;
+  display_order: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export async function getArchivePhotos(onlyActive: boolean = false): Promise<ArchivePhotoRow[]> {
+  try {
+    let query = supabase
+      .from('archive_photos')
+      .select('*')
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (onlyActive) {
+      query = query.or('status.eq.active,status.is.null');
+    }
+
+    const { data, error } = await query;
+
+    if (error || !data || data.length === 0) {
+      const { archivePhotos } = await import('@/data/archive');
+      return archivePhotos.map((p, idx) => ({
+        id: p.id,
+        url: p.url,
+        alt: p.alt,
+        caption: p.caption || null,
+        year: p.year || null,
+        status: 'active' as ArchivePhotoStatus,
+        display_order: idx + 1,
+        created_at: new Date().toISOString(),
+      }));
+    }
+
+    return (data as ArchivePhotoRow[]).map((r) => ({
+      ...r,
+      status: (r.status || 'active') as ArchivePhotoStatus,
+    }));
+  } catch {
+    try {
+      const { archivePhotos } = await import('@/data/archive');
+      return archivePhotos.map((p, idx) => ({
+        id: p.id,
+        url: p.url,
+        alt: p.alt,
+        caption: p.caption || null,
+        year: p.year || null,
+        status: 'active' as ArchivePhotoStatus,
+        display_order: idx + 1,
+        created_at: new Date().toISOString(),
+      }));
+    } catch {
+      return [];
+    }
+  }
+}
+
+/* ─── 8. Membership Dues ─── */
+
+export interface MembershipDueRow {
+  id: string;
+  student_name: string;
+  student_name_normalized: string;
+  program: string;
+  year_level: number;
+  section: string;
+  year_section: string;
+  amount: number;
+  is_paid: boolean;
+  academic_year: string;
+  semester: string;
+  recorded_by: string | null;
+  paid_at: string;
+  created_at: string;
+}
+
+export interface PublicMaskedDueRow {
+  id: string;
+  masked_name: string;
+  program: string;
+  year_level: number;
+  section: string;
+  year_section: string;
+  amount: number;
+  is_paid: boolean;
+  academic_year: string;
+  semester: string;
+  paid_at: string;
+}
+
+export async function getMembershipDues(): Promise<MembershipDueRow[]> {
+  try {
+    const { data, error } = await supabase
+      .from('membership_dues')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+    return data as MembershipDueRow[];
+  } catch {
+    return [];
+  }
+}
+
