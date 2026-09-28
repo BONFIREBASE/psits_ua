@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import SectionHeader from '@/components/SectionHeader'
 import ArchiveStack from '@/components/ArchiveStack'
 import ScrollReveal from '@/components/ScrollReveal'
-import { archivePhotos } from '@/data/archive'
+import { getArchivePhotos } from '@/lib/supabase'
+import type { ArchivePhoto } from '@/data/archive'
 
 export const metadata: Metadata = {
   title: 'About PSITS-UA | History & Archive',
@@ -45,7 +46,18 @@ const aboutSchema = {
   },
 }
 
-export default function AboutPage() {
+export const revalidate = 60
+
+export default async function AboutPage() {
+  const rawPhotos = await getArchivePhotos(true)
+  const photos: ArchivePhoto[] = rawPhotos.map((p) => ({
+    id: p.id,
+    url: p.url,
+    alt: p.alt,
+    caption: p.caption || undefined,
+    year: p.year || undefined,
+  }))
+
   return (
     <main className="min-h-screen bg-canvas text-text">
       <script
@@ -117,7 +129,7 @@ export default function AboutPage() {
 
         {/* Minimalist Tactile Memory Photo Stack */}
         <ScrollReveal delay={0.1}>
-          <ArchiveStack photos={archivePhotos} />
+          <ArchiveStack photos={photos} />
         </ScrollReveal>
       </section>
     </main>

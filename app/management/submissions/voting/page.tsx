@@ -1,17 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  BarChart3,
   Users,
   TrendingUp,
   Award,
   Download,
   RefreshCw,
-  Calendar,
-  Clock,
   CheckCircle2,
   XCircle,
   Settings,
@@ -297,7 +294,7 @@ export default function VotingAnalyticsPage() {
   }, []);
 
   // Fetch analytics data
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     if (!sessionToken) return;
 
     setLoading(true);
@@ -316,12 +313,39 @@ export default function VotingAnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionToken]);
 
   useEffect(() => {
-    if (sessionToken) {
-      fetchAnalytics();
+    if (!sessionToken) return;
+    let isCancelled = false;
+
+    async function loadInitialData() {
+      try {
+        const res = await fetch("/api/submissions/polo/analytics", {
+          headers: { Authorization: `Bearer ${sessionToken}` },
+        });
+
+        if (res.ok && !isCancelled) {
+          const analyticsData = await res.json();
+          setData(analyticsData);
+          setConfigForm(analyticsData.config);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          console.error("Error fetching analytics:", err);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
     }
+
+    loadInitialData();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [sessionToken]);
 
   // Save voting configuration

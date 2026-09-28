@@ -16,7 +16,7 @@ const privacySections = [
   { id: 'governance', num: '02', label: 'Operational Roles & Governance' },
   { id: 'data-collected', num: '03', label: 'Information We Collect' },
   { id: 'coa-activities', num: '04', label: 'COA Activities & Career' },
-  { id: 'subprocessors', num: '05', label: 'Subprocessors & Cookies' },
+  { id: 'subprocessors', num: '05', label: 'Infrastructure & Storage' },
   { id: 'security-storage', num: '06', label: 'Security & Data Storage' },
   { id: 'inquiries', num: '07', label: 'Data Inquiries (DSAR)' },
   { id: 'rights', num: '08', label: 'Legal Rights & Contact' },
@@ -168,7 +168,7 @@ export default function PrivacyPolicyPage() {
               </li>
               <li>
                 <strong className="text-slate-900 dark:text-white">Ephemeral Security Logs:</strong> IP addresses and browser
-                user-agents evaluated in-memory by Cloudflare Turnstile and sliding-window rate limiters to prevent bot spam.
+                user-agents evaluated in-memory by automated bot verification and rate-limiting safeguards to prevent abuse.
                 Security logs are never linked to personal student profiles.
               </li>
             </ul>
@@ -213,48 +213,52 @@ export default function PrivacyPolicyPage() {
 
           <hr className="border-border/40" />
 
-          {/* Section 05: Cloud Subprocessors & Cookie Storage */}
+          {/* Section 05: Cloud Infrastructure & Browser Storage */}
           <section id="subprocessors" className="scroll-mt-24 space-y-3">
             <p className="text-xs font-mono text-gold uppercase tracking-wider">
-              05 · Subprocessors &amp; Browser Storage
+              05 · Infrastructure &amp; Browser Storage
             </p>
             <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
-              Cloud Subprocessors &amp; Browser Storage
+              Cloud Infrastructure &amp; Browser Storage
             </h2>
             <p>
-              To deliver resilient operations, student data is processed across enterprise cloud infrastructure under
-              strict security standards:
+              To ensure platform integrity and service resilience, authorized student data is processed
+              across vetted enterprise cloud infrastructure governed by strict security, encryption, and confidentiality standards:
             </p>
             <ul className="list-disc list-outside pl-5 space-y-2">
               <li>
-                <strong className="text-slate-900 dark:text-white">Supabase / PostgreSQL:</strong> Relational database hosting,
-                user authentication, and database-level Row-Level Security (RLS) policies.
+                <strong className="text-slate-900 dark:text-white">Encrypted Cloud Database:</strong> Secure
+                data hosting with strict granular authorization, row-level access controls, and encrypted storage.
               </li>
               <li>
-                <strong className="text-slate-900 dark:text-white">Cloudflare:</strong> Direct media asset storage via Cloudflare R2
-                buckets and human verification via Cloudflare Turnstile.
+                <strong className="text-slate-900 dark:text-white">Edge Security &amp; Delivery Network:</strong> Distributed
+                edge routing, abuse mitigation, rate limiting, and automated bot verification to protect system availability.
               </li>
               <li>
-                <strong className="text-slate-900 dark:text-white">Vercel:</strong> Serverless Next.js edge application hosting
-                and aggregated web telemetry.
+                <strong className="text-slate-900 dark:text-white">Encrypted Object Storage:</strong> Isolated
+                cloud media storage utilizing time-limited, signed access tokens for student design files and event materials.
               </li>
               <li>
-                <strong className="text-slate-900 dark:text-white">Upstash:</strong> Serverless in-memory Redis for edge sliding-window
-                rate limiting and defense against distributed denial-of-service attempts.
-              </li>
-              <li>
-                <strong className="text-slate-900 dark:text-white">Google Workspace:</strong> Institutional Single Sign-On identity
-                provider and Search Console telemetry.
+                <strong className="text-slate-900 dark:text-white">Institutional Identity Provider:</strong> Single
+                Sign-On authentication restricted to verified university institutional email domains.
               </li>
             </ul>
             <p className="pt-2">
-              Our platform uses strictly essential browser storage:
+              Our platform uses strictly essential browser storage required for core functionality:
             </p>
             <ul className="list-disc list-outside pl-5 space-y-1.5">
-              <li><strong className="text-slate-900 dark:text-white">Theme Preference (<code className="font-mono text-xs">theme</code>):</strong> Remembers light or dark mode in localStorage.</li>
-              <li><strong className="text-slate-900 dark:text-white">Auth Session (<code className="font-mono text-xs">sb-*-auth-token</code>):</strong> Encrypted session cookie to maintain your Google Workspace login.</li>
+              <li>
+                <strong className="text-slate-900 dark:text-white">Interface Preferences:</strong> Local
+                device storage to remember your chosen theme (light or dark mode).
+              </li>
+              <li>
+                <strong className="text-slate-900 dark:text-white">Authentication Session:</strong> Secure,
+                encrypted session tokens required to maintain your active institutional sign-in.
+              </li>
             </ul>
-            <p className="text-xs text-muted">We do not use third-party marketing cookies, cross-site trackers, or advertising pixels.</p>
+            <p className="text-xs text-muted">
+              We do not use third-party marketing cookies, cross-site trackers, behavioral profiling, or advertising pixels.
+            </p>
           </section>
 
           <hr className="border-border/40" />
@@ -270,12 +274,12 @@ export default function PrivacyPolicyPage() {
             <p>We enforce modern cryptographic and architectural protections to keep student data safe:</p>
             <ul className="list-disc list-outside pl-5 space-y-2">
               <li>
-                <strong className="text-slate-900 dark:text-white">Database Encryption:</strong> PostgreSQL on Supabase
-                secured with TLS 1.3 in transit, AES-256 at rest, and database-level Row-Level Security (RLS).
+                <strong className="text-slate-900 dark:text-white">Database Encryption:</strong> Enterprise
+                relational database secured with TLS 1.3 in transit, AES-256 at rest, and strict row-level authorization.
               </li>
               <li>
                 <strong className="text-slate-900 dark:text-white">Direct Storage Uploads:</strong> Student design files
-                upload directly to Cloudflare R2 object storage via short-lived presigned URLs, bypassing application servers.
+                upload directly to encrypted cloud object storage via short-lived presigned URLs, bypassing application servers.
               </li>
               <li>
                 <strong className="text-slate-900 dark:text-white">Automated 365-Day Purge:</strong> Unlinked media and

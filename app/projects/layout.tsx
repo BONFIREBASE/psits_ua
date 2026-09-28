@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     title: 'Student Projects & Capstone Repository | PSITS-UA',
     description:
       'Explore software projects, applications, and capstones engineered by University of Antique IT majors.',
-    url: 'https://psits-ua.antiquespride.edu.ph/projects',
+    url: '/projects',
   },
 }
 

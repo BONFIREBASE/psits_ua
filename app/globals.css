@@ -181,6 +181,19 @@
     animation: orange-gradient-flow 3.5s ease-in-out infinite;
   }
 
+  @keyframes banner-shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .animate-banner-shimmer {
+    animation: banner-shimmer 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
   .scrollbar-minimal {
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.12) transparent;

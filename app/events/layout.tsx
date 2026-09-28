@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     title: 'Calendar of Activities (COA) | PSITS-UA',
     description:
       'Official Calendar of Activities (PRES-FM-008), IT Assemblies, and Competitions at the University of Antique CCIS.',
-    url: 'https://psits-ua.antiquespride.edu.ph/events',
+    url: '/events',
   },
 }
 

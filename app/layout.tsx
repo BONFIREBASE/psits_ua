@@ -28,8 +28,8 @@ const organizationSchema = {
   "@type": "EducationalOrganization",
   name: "Philippine Society of Information Technology Students — University of Antique",
   alternateName: ["PSITS-UA", "PSITS CCIS UA", "PSITS Antique"],
-  url: "https://psits-ua.antiquespride.edu.ph",
-  logo: "https://psits-ua.antiquespride.edu.ph/assets/logo/PSITS%20logo.png",
+  url: "https://psitsua.vercel.app",
+  logo: "https://psitsua.vercel.app/assets/logo/PSITS%20logo.png",
   description:
     "Official student organization of the College of Computing and Information Sciences (CCIS), University of Antique — Main Campus.",
   parentOrganization: {
@@ -138,17 +138,17 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_PH",
-    url: "https://psits-ua.antiquespride.edu.ph",
+    url: "/",
     siteName: "PSITS-UA Official Portal",
     title: "PSITS-UA | Philippine Society of Information Technology Students",
     description:
       "Official portal of PSITS-UA at the University of Antique College of Computing and Information Sciences.",
     images: [
       {
-        url: "/og-image.png",
+        url: "/assets/logo/PSITS%20logo.png",
         width: 1200,
         height: 630,
-        alt: "PSITS-UA Portal",
+        alt: "PSITS-UA Official Logo",
       },
     ],
   },
@@ -157,7 +157,7 @@ export const metadata: Metadata = {
     title: "PSITS-UA | Philippine Society of Information Technology Students",
     description:
       "Official portal of PSITS-UA at the University of Antique College of Computing and Information Sciences.",
-    images: ["/og-image.png"],
+    images: ["/assets/logo/PSITS%20logo.png"],
   },
   robots: {
     index: true,

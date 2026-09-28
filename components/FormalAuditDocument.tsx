@@ -112,9 +112,9 @@ function InstitutionalLetterhead({
  * Standard Institutional Sign-Off Block (3-column)
  */
 function LeadershipSignOff({
-  date = 'Academic Year 2026–2027',
+  _date = 'Academic Year 2026–2027',
 }: {
-  date?: string
+  _date?: string
 }) {
   return (
     <div className="pt-6 border-t-2 border-slate-800 print-avoid-break mt-6">
@@ -164,13 +164,13 @@ export default function FormalAuditDocument({
   officersList,
   pubmatList,
   postsList,
-  bannersList,
+  bannersList: _bannersList,
   eventsList,
-  projectsList,
+  projectsList: _projectsList,
   meetingsList = [],
   treasuryList = [],
   documentsList = [],
-  auditReportsList = [],
+  auditReportsList: _auditReportsList = [],
   cblData,
   generatedDate,
   exportedBy,

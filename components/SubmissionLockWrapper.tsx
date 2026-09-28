@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useSyncExternalStore } from 'react';
+import React, { useSyncExternalStore } from 'react';
 import Image from 'next/image';
-import type { AnimationItem } from 'lottie-web';
+import LottiePlayer from './LottiePlayer';
 
 // Target unlock timestamp: Monday, September 28, 2026 at 12:00:00 PHT (UTC+8)
 const SUBMISSION_OPENS_STRING = '2026-09-28T12:00:00+08:00';
@@ -57,46 +57,6 @@ export default function SubmissionLockWrapper({
     () => false
   );
 
-  const lottieContainerRef = useRef<HTMLDivElement>(null);
-
-  // Load Minimalist Lottie Animation
-  useEffect(() => {
-    if (isPassed || bypassed) return;
-
-    let animInstance: AnimationItem | null = null;
-    let isCancelled = false;
-
-    async function initLottie() {
-      try {
-        const lottieModule = await import('lottie-web');
-        if (isCancelled || !lottieContainerRef.current) return;
-
-        const res = await fetch('/assets/timer.json');
-        if (!res.ok) return;
-        const animData = await res.json();
-
-        if (isCancelled || !lottieContainerRef.current) return;
-
-        animInstance = lottieModule.default.loadAnimation({
-          container: lottieContainerRef.current,
-          renderer: 'svg',
-          loop: true,
-          autoplay: true,
-          animationData: animData,
-        });
-      } catch (err) {
-        console.warn('Lottie submission gate note:', err);
-      }
-    }
-
-    initLottie();
-
-    return () => {
-      isCancelled = true;
-      if (animInstance) animInstance.destroy();
-    };
-  }, [isPassed, bypassed]);
-
   // Once Monday September 28, 2026 at 12:00 PM arrives (or with ?bypass=true), reveal the application
   if (isPassed || bypassed) {
     return <>{children}</>;
@@ -126,9 +86,10 @@ export default function SubmissionLockWrapper({
 
         {/* Perfectly Centered Responsive Lottie Animation */}
         <div className="w-40 h-40 sm:w-52 sm:h-52 md:w-60 md:h-60 aspect-square flex items-center justify-center shrink-0 mx-auto">
-          <div
-            ref={lottieContainerRef}
-            className="w-full h-full pointer-events-none drop-shadow-[0_15px_35px_rgba(0,0,0,0.5)] flex items-center justify-center"
+          <LottiePlayer
+            src="/assets/timer.json"
+            className="w-full h-full"
+            animationClassName="drop-shadow-[0_15px_35px_rgba(0,0,0,0.5)]"
           />
         </div>
 

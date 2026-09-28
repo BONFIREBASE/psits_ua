@@ -22,6 +22,8 @@ import {
   ChevronRight,
   Megaphone,
   Palette,
+  Images,
+  Receipt,
 } from 'lucide-react'
 import { useAuth } from '../_context/auth-context'
 
@@ -40,6 +42,8 @@ const navItems: NavItem[] = [
   { href: '/management/officers', label: 'Officers', icon: Users },
   { href: '/management/events', label: 'Events & Calendar', icon: CalendarDays },
   { href: '/management/projects', label: 'Projects Showcase', icon: Code2 },
+  { href: '/management/archive', label: 'PSITS Archive', icon: Images },
+  { href: '/management/dues', label: 'Membership Dues', icon: Receipt },
   { href: '/management/attendance', label: 'Attendance', icon: ClipboardList },
   { href: '/management/documents', label: 'Documents', icon: FolderOpen },
   { href: '/management/cbl', label: 'Constitution (CBL)', icon: BookOpen },

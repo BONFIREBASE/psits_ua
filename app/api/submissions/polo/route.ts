@@ -507,7 +507,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Polo submission upload error:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal upload error" },
+      { error: "An unexpected error occurred while processing the submission upload." },
       { status: 500 }
     );
   }

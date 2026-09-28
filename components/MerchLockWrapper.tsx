@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useEffect, useRef, useSyncExternalStore } from 'react'
+import React, { useSyncExternalStore } from 'react'
 import Image from 'next/image'
-import type { AnimationItem } from 'lottie-web'
+import LottiePlayer from './LottiePlayer'
 
 function getIsBypassed() {
   if (typeof window === 'undefined') return false
@@ -25,45 +25,6 @@ export default function MerchLockWrapper({
     getIsBypassed,
     () => false
   )
-
-  const lottieContainerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (bypassed) return
-
-    let animInstance: AnimationItem | null = null
-    let isCancelled = false
-
-    async function initLottie() {
-      try {
-        const lottieModule = await import('lottie-web')
-        if (isCancelled || !lottieContainerRef.current) return
-
-        const res = await fetch('/assets/store.json')
-        if (!res.ok) return
-        const animData = await res.json()
-
-        if (isCancelled || !lottieContainerRef.current) return
-
-        animInstance = lottieModule.default.loadAnimation({
-          container: lottieContainerRef.current,
-          renderer: 'svg',
-          loop: true,
-          autoplay: true,
-          animationData: animData,
-        })
-      } catch (err) {
-        console.warn('Lottie merch gate notice:', err)
-      }
-    }
-
-    initLottie()
-
-    return () => {
-      isCancelled = true
-      if (animInstance) animInstance.destroy()
-    }
-  }, [bypassed])
 
   // If ?bypass=true is provided, reveal the store catalog preview
   if (bypassed) {
@@ -93,9 +54,10 @@ export default function MerchLockWrapper({
 
         {/* Centered Lottie Animation from store.json */}
         <div className="w-40 h-40 sm:w-52 sm:h-52 md:w-60 md:h-60 aspect-square flex items-center justify-center shrink-0 mx-auto">
-          <div
-            ref={lottieContainerRef}
-            className="w-full h-full pointer-events-none drop-shadow-[0_15px_35px_rgba(0,0,0,0.5)] flex items-center justify-center"
+          <LottiePlayer
+            src="/assets/store.json"
+            className="w-full h-full"
+            animationClassName="drop-shadow-[0_15px_35px_rgba(0,0,0,0.5)]"
           />
         </div>
 

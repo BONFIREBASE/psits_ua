@@ -50,10 +50,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result)
   } catch (err: unknown) {
+    console.error('[Verification Challenge Error]:', err);
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'Turnstile verification error',
+        error: 'Security challenge verification service unavailable.',
       },
       { status: 500 }
     )

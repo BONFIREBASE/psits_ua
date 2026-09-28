@@ -151,7 +151,7 @@ export const MeetingStore = {
               endTime: dbm.end_time,
               location: dbm.location,
               description: dbm.description,
-              status: dbm.status as any,
+              status: dbm.status as Meeting['status'],
               createdAt: dbm.created_at,
               createdBy: dbm.created_by,
             })
@@ -380,8 +380,8 @@ export const AttendanceStore = {
               position: dbr.position,
               scannedAt: dbr.scanned_at,
               qrToken: dbr.qr_token,
-              status: dbr.status as any,
-              method: dbr.method as any,
+              status: dbr.status as AttendanceStatus,
+              method: dbr.method as AttendanceRecord['method'],
             })
           }
         }
