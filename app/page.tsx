@@ -86,7 +86,7 @@ export default function HomePage() {
           '@type': 'NewsArticle',
           headline: d.title,
           description: d.excerpt,
-          url: d.postUrl || 'https://psits-ua.antiquespride.edu.ph',
+          url: d.postUrl || 'https://psitsua.vercel.app',
           ...(d.credits?.writer ? { author: { '@type': 'Person', name: d.credits.writer, jobTitle: 'Writer' } } : {}),
           ...(contributors.length > 0 ? { contributor: contributors } : {}),
           publisher: {

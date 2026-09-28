@@ -32,6 +32,14 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Redirect accidental trailing punctuation appended by social media post auto-linkers (e.g., /submission. or /submission,)
+  if (/[.,;:!]+$/.test(pathname)) {
+    const cleanPath = pathname.replace(/[.,;:!]+$/, '')
+    const url = request.nextUrl.clone()
+    url.pathname = cleanPath
+    return NextResponse.redirect(url, 308)
+  }
+
   const forwardedFor = request.headers.get('x-forwarded-for')
   const realIp = request.headers.get('x-real-ip')
   const ip = forwardedFor?.split(',')[0]?.trim() || realIp || '127.0.0.1'

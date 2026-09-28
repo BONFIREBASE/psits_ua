@@ -19,7 +19,22 @@ export const metadata: Metadata = {
     title: 'Official Polo Shirt Design Contest | PSITS-UA',
     description:
       'Submit and vote on student-crafted uniform designs for the College of Computing and Information Sciences, University of Antique.',
-    url: 'https://psits-ua.antiquespride.edu.ph/submission',
+    url: '/submission',
+    images: [
+      {
+        url: '/assets/logo/PSITS%20logo.png',
+        width: 1200,
+        height: 630,
+        alt: 'PSITS-UA Official Logo',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Official Polo Shirt Design Contest | PSITS-UA',
+    description:
+      'Submit and vote on student-crafted uniform designs for the College of Computing and Information Sciences, University of Antique.',
+    images: ['/assets/logo/PSITS%20logo.png'],
   },
 }
 
