@@ -30,7 +30,7 @@ export default async function PublicDuesPage({
     totalCollected: 0,
     academicYear: activeAY,
     semester: activeSem,
-    sectionBreakdown: getAllStandardSections().map((sec) => ({
+    sectionBreakdown: getAllStandardSections().map((sec: string) => ({
       yearSection: sec,
       count: 0,
       amount: 0,
