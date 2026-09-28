@@ -3,8 +3,8 @@ export const YEAR_LEVELS = [1, 2, 3, 4] as const
 export const SECTIONS = ['A', 'B', 'C', 'D', 'E'] as const
 
 export const DEFAULT_MEMBERSHIP_FEE = 25.00
-export const DEFAULT_ACADEMIC_YEAR = '2025-2026'
-export const DEFAULT_SEMESTER = '2nd Semester'
+export const DEFAULT_ACADEMIC_YEAR = '2026-2027'
+export const DEFAULT_SEMESTER = '1st Semester'
 
 export const ACADEMIC_YEARS = [
   '2026-2027',

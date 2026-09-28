@@ -11,14 +11,25 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
-export default async function PublicDuesPage() {
-  const result = await getPublicDuesSummaryAction(DEFAULT_ACADEMIC_YEAR, DEFAULT_SEMESTER)
+export default async function PublicDuesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ ay?: string; sem?: string }>
+}) {
+  const resolvedParams = searchParams ? await searchParams : undefined
+  const ay = resolvedParams?.ay
+  const sem = resolvedParams?.sem
+
+  const result = await getPublicDuesSummaryAction(ay, sem)
+
+  const activeAY = result.data?.academicYear || ay || DEFAULT_ACADEMIC_YEAR
+  const activeSem = result.data?.semester || sem || DEFAULT_SEMESTER
 
   const fallbackData: PublicDuesSummary = {
     totalPaid: 0,
     totalCollected: 0,
-    academicYear: DEFAULT_ACADEMIC_YEAR,
-    semester: DEFAULT_SEMESTER,
+    academicYear: activeAY,
+    semester: activeSem,
     sectionBreakdown: getAllStandardSections().map((sec) => ({
       yearSection: sec,
       count: 0,

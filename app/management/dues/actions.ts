@@ -182,15 +182,36 @@ export async function deleteMembershipDueAction(id: string): Promise<DuesActionR
  * Raw student names are strictly withheld and never serialized in the response.
  */
 export async function getPublicDuesSummaryAction(
-  academicYear: string = DEFAULT_ACADEMIC_YEAR,
-  semester: string = DEFAULT_SEMESTER
+  academicYear?: string,
+  semester?: string
 ): Promise<DuesActionResult<PublicDuesSummary>> {
   try {
+    let targetAY: string = academicYear || ''
+    let targetSem: string = semester || ''
+
+    // If term not explicitly specified, query the most recently recorded payment to find the active term
+    if (!targetAY || !targetSem) {
+      const { data: latestRecord } = await supabaseAdmin
+        .from('membership_dues')
+        .select('academic_year, semester')
+        .order('paid_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (latestRecord?.academic_year && latestRecord?.semester) {
+        targetAY = latestRecord.academic_year
+        targetSem = latestRecord.semester
+      } else {
+        targetAY = DEFAULT_ACADEMIC_YEAR
+        targetSem = DEFAULT_SEMESTER
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('membership_dues')
       .select('id, student_name, program, year_level, section, year_section, amount, is_paid, academic_year, semester, paid_at')
-      .eq('academic_year', academicYear)
-      .eq('semester', semester)
+      .eq('academic_year', targetAY)
+      .eq('semester', targetSem)
       .order('paid_at', { ascending: false })
 
     if (error) {
@@ -257,8 +278,8 @@ export async function getPublicDuesSummaryAction(
       data: {
         totalPaid: rows.length,
         totalCollected,
-        academicYear,
-        semester,
+        academicYear: targetAY,
+        semester: targetSem,
         sectionBreakdown,
         maskedRecords,
       },

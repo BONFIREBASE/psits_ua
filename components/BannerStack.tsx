@@ -36,19 +36,6 @@ export function BannerStackSkeleton() {
             {/* Central ambient glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-60 bg-gold/[0.06] rounded-full blur-[90px] pointer-events-none" />
 
-            {/* Center modern loading badge */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-2xl">
-                <div className="relative w-4 h-4 flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-full border border-gold/40 border-t-gold animate-spin" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-gold shadow-[0_0_8px_rgba(245,166,35,0.8)]" />
-                </div>
-                <span className="text-[11px] font-mono tracking-wider uppercase text-white/70 font-semibold">
-                  Loading Banner...
-                </span>
-              </div>
-            </div>
-
             {/* Bottom dock skeleton */}
             <div className="absolute bottom-0 inset-x-0 z-20 px-4 sm:px-8 md:px-10 pb-5 pt-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div className="space-y-2.5 flex-1 max-w-xl">

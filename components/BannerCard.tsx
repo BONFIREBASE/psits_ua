@@ -58,21 +58,6 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
             <div className="absolute inset-0 overflow-hidden">
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.07] to-transparent animate-banner-shimmer" />
             </div>
-
-            {/* Subtle micro loader badge (Only displayed on active card to prevent visual clutter in stacked mode) */}
-            {isActive && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-2xl">
-                  <div className="relative w-3.5 h-3.5 flex items-center justify-center">
-                    <div className="absolute inset-0 rounded-full border border-gold/40 border-t-gold animate-spin" />
-                    <div className="w-1 h-1 rounded-full bg-gold shadow-[0_0_6px_rgba(245,166,35,0.8)]" />
-                  </div>
-                  <span className="text-[10.5px] font-mono tracking-wider uppercase text-white/75 font-semibold">
-                    Loading
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Progressive Blur-Up Image */}

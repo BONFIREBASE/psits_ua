@@ -11,7 +11,7 @@ interface PublicDuesClientProps {
 }
 
 export default function PublicDuesClient({ initialData }: PublicDuesClientProps) {
-  const [data] = useState<PublicDuesSummary>(initialData)
+  const data = initialData
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSection, setSelectedSection] = useState<string>('all')
 
