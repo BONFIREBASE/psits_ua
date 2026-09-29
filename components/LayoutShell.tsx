@@ -10,7 +10,7 @@ import SiteSplashSkeleton from '@/components/SiteSplashSkeleton'
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isCleanRoute = pathname.startsWith('/management') || pathname.startsWith('/camera')
+  const isCleanRoute = pathname.startsWith('/management')
 
   if (isCleanRoute) {
     return <>{children}</>

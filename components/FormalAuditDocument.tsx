@@ -20,7 +20,6 @@ export type DocumentSectionId =
   | 'executive'
   | 'officers'
   | 'coa'
-  | 'attendance'
   | 'cbl'
   | 'treasury'
   | 'documents'
@@ -167,7 +166,6 @@ export default function FormalAuditDocument({
   bannersList: _bannersList,
   eventsList,
   projectsList: _projectsList,
-  meetingsList = [],
   treasuryList = [],
   documentsList = [],
   auditReportsList: _auditReportsList = [],
@@ -256,12 +254,6 @@ export default function FormalAuditDocument({
                   <td className="p-2 font-mono text-[11px] text-slate-600 border-r border-slate-300">PRES-FM-008</td>
                   <td className="p-2 font-mono text-center font-bold text-slate-900 border-r border-slate-300">{eventsList.length}</td>
                   <td className="p-2 text-emerald-700 font-medium">Approved for AY 2026–2027</td>
-                </tr>
-                <tr className="bg-slate-50/50">
-                  <td className="p-2 font-medium border-r border-slate-300">Attendance Meetings</td>
-                  <td className="p-2 font-mono text-[11px] text-slate-600 border-r border-slate-300">ATT-LOG-02</td>
-                  <td className="p-2 font-mono text-center font-bold text-slate-900 border-r border-slate-300">{meetingsList.length}</td>
-                  <td className="p-2 text-emerald-700 font-medium">Recorded in Registry</td>
                 </tr>
                 <tr>
                   <td className="p-2 font-medium border-r border-slate-300">Constitution & By-Laws (CBL)</td>
@@ -450,73 +442,7 @@ export default function FormalAuditDocument({
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          SECTION 4: ATTENDANCE SYSTEM LEDGER
-      ══════════════════════════════════════════════════════════ */}
-      {isSec('attendance') && (
-        <section className={`mb-10 ${showAll ? 'print-page-break pt-6' : ''}`}>
-          <InstitutionalLetterhead code="ATT-LOG-02" />
-
-          <div className="border-b-2 border-slate-800 pb-1 mb-4 flex items-center justify-between">
-            <div>
-              <h3 className="font-serif font-bold text-sm sm:text-base text-slate-900 uppercase tracking-wide">
-                IV. Attendance System & Meeting Logs (AY 2026–2027)
-              </h3>
-              <p className="text-[11px] text-slate-600">
-                Official Assembly Log and Quorum Register per CBL Article VIII Section 2
-              </p>
-            </div>
-            <span className="text-[10px] font-mono text-slate-500 font-semibold">ATT-LOG-02</span>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-300 rounded-lg p-3.5 mb-6 text-xs text-slate-700">
-            <p className="font-bold text-slate-900 mb-1">CBL Attendance & Fines Mandate:</p>
-            <p className="italic">
-              &ldquo;All members are required to attend regular monthly meetings scheduled every last week of the month.
-              An unexcused absence incurs a statutory fine of ₱100.00 as ratified under Article VIII, Section 2.&rdquo;
-            </p>
-          </div>
-
-          <table className="w-full text-left text-xs border-collapse border border-slate-300">
-            <thead>
-              <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-300 text-[11px]">
-                <th className="p-2 w-10 text-center border-r border-slate-300">No.</th>
-                <th className="p-2 border-r border-slate-300">Assembly / Meeting Title</th>
-                <th className="p-2 border-r border-slate-300">Session Type</th>
-                <th className="p-2 border-r border-slate-300">Scheduled Date & Time</th>
-                <th className="p-2 border-r border-slate-300">Venue</th>
-                <th className="p-2 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {meetingsList.length > 0 ? (
-                meetingsList.map((m, i) => (
-                  <tr key={m.id || i} className="hover:bg-slate-50">
-                    <td className="p-2 text-center font-mono text-slate-500 border-r border-slate-300">{i + 1}</td>
-                    <td className="p-2 font-bold text-slate-900 border-r border-slate-300">{m.title}</td>
-                    <td className="p-2 uppercase font-mono text-[10px] text-[#1B2A6B] border-r border-slate-300">{m.type} Session</td>
-                    <td className="p-2 font-mono text-[11px] text-slate-700 border-r border-slate-300">
-                      {m.date} · {m.start_time} - {m.end_time}
-                    </td>
-                    <td className="p-2 text-slate-700 border-r border-slate-300">{m.location}</td>
-                    <td className="p-2 text-center text-emerald-700 font-bold uppercase text-[10.5px]">{m.status}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="p-4 text-center font-mono text-xs text-slate-400 italic">
-                    No assembly records registered in the official database.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-
-          {!showAll && <LeadershipSignOff />}
-        </section>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════
-          SECTION 5: CONSTITUTION AND BY-LAWS (CBL)
+          SECTION 4: CONSTITUTION AND BY-LAWS (CBL)
       ══════════════════════════════════════════════════════════ */}
       {isSec('cbl') && (
         <section className={`mb-10 ${showAll ? 'print-page-break pt-6' : ''}`}>
@@ -525,7 +451,7 @@ export default function FormalAuditDocument({
           <div className="border-b-2 border-slate-800 pb-1 mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-serif font-black text-sm sm:text-base text-slate-900 uppercase tracking-wide">
-                V. Constitution and By-Laws (CBL)
+                IV. Constitution and By-Laws (CBL)
               </h3>
               <p className="text-[11px] text-slate-600">
                 Philippine Society of Information Technology Students — University of Antique Chapter
@@ -587,7 +513,7 @@ export default function FormalAuditDocument({
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          SECTION 6: TREASURY & FINANCIAL LEDGER
+          SECTION 5: TREASURY & FINANCIAL LEDGER
       ══════════════════════════════════════════════════════════ */}
       {isSec('treasury') && (
         <section className={`mb-10 ${showAll ? 'print-page-break pt-6' : ''}`}>
@@ -596,7 +522,7 @@ export default function FormalAuditDocument({
           <div className="border-b-2 border-slate-800 pb-1 mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-serif font-bold text-sm sm:text-base text-slate-900 uppercase tracking-wide">
-                VI. Treasury & Financial Statement (AY 2026–2027)
+                V. Treasury & Financial Statement (AY 2026–2027)
               </h3>
               <p className="text-[11px] text-slate-600">
                 Official Financial Statement, Dues Assessment, and Asset Inventory
@@ -662,7 +588,7 @@ export default function FormalAuditDocument({
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          SECTION 7: DOCUMENTS & RESOLUTIONS REGISTRY
+          SECTION 6: DOCUMENTS & RESOLUTIONS REGISTRY
       ══════════════════════════════════════════════════════════ */}
       {isSec('documents') && (
         <section className={`mb-10 ${showAll ? 'print-page-break pt-6' : ''}`}>
@@ -671,7 +597,7 @@ export default function FormalAuditDocument({
           <div className="border-b-2 border-slate-800 pb-1 mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-serif font-bold text-sm sm:text-base text-slate-900 uppercase tracking-wide">
-                VII. Registry of Official Resolutions & Documents
+                VI. Registry of Official Resolutions & Documents
               </h3>
               <p className="text-[11px] text-slate-600">
                 Official Enactments per SORG-FM-012 Student Organization Resolution Standard
@@ -735,7 +661,7 @@ export default function FormalAuditDocument({
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          SECTION 8: AUDIT TRAIL & FINAL CERTIFICATION
+          SECTION 7: AUDIT TRAIL & FINAL CERTIFICATION
       ══════════════════════════════════════════════════════════ */}
       {isSec('audit') && (
         <section className={`mb-10 ${showAll ? 'print-page-break pt-6' : ''}`}>
@@ -744,7 +670,7 @@ export default function FormalAuditDocument({
           <div className="border-b-2 border-slate-800 pb-1 mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-serif font-bold text-sm sm:text-base text-slate-900 uppercase tracking-wide">
-                VIII. Audit Trail, Media Assets & Master Certification
+                VII. Audit Trail, Media Assets & Master Certification
               </h3>
               <p className="text-[11px] text-slate-600">
                 Official Chapter Audit Clearance and Database Integrity Seal

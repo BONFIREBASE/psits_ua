@@ -13,7 +13,6 @@ import {
   Clock,
   ShieldCheck,
   Megaphone,
-  ClipboardList,
   Sparkles,
   BookOpen,
   Award,
@@ -144,11 +143,6 @@ export default function DashboardPage() {
       href: '/management/banners',
     },
     {
-      label: 'Attendance Check-in',
-      icon: ClipboardList,
-      href: '/management/attendance',
-    },
-    {
       label: 'PSITS Archive',
       icon: Images,
       href: '/management/archive',
@@ -218,7 +212,7 @@ export default function DashboardPage() {
                 Officer Assignment: <span className="text-sky-600 dark:text-sky-300">{user.position || 'PSITS Officer'}</span>
               </p>
               <p className="text-[11px] font-mono text-slate-500 dark:text-white/50">
-                Authorized for event coordination, attendance check-ins, and advisory dispatches.
+                Authorized for event coordination and advisory dispatches.
               </p>
             </div>
           </div>

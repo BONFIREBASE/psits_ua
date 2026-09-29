@@ -175,15 +175,6 @@ export default function BackupManagementPage() {
       tag: `${executiveOfficers.length + pubmatCreativeTeam.length} Active`,
     },
     {
-      id: 'attendance',
-      title: 'Attendance System & Meeting Logs',
-      code: 'ATT-LOG-02',
-      desc: 'Assembly schedules, regular and emergency meeting logs, quorum records, and CBL attendance compliance.',
-      count: `${liveMeetings.length} Sessions`,
-      icon: ClipboardCheck,
-      tag: 'CBL Mandate',
-    },
-    {
       id: 'cbl',
       title: 'Codified Constitution and By-Laws (CBL)',
       code: 'CBL-UA-2016',

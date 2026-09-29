@@ -204,7 +204,7 @@ export default function OfficersDirectoryClient({
 
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
           {executives.map((officer, index) => (
-            <ScrollReveal key={officer.name} delay={index * 0.07} className="h-full">
+            <ScrollReveal key={`${officer.position}-${officer.name}-${index}`} delay={index * 0.07} className="h-full">
               <div
                 role="button"
                 tabIndex={0}
@@ -262,7 +262,7 @@ export default function OfficersDirectoryClient({
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {secretariat.map((officer, index) => (
-            <ScrollReveal key={officer.name} delay={(index % 4) * 0.05} className="h-full">
+            <ScrollReveal key={`${officer.position}-${officer.name}-${index}`} delay={(index % 4) * 0.05} className="h-full">
               <InteractiveOfficerCard officer={officer} onOpen={() => openOfficer(officer)} />
             </ScrollReveal>
           ))}
@@ -281,7 +281,7 @@ export default function OfficersDirectoryClient({
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-3 sm:gap-4">
           {operations.map((officer, index) => (
-            <ScrollReveal key={officer.name} delay={(index % 4) * 0.05} className="h-full">
+            <ScrollReveal key={`${officer.position}-${officer.name}-${index}`} delay={(index % 4) * 0.05} className="h-full">
               <InteractiveOfficerCard officer={officer} onOpen={() => openOfficer(officer)} />
             </ScrollReveal>
           ))}
@@ -300,7 +300,7 @@ export default function OfficersDirectoryClient({
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
           {representatives.map((officer, index) => (
-            <ScrollReveal key={officer.name} delay={(index % 4) * 0.04} className="h-full">
+            <ScrollReveal key={`${officer.position}-${officer.name}-${index}`} delay={(index % 4) * 0.04} className="h-full">
               <InteractiveOfficerCard officer={officer} compact onOpen={() => openOfficer(officer)} />
             </ScrollReveal>
           ))}
@@ -320,7 +320,7 @@ export default function OfficersDirectoryClient({
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
             {pubmatMembers.map((officer, index) => (
-              <ScrollReveal key={officer.name} delay={(index % 5) * 0.04} className="h-full">
+              <ScrollReveal key={`${officer.position}-${officer.name}-${index}`} delay={(index % 5) * 0.04} className="h-full">
                 <InteractiveOfficerCard officer={officer} compact onOpen={() => openOfficer(officer)} />
               </ScrollReveal>
             ))}

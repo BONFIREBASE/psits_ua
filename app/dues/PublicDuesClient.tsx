@@ -157,7 +157,7 @@ export default function PublicDuesClient({
               {data.totalPaid}
             </div>
             <span className="text-[11px] text-slate-400 dark:text-white/40 font-mono uppercase tracking-wider">
-              Paid
+              Registered
             </span>
           </div>
 
@@ -309,7 +309,7 @@ export default function PublicDuesClient({
                       <td className="py-4 pr-4">
                         <span className="inline-flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 font-mono">
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          Paid
+                          Registered
                         </span>
                       </td>
 
@@ -347,7 +347,7 @@ export default function PublicDuesClient({
                     </div>
                     <span className="inline-flex items-center gap-0.5 text-xs text-emerald-600 dark:text-emerald-400 font-mono">
                       <CheckCircle2 className="w-3 h-3" />
-                      Paid
+                      Registered
                     </span>
                   </div>
                 </div>
