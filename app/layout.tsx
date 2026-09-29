@@ -199,7 +199,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
       </head>
-      <body className="bg-base text-text font-body transition-colors duration-200">
+      <body className="bg-base text-text font-body">
         <ThemeProvider>
           <LayoutShell>{children}</LayoutShell>
         </ThemeProvider>

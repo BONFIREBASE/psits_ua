@@ -33,7 +33,17 @@ export default function ManagementLoginPage() {
   const [adminPassword, setAdminPassword] = useState('')
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [resetKey, setResetKey] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const storedError = sessionStorage.getItem('psits_auth_error')
+      if (storedError) {
+        sessionStorage.removeItem('psits_auth_error')
+        return storedError
+      }
+    } catch {}
+    return null
+  })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Redirect to dashboard safely inside useEffect
@@ -42,16 +52,6 @@ export default function ManagementLoginPage() {
       router.replace('/management/dashboard')
     }
   }, [authLoading, isAuthenticated, router])
-
-  // Check for auth errors from OAuth redirects or session resolution
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const storedError = sessionStorage.getItem('psits_auth_error')
-    if (storedError) {
-      setError(storedError)
-      sessionStorage.removeItem('psits_auth_error')
-    }
-  }, [])
 
   // Reset token and clear errors when switching modes
   function switchMode(newMode: LoginMode) {

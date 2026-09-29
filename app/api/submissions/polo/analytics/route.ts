@@ -107,18 +107,26 @@ export async function GET(req: NextRequest) {
       console.error("Error fetching voter list:", voterError);
     }
 
+    // Sanitize analytics to ensure vote counts and percentages are never null
+    const sanitizedAnalytics = (analytics || []).map((item) => ({
+      ...item,
+      vote_count: Number(item.vote_count) || 0,
+      vote_percentage: Number(item.vote_percentage) || 0,
+    }));
+
     // Calculate summary statistics
-    const totalSubmissions = analytics?.length || 0;
-    const submissionsWithVotes = analytics?.filter((a) => a.vote_count > 0).length || 0;
-    const highestVotes = Math.max(...(analytics?.map((a) => a.vote_count) || [0]));
+    const totalSubmissions = sanitizedAnalytics.length;
+    const submissionsWithVotes = sanitizedAnalytics.filter((a) => a.vote_count > 0).length;
+    const highestVotes = sanitizedAnalytics.length > 0 ? Math.max(...sanitizedAnalytics.map((a) => a.vote_count)) : 0;
     const averageVotes =
       totalVotes && totalSubmissions > 0
-        ? Math.round((totalVotes / totalSubmissions) * 10) / 10
+        ? Math.round((Number(totalVotes) / totalSubmissions) * 10) / 10
         : 0;
 
     // Get top 3 designs
-    const topDesigns = analytics
-      ?.sort((a, b) => b.vote_count - a.vote_count)
+    const topDesigns = sanitizedAnalytics
+      .slice()
+      .sort((a, b) => b.vote_count - a.vote_count)
       .slice(0, 3)
       .map((design, index) => ({
         rank: index + 1,
@@ -137,11 +145,15 @@ export async function GET(req: NextRequest) {
       { count: "exact" }
     );
 
+    if (timelineError) {
+      console.warn("get_voting_timeline RPC notice:", timelineError.message);
+    }
+
     // If the RPC doesn't exist, we'll calculate it manually
     const votingTimeline =
       timeline ||
       (voterList
-        ? voterList.reduce((acc: any[], vote) => {
+        ? voterList.reduce<Array<{ date: string; count: number }>>((acc, vote) => {
             const date = new Date(vote.voted_at).toLocaleDateString();
             const existing = acc.find((item) => item.date === date);
             if (existing) {
@@ -167,7 +179,7 @@ export async function GET(req: NextRequest) {
         highest_votes: highestVotes,
         average_votes: averageVotes,
       },
-      analytics: analytics || [],
+      analytics: sanitizedAnalytics || [],
       top_designs: topDesigns || [],
       voters: voterList || [],
       timeline: votingTimeline,

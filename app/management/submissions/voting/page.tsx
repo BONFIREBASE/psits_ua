@@ -29,7 +29,7 @@ interface VotingAnalytics {
   designer_course_year: string | null;
   file_url: string;
   vote_count: number;
-  vote_percentage: number;
+  vote_percentage: number | null;
   status: string;
   created_at: string;
 }
@@ -71,7 +71,7 @@ interface AnalyticsData {
     title: string | null;
     designer_name: string;
     vote_count: number;
-    vote_percentage: number;
+    vote_percentage: number | null;
     file_url: string;
   }>;
   voters: VoterRecord[];
@@ -108,8 +108,8 @@ function PieChart({ data }: { data: VotingAnalytics[] }) {
     );
   }
 
-  const sortedData = [...data].sort((a, b) => b.vote_count - a.vote_count);
-  const total = sortedData.reduce((sum, item) => sum + item.vote_count, 0);
+  const sortedData = [...data].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
+  const total = sortedData.reduce((sum, item) => sum + (item.vote_count || 0), 0);
 
   if (total === 0) {
     return (
@@ -253,7 +253,7 @@ function ChartLegend({ data }: { data: VotingAnalytics[] }) {
                 {item.vote_count} {item.vote_count === 1 ? "vote" : "votes"}
               </p>
               <p className="text-[10px] text-muted-foreground-theme font-mono">
-                {item.vote_percentage.toFixed(1)}%
+                {(Number(item.vote_percentage) || 0).toFixed(1)}%
               </p>
             </div>
           </div>
@@ -519,7 +519,7 @@ export default function VotingAnalyticsPage() {
           </div>
           <div class="stat-card">
             <h3>Average Votes</h3>
-            <div class="value">${data.summary.average_votes.toFixed(1)}</div>
+            <div class="value">${(Number(data.summary.average_votes) || 0).toFixed(1)}</div>
           </div>
         </div>
 
@@ -548,9 +548,9 @@ export default function VotingAnalyticsPage() {
                 <td>${item.designer_name}</td>
                 <td>${item.designer_course_year || 'N/A'}</td>
                 <td style="text-align: right; font-weight: 600;">${item.vote_count}</td>
-                <td style="text-align: right;">${item.vote_percentage.toFixed(1)}%</td>
+                <td style="text-align: right;">${(Number(item.vote_percentage) || 0).toFixed(1)}%</td>
                 <td>
-                  <div class="vote-bar" style="width: ${item.vote_percentage}%"></div>
+                  <div class="vote-bar" style="width: ${Number(item.vote_percentage) || 0}%"></div>
                 </td>
               </tr>
             `).join('')}
@@ -766,7 +766,7 @@ export default function VotingAnalyticsPage() {
             <span className="text-xs text-muted-foreground-theme font-mono">AVERAGE</span>
           </div>
           <p className="text-2xl font-bold text-foreground-theme font-display">
-            {data.summary.average_votes.toFixed(1)}
+            {(Number(data.summary.average_votes) || 0).toFixed(1)}
           </p>
           <p className="text-xs text-muted-foreground-theme mt-1">Votes per Design</p>
         </div>
@@ -825,7 +825,7 @@ export default function VotingAnalyticsPage() {
                       {design.vote_count} votes
                     </span>
                     <span className="text-muted-foreground-theme">
-                      {design.vote_percentage.toFixed(1)}%
+                      {(Number(design.vote_percentage) || 0).toFixed(1)}%
                     </span>
                   </div>
                 </div>

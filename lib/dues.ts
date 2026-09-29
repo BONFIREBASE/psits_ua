@@ -130,3 +130,75 @@ export function parseRecordedBy(recordedBy?: string | null): { name: string; rol
   return { name: recordedBy, role: null }
 }
 
+/**
+ * Intelligent Batch Student Name Parser.
+ * Designed for minimalist, zero-friction fast entry.
+ * Extracts clean student names from text copied from Excel, Google Sheets,
+ * word documents, or plain text lists.
+ */
+export function parseBatchStudentNames(rawInput: string): string[] {
+  if (!rawInput || !rawInput.trim()) return []
+
+  const rawLines = rawInput.split(/\r?\n/)
+  const candidateNames: string[] = []
+
+  for (const line of rawLines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+
+    // Tab-delimited (Copied multi-column from Google Sheets or Excel)
+    if (trimmed.includes('\t')) {
+      const cells = trimmed.split('\t').map((c) => c.trim()).filter(Boolean)
+      for (const cell of cells) {
+        // Discard pure numeric cells (e.g., student IDs, row counts, fees)
+        if (/^[\d\s.,₱$]+$/.test(cell)) continue
+        // Discard known section or status labels
+        if (/^(bsit|act|cs|is)\s*\d/i.test(cell) || /^(paid|unpaid|pending|yes|no)$/i.test(cell)) continue
+        // Discard very short fragments
+        if (cell.length < 2) continue
+
+        // Strip leading numbering or bullet points
+        const cleanCell = cell.replace(/^(\[\d+\]|\d+[\.\)\-:]|\*|\-|•)\s*/, '').trim()
+        if (cleanCell.length >= 2 && !/^[\d\s.,₱$]+$/.test(cleanCell)) {
+          candidateNames.push(cleanCell)
+        }
+      }
+      continue
+    }
+
+    // Comma-separated on a single line (e.g. "Juan Dela Cruz, Maria Santos, Cardo Dalisay")
+    // If the line has 2 or more commas and is not just a single "Lastname, Firstname M."
+    const commaParts = trimmed.split(',').map((p) => p.trim()).filter(Boolean)
+    if (commaParts.length > 2) {
+      for (const part of commaParts) {
+        const clean = part.replace(/^(\[\d+\]|\d+[\.\)\-:]|\*|\-|•)\s*/, '').trim()
+        if (clean.length >= 2 && !/^[\d\s.,₱$]+$/.test(clean)) {
+          candidateNames.push(clean)
+        }
+      }
+      continue
+    }
+
+    // Single line entry: strip leading numbering or bullet points
+    // e.g. "1. Juan Dela Cruz", "2) Maria Santos", "• Pedro Penduko"
+    const cleaned = trimmed.replace(/^(\[\d+\]|\d+[\.\)\-:]|\*|\-|•)\s*/, '').trim()
+    if (cleaned.length >= 2 && !/^[\d\s.,₱$]+$/.test(cleaned)) {
+      candidateNames.push(cleaned)
+    }
+  }
+
+  // Deduplicate within the batch (case-insensitive) while preserving display casing of first occurrence
+  const seen = new Set<string>()
+  const uniqueNames: string[] = []
+
+  for (const name of candidateNames) {
+    const norm = normalizeStudentName(name)
+    if (!seen.has(norm)) {
+      seen.add(norm)
+      uniqueNames.push(name)
+    }
+  }
+
+  return uniqueNames
+}
+

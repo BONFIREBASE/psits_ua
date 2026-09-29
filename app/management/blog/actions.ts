@@ -82,9 +82,6 @@ export async function createBlogPost(formData: FormData): Promise<ActionResult> 
     const quoteAuthor = (formData.get('quoteAuthor') as string)?.trim() || null;
     const postUrl = (formData.get('postUrl') as string)?.trim() || null;
     const tagsRaw = (formData.get('tags') as string)?.trim() || '';
-    const creditWriter = (formData.get('creditWriter') as string)?.trim() || null;
-    const creditPhotographer = (formData.get('creditPhotographer') as string)?.trim() || null;
-    const creditPubmat = (formData.get('creditPubmat') as string)?.trim() || null;
 
     if (!title || !fullContent) {
       return { success: false, error: 'Title and content are required.' };
@@ -176,9 +173,6 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<Ac
     const quoteAuthor = (formData.get('quoteAuthor') as string)?.trim() || null;
     const postUrl = (formData.get('postUrl') as string)?.trim() || null;
     const tagsRaw = (formData.get('tags') as string)?.trim() || '';
-    const creditWriter = (formData.get('creditWriter') as string)?.trim() || null;
-    const creditPhotographer = (formData.get('creditPhotographer') as string)?.trim() || null;
-    const creditPubmat = (formData.get('creditPubmat') as string)?.trim() || null;
 
     if (!id || !title || !fullContent) {
       return { success: false, error: 'Post ID, title, and content are required.' };
@@ -209,7 +203,7 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<Ac
     // Build credits object from dynamic JSON array or fallback fields
     const credits = parseCreditsFromFormData(formData);
 
-    const updatePayload: Record<string, any> = {
+    const updatePayload: Record<string, unknown> = {
       title,
       category,
       date,

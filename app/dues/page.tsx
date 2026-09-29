@@ -1,6 +1,11 @@
 import type { Metadata } from 'next'
 import PublicDuesClient from './PublicDuesClient'
-import { getPublicDuesSummaryAction, type PublicDuesSummary } from '@/app/management/dues/actions'
+import {
+  getPublicDuesSummaryAction,
+  getAvailableTermsAction,
+  getDuesTermConfigAction,
+  type PublicDuesSummary,
+} from '@/app/management/dues/actions'
 import { DEFAULT_ACADEMIC_YEAR, DEFAULT_SEMESTER, getAllStandardSections } from '@/lib/dues'
 
 export const metadata: Metadata = {
@@ -20,10 +25,14 @@ export default async function PublicDuesPage({
   const ay = resolvedParams?.ay
   const sem = resolvedParams?.sem
 
-  const result = await getPublicDuesSummaryAction(ay, sem)
+  const [result, termsRes, configRes] = await Promise.all([
+    getPublicDuesSummaryAction(ay, sem),
+    getAvailableTermsAction(),
+    getDuesTermConfigAction(),
+  ])
 
-  const activeAY = result.data?.academicYear || ay || DEFAULT_ACADEMIC_YEAR
-  const activeSem = result.data?.semester || sem || DEFAULT_SEMESTER
+  const activeAY = result.data?.academicYear || ay || configRes.data?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR
+  const activeSem = result.data?.semester || sem || configRes.data?.activeSemester || DEFAULT_SEMESTER
 
   const fallbackData: PublicDuesSummary = {
     totalPaid: 0,
@@ -39,6 +48,14 @@ export default async function PublicDuesPage({
   }
 
   const duesData = result.success && result.data ? result.data : fallbackData
+  const availableTerms = termsRes.success && termsRes.data ? termsRes.data : []
+  const availableAcademicYears = configRes.success && configRes.data ? configRes.data.availableAcademicYears : []
 
-  return <PublicDuesClient initialData={duesData} />
+  return (
+    <PublicDuesClient
+      initialData={duesData}
+      availableTerms={availableTerms}
+      availableAcademicYears={availableAcademicYears}
+    />
+  )
 }

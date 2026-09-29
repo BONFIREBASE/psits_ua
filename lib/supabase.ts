@@ -562,6 +562,15 @@ export interface PublicMaskedDueRow {
   paid_at: string;
 }
 
+export interface DuesTermConfigRow {
+  id: number;
+  active_academic_year: string;
+  active_semester: string;
+  available_academic_years: string[];
+  updated_at: string;
+  updated_by: string | null;
+}
+
 export async function getMembershipDues(): Promise<MembershipDueRow[]> {
   try {
     const { data, error } = await supabase
