@@ -17,6 +17,10 @@ export default function HomePage() {
   const [dispatches, setDispatches] = useState(socialDispatches)
   const [activeBanners, setActiveBanners] = useState<BannerRow[]>([])
   const [bannersLoading, setBannersLoading] = useState(true)
+  const [studentStats, setStudentStats] = useState<{ totalStudents: number; totalSections: number }>({
+    totalStudents: 0,
+    totalSections: 0,
+  })
 
   useEffect(() => {
     async function load() {
@@ -35,6 +39,19 @@ export default function HomePage() {
         // Fall back cleanly to static data
       } finally {
         setBannersLoading(false)
+      }
+
+      // Fetch student stats separately (non-blocking)
+      try {
+        const res = await fetch('/api/students/stats')
+        if (res.ok) {
+          const stats = await res.json()
+          if (stats.totalStudents > 0) {
+            setStudentStats(stats)
+          }
+        }
+      } catch {
+        // Keep fallback
       }
     }
     load()

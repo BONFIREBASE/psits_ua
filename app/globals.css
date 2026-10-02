@@ -382,3 +382,13 @@ html.theme-transitioning *::after {
   }
 }
 
+/* ─── Touch-Friendly Invisible Scrollbar Utility ─── */
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+

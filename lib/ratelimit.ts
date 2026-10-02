@@ -19,6 +19,7 @@ let redis: Redis | null = null
 let authRateLimiter: Ratelimit | null = null
 let cronRateLimiter: Ratelimit | null = null
 let voteRateLimiter: Ratelimit | null = null
+let duesRateLimiter: Ratelimit | null = null
 
 if (isUpstashConfigured && redisUrl && redisToken) {
   try {
@@ -50,24 +51,32 @@ if (isUpstashConfigured && redisUrl && redisToken) {
       prefix: 'psits:rl:vote',
       analytics: true,
     })
+
+    // Dues & student registry mutations: 30 requests per 10 seconds per operator
+    duesRateLimiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(30, '10 s'),
+      prefix: 'psits:rl:dues',
+      analytics: true,
+    })
   } catch (err) {
     console.warn('[Upstash Redis Init Warning]:', err)
     redis = null
   }
 }
 
-
 export async function checkRateLimit(
   identifier: string = 'anonymous',
-  type: 'auth' | 'cron' | 'vote' = 'auth'
+  type: 'auth' | 'cron' | 'vote' | 'dues' = 'auth'
 ): Promise<RateLimitResult> {
   const limiter =
     type === 'auth'
       ? authRateLimiter
       : type === 'cron'
       ? cronRateLimiter
-      : voteRateLimiter
-
+      : type === 'vote'
+      ? voteRateLimiter
+      : duesRateLimiter
 
   if (!limiter) {
     return {
@@ -97,3 +106,78 @@ export async function checkRateLimit(
     }
   }
 }
+
+/**
+ * Get cached data from Upstash Redis (returns null if unconfigured or missing)
+ */
+export async function getCache<T>(key: string): Promise<T | null> {
+  if (!redis) return null
+  try {
+    return await redis.get<T>(key)
+  } catch (err) {
+    console.warn('[Upstash Redis Get Cache Warning]:', err)
+    return null
+  }
+}
+
+/**
+ * Cache data in Upstash Redis with a TTL in seconds (default: 300s / 5 mins)
+ */
+export async function setCache<T>(
+  key: string,
+  value: T,
+  ttlSeconds: number = 300
+): Promise<void> {
+  if (!redis) return
+  try {
+    await redis.set(key, value, { ex: ttlSeconds })
+  } catch (err) {
+    console.warn('[Upstash Redis Set Cache Warning]:', err)
+  }
+}
+
+/**
+ * Invalidate/delete cache keys from Upstash Redis
+ */
+export async function deleteCache(key: string): Promise<void> {
+  if (!redis) return
+  try {
+    await redis.del(key)
+  } catch (err) {
+    console.warn('[Upstash Redis Del Cache Warning]:', err)
+  }
+}
+
+/**
+ * Invalidate cache keys by pattern prefix using Redis SCAN/KEYS
+ */
+export async function deleteCachePattern(pattern: string): Promise<void> {
+  if (!redis) return
+  try {
+    const keys = await redis.keys(pattern)
+    if (keys && keys.length > 0) {
+      await redis.del(...keys)
+    }
+  } catch (err) {
+    console.warn('[Upstash Redis Del Pattern Warning]:', err)
+  }
+}
+
+/**
+ * Invalidate all student registry, dues summary, and student stats caches
+ */
+export async function invalidateStudentCaches(): Promise<void> {
+  if (!redis) return
+  try {
+    await Promise.all([
+      deleteCache('psits:cache:student_stats'),
+      deleteCachePattern('psits:cache:registry:*'),
+      deleteCachePattern('psits:cache:dues_summary:*'),
+      deleteCachePattern('psits:cache:dues_students:*'),
+    ])
+  } catch (err) {
+    console.warn('[Upstash Invalidate Student Caches Warning]:', err)
+  }
+}
+
+

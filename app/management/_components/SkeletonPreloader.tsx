@@ -313,3 +313,128 @@ export function CameraSkeleton() {
   )
 }
 
+export function DuesTableSkeleton({ rows = 8 }: { rows?: number }) {
+  return (
+    <div className="w-full select-none animate-pulse">
+      {/* Table Container Skeleton */}
+      <div className="rounded-2xl border border-black/5 dark:border-white/5 overflow-hidden bg-white dark:bg-[#0c0c0c] shadow-xs">
+        {/* Table Top Controls Skeleton */}
+        <div className="flex items-center justify-between px-4 py-3 bg-slate-50/80 dark:bg-white/[0.02] border-b border-black/5 dark:border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="w-3.5 h-3.5 rounded bg-slate-200 dark:bg-white/[0.06]" />
+            <div className="w-24 h-3 bg-slate-200 dark:bg-white/[0.06] rounded font-mono" />
+          </div>
+          <div className="w-44 h-2.5 bg-slate-200 dark:bg-white/[0.04] rounded hidden sm:block font-mono" />
+        </div>
+
+        {/* Rows */}
+        <div className="divide-y divide-black/5 dark:divide-white/5">
+          {Array.from({ length: rows }).map((_, i) => (
+            <div
+              key={i}
+              className="px-3.5 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3"
+            >
+              {/* Checkbox / Index */}
+              <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                <div className="w-3.5 h-3.5 rounded bg-slate-200 dark:bg-white/[0.06]" />
+                <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-white/[0.04] hidden sm:flex items-center justify-center">
+                  <div className="w-3 h-2 bg-slate-300 dark:bg-white/[0.08] rounded" />
+                </div>
+              </div>
+
+              {/* Student Info (Name + Section + Student No.) */}
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-3.5 bg-slate-200 dark:bg-white/[0.08] rounded font-medium"
+                    style={{ width: `${45 + ((i * 19) % 35)}%` }}
+                  />
+                  <div className="w-14 h-4 rounded bg-blue-500/10 shrink-0" />
+                </div>
+                <div className="w-24 h-2.5 bg-slate-200 dark:bg-white/[0.05] rounded" />
+              </div>
+
+              {/* Dues Status Pill */}
+              <div className="shrink-0">
+                <div
+                  className={`w-20 sm:w-24 h-7.5 rounded-lg border ${
+                    i % 3 === 0
+                      ? 'bg-amber-500/10 border-amber-500/20'
+                      : 'bg-emerald-500/10 border-emerald-500/20'
+                  }`}
+                />
+              </div>
+
+              {/* Action buttons placeholder (desktop only) */}
+              <div className="hidden md:flex items-center justify-end gap-1.5 shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-white/[0.04]" />
+                <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-white/[0.04]" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function DuesPageSkeleton() {
+  return (
+    <div className="space-y-5 select-none animate-pulse">
+      {/* Executive Minimalist Stats Ribbon Skeleton */}
+      <div className="grid grid-cols-2 md:flex md:flex-wrap items-center justify-between gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-black/5 dark:border-white/5">
+        {/* Total Population */}
+        <div className="flex items-center gap-2.5 sm:gap-3 col-span-1">
+          <div className="w-8 h-8 rounded-xl bg-blue-500/10" />
+          <div className="space-y-1.5">
+            <div className="w-20 h-2 bg-slate-200 dark:bg-white/[0.05] rounded font-mono" />
+            <div className="w-24 h-4 bg-slate-300 dark:bg-white/[0.08] rounded" />
+          </div>
+        </div>
+
+        <div className="hidden md:block w-px h-8 bg-black/5 dark:bg-white/10" />
+
+        {/* Unpaid / Pending Balance */}
+        <div className="flex items-center gap-2.5 sm:gap-3 col-span-1 justify-self-end md:justify-self-auto order-2 md:order-3">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/10" />
+          <div className="space-y-1.5">
+            <div className="w-20 h-2 bg-slate-200 dark:bg-white/[0.05] rounded font-mono" />
+            <div className="w-24 h-4 bg-amber-500/20 rounded" />
+          </div>
+        </div>
+
+        <div className="hidden md:block w-px h-8 bg-black/5 dark:bg-white/10" />
+
+        {/* Paid / Collection Metric with Hairline Progress */}
+        <div className="col-span-2 md:col-span-1 md:flex-1 w-full min-w-0 md:min-w-[200px] md:max-w-sm order-3 md:order-2 space-y-2 pt-2 md:pt-0 border-t border-black/5 dark:border-white/5 md:border-t-0">
+          <div className="flex items-center justify-between">
+            <div className="w-24 h-3 bg-emerald-500/20 rounded" />
+            <div className="w-10 h-3 bg-slate-200 dark:bg-white/[0.05] rounded" />
+          </div>
+          <div className="h-1.5 w-full bg-slate-200 dark:bg-white/[0.06] rounded-full overflow-hidden">
+            <div className="h-full w-2/3 bg-emerald-500/30 rounded-full" />
+          </div>
+        </div>
+      </div>
+
+      {/* Command Search & Segmented Filter Bar Skeleton */}
+      <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="h-9.5 rounded-xl bg-slate-200 dark:bg-white/[0.05] flex-1" />
+          <div className="h-9.5 w-24 sm:w-28 rounded-xl bg-gold/25 shrink-0" />
+        </div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar w-full md:w-auto">
+            <div className="h-7 w-44 rounded-lg bg-black/5 dark:bg-white/5 shrink-0" />
+            <div className="h-7 w-48 rounded-lg bg-black/5 dark:bg-white/5 shrink-0" />
+            <div className="h-7 w-28 rounded-lg bg-black/5 dark:bg-white/5 shrink-0" />
+          </div>
+          <div className="w-20 h-3 bg-slate-200 dark:bg-white/[0.04] rounded ml-auto" />
+        </div>
+      </div>
+
+      {/* Table Skeleton */}
+      <DuesTableSkeleton rows={8} />
+    </div>
+  )
+}

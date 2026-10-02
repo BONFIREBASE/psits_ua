@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Image, { type ImageProps } from 'next/image'
-import { ImageOff } from 'lucide-react'
 
 export interface ProgressiveImageProps extends Omit<ImageProps, 'onLoad' | 'onError'> {
   containerClassName?: string
@@ -64,12 +63,20 @@ export default function ProgressiveImage({
           {...rest}
         />
       ) : (
-        /* Graceful error fallback */
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-[#0a0e17] text-white/40">
-          <ImageOff size={22} className="text-white/40" />
-          <span className="text-[10px] font-mono uppercase tracking-wider text-white/50">
-            Unavailable
-          </span>
+        /* Skeleton preloader fallback */
+        <div className="absolute inset-0 bg-slate-100 dark:bg-[#0a0e17] overflow-hidden">
+          {/* Animated skeleton gradient */}
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-200/50 via-slate-300/50 to-slate-200/50 dark:from-white/[0.03] dark:via-white/[0.08] dark:to-white/[0.03]" />
+          
+          {/* Shimmer animation */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 dark:via-white/[0.15] to-transparent animate-banner-shimmer" />
+          </div>
+          
+          {/* Subtle ambient glow */}
+          {ambientGlow && (
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-gold/[0.04] dark:bg-gold/[0.02] rounded-full blur-[80px]" />
+          )}
         </div>
       )}
     </div>
