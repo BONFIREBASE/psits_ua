@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import {
   CalendarDays,
@@ -11,12 +11,10 @@ import {
   Plus,
   ArrowUpRight,
   Clock,
-  ShieldCheck,
   Megaphone,
   Sparkles,
   BookOpen,
   Award,
-  CheckCircle2,
   Images,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -28,30 +26,6 @@ import { officers, pubmatTeam, dean, adviser } from '@/data/officers'
 
 const emptySubscribe = () => () => {}
 
-function subscribeClock(callback: () => void) {
-  const timer = setInterval(callback, 1000)
-  return () => clearInterval(timer)
-}
-
-function getClockSnapshot() {
-  const now = new Date()
-  return `${now.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })} · ${now.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true,
-  })}`
-}
-
-function getServerClockSnapshot() {
-  return ''
-}
-
 export default function DashboardPage() {
   const { user } = useAuth()
   const isClient = useSyncExternalStore(
@@ -60,11 +34,29 @@ export default function DashboardPage() {
     () => false
   )
 
-  const currentTimeStr = useSyncExternalStore(
-    subscribeClock,
-    getClockSnapshot,
-    getServerClockSnapshot
-  )
+  const [currentTimeStr, setCurrentTimeStr] = useState('')
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      setCurrentTimeStr(
+        `${now.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })} · ${now.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+        })}`
+      )
+    }
+    updateTime()
+    const timer = setInterval(updateTime, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const greeting = isClient
     ? (() => {
@@ -116,11 +108,11 @@ export default function DashboardPage() {
       href: '/management/officers',
     },
     {
-      label: isAdmin ? 'Treasury Compliance' : 'Campus Projects',
-      value: isAdmin ? '₱25.00 / sem' : `${projectsData.length} Utilities`,
-      sub: isAdmin ? 'Mandatory Semestral Fee' : 'Active Student Projects',
-      icon: isAdmin ? Landmark : Code2,
-      href: isAdmin ? '/management/treasury' : '/management/projects',
+      label: 'Campus Projects',
+      value: `${projectsData.length} Utilities`,
+      sub: 'Active Student Projects',
+      icon: Code2,
+      href: '/management/projects',
     },
   ]
 
@@ -412,146 +404,56 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ─── Bottom Row: Role-Tailored Snapshot (Stack on Mobile, 5/7 on Desktop) ─── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 sm:gap-6">
-        {/* Left Bottom Card: Role-Tailored */}
-        <div className="xl:col-span-5 bg-white dark:bg-[#0d121f] border border-black/8 dark:border-white/6 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm dark:shadow-none">
-          {isAdmin ? (
-            <>
-              <div className="flex items-center justify-between pb-3 border-b border-black/8 dark:border-white/6">
-                <div className="flex items-center gap-2">
-                  <Landmark size={16} className="text-gold" />
-                  <h2 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">Constitutional Dues & Compliance</h2>
-                </div>
-                <Link href="/management/treasury" className="text-xs font-mono text-gold hover:underline flex items-center gap-0.5">
-                  <span>Ledger</span>
-                  <ArrowUpRight size={11} />
-                </Link>
-              </div>
-
-              <div className="space-y-3">
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-slate-500 dark:text-white/50">Mandatory Semestral Fee</span>
-                    <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">₱25.00 / student</span>
-                  </div>
-                  <p className="text-[11px] font-mono text-slate-500 dark:text-white/40">
-                    Mandatory collection for all enrolled BSIT majors (A.Y. 2026–2027)
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-slate-500 dark:text-white/50">Unexcused Absence Fine</span>
-                    <span className="font-bold text-sm sm:text-base text-gold">₱100.00 / meeting</span>
-                  </div>
-                  <p className="text-[11px] font-mono text-slate-500 dark:text-white/40">
-                    CBL Article V: Official assemblies & monthly performance evaluation
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/[0.08] border border-emerald-500/20 text-xs font-mono text-emerald-600 dark:text-emerald-400">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck size={15} />
-                    <span>CBL Ratification Status</span>
-                  </div>
-                  <span className="font-bold">Ratified (A.Y. 2026)</span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between pb-3 border-b border-black/8 dark:border-white/6">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={16} className="text-sky-500" />
-                  <h2 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">Officer Duties & Code of Conduct</h2>
-                </div>
-                <Link href="/management/cbl" className="text-xs font-mono text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-0.5">
-                  <span>By-Laws</span>
-                  <ArrowUpRight size={11} />
-                </Link>
-              </div>
-
-              <div className="space-y-2.5 text-xs font-mono">
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 flex items-start gap-2.5">
-                  <CheckCircle2 size={14} className="text-sky-500 flex-shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <p className="text-slate-800 dark:text-white/80 font-medium">Uphold Organization Loyalty</p>
-                    <p className="text-slate-500 dark:text-white/40 text-[11px]">Serve as an exemplary role model for CCIS IT students.</p>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 flex items-start gap-2.5">
-                  <CheckCircle2 size={14} className="text-sky-500 flex-shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <p className="text-slate-800 dark:text-white/80 font-medium">Mandatory Assembly Attendance</p>
-                    <p className="text-slate-500 dark:text-white/40 text-[11px]">Attend monthly regular meetings every last week of the month.</p>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 flex items-start gap-2.5">
-                  <CheckCircle2 size={14} className="text-sky-500 flex-shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <p className="text-slate-800 dark:text-white/80 font-medium">Cooperative Execution</p>
-                    <p className="text-slate-500 dark:text-white/40 text-[11px]">Coordinate actively with committee chairs for scheduled events.</p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+      {/* ─── Bottom Row: Staffing / Committee Matrix (Full Width) ─── */}
+      <div className="bg-white dark:bg-[#0d121f] border border-black/8 dark:border-white/6 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm dark:shadow-none">
+        <div className="flex items-center justify-between pb-3 border-b border-black/8 dark:border-white/6">
+          <div className="flex items-center gap-2">
+            <Users size={16} className="text-gold" />
+            <h2 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
+              {isAdmin ? 'Organization Staffing Matrix' : 'PSITS Leadership & Committees'}
+            </h2>
+          </div>
+          <Link href="/management/officers" className="text-xs font-mono text-gold hover:underline flex items-center gap-0.5">
+            <span>View Roster</span>
+            <ArrowUpRight size={11} />
+          </Link>
         </div>
 
-        {/* Right Bottom Card: Staffing / Committee Matrix */}
-        <div className="xl:col-span-7 bg-white dark:bg-[#0d121f] border border-black/8 dark:border-white/6 rounded-2xl p-4 sm:p-5 space-y-4 flex flex-col justify-between shadow-sm dark:shadow-none">
-          <div className="flex items-center justify-between pb-3 border-b border-black/8 dark:border-white/6">
-            <div className="flex items-center gap-2">
-              <Users size={16} className="text-gold" />
-              <h2 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
-                {isAdmin ? 'Organization Staffing Matrix' : 'PSITS Leadership & Committees'}
-              </h2>
-            </div>
-            <Link href="/management/officers" className="text-xs font-mono text-gold hover:underline flex items-center gap-0.5">
-              <span>View Roster</span>
-              <ArrowUpRight size={11} />
-            </Link>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
+          <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-0.5 text-center">
+            <span className="text-[9.5px] font-mono uppercase text-slate-500 dark:text-white/40 block">Executive</span>
+            <span className="font-black text-lg sm:text-xl text-gold">{executiveCount}</span>
+            <span className="text-[9.5px] font-mono text-slate-400 dark:text-white/30 block">Pres & VP</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
-            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-0.5 text-center">
-              <span className="text-[9.5px] font-mono uppercase text-slate-500 dark:text-white/40 block">Executive</span>
-              <span className="font-black text-lg sm:text-xl text-gold">{executiveCount}</span>
-              <span className="text-[9.5px] font-mono text-slate-400 dark:text-white/30 block">Pres & VP</span>
-            </div>
-
-            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-0.5 text-center">
-              <span className="text-[9.5px] font-mono uppercase text-slate-500 dark:text-white/40 block">Sec & Finance</span>
-              <span className="font-black text-lg sm:text-xl text-slate-900 dark:text-white">{secFinanceCount}</span>
-              <span className="text-[9.5px] font-mono text-slate-400 dark:text-white/30 block">Sec, Treas, Aud</span>
-            </div>
-
-            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-0.5 text-center">
-              <span className="text-[9.5px] font-mono uppercase text-slate-500 dark:text-white/40 block">Operations</span>
-              <span className="font-black text-lg sm:text-xl text-slate-900 dark:text-white">{opsPrCount}</span>
-              <span className="text-[9.5px] font-mono text-slate-400 dark:text-white/30 block">PIO, Bus. Mgrs</span>
-            </div>
-
-            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-0.5 text-center">
-              <span className="text-[9.5px] font-mono uppercase text-slate-500 dark:text-white/40 block">Year Reps</span>
-              <span className="font-black text-lg sm:text-xl text-slate-900 dark:text-white">{yearRepsCount}</span>
-              <span className="text-[9.5px] font-mono text-slate-400 dark:text-white/30 block">1st–4th Year</span>
-            </div>
-
-            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-0.5 text-center col-span-2 sm:col-span-1">
-              <span className="text-[9.5px] font-mono uppercase text-slate-500 dark:text-white/40 block">Pubmat</span>
-              <span className="font-black text-lg sm:text-xl text-gold">{pubmatCount}</span>
-              <span className="text-[9.5px] font-mono text-slate-400 dark:text-white/30 block">Creatives</span>
-            </div>
+          <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-0.5 text-center">
+            <span className="text-[9.5px] font-mono uppercase text-slate-500 dark:text-white/40 block">Sec & Finance</span>
+            <span className="font-black text-lg sm:text-xl text-slate-900 dark:text-white">{secFinanceCount}</span>
+            <span className="text-[9.5px] font-mono text-slate-400 dark:text-white/30 block">Sec, Treas, Aud</span>
           </div>
 
-          <div className="pt-3 border-t border-black/5 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] font-mono text-slate-500 dark:text-white/40">
-            <span className="truncate">Adviser: <strong className="text-slate-800 dark:text-white/80">{adviser.name}</strong></span>
-            <span className="truncate">College Dean: <strong className="text-slate-800 dark:text-white/80">{dean.name}</strong></span>
+          <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-0.5 text-center">
+            <span className="text-[9.5px] font-mono uppercase text-slate-500 dark:text-white/40 block">Operations</span>
+            <span className="font-black text-lg sm:text-xl text-slate-900 dark:text-white">{opsPrCount}</span>
+            <span className="text-[9.5px] font-mono text-slate-400 dark:text-white/30 block">PIO, Bus. Mgrs</span>
           </div>
+
+          <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-0.5 text-center">
+            <span className="text-[9.5px] font-mono uppercase text-slate-500 dark:text-white/40 block">Year Reps</span>
+            <span className="font-black text-lg sm:text-xl text-slate-900 dark:text-white">{yearRepsCount}</span>
+            <span className="text-[9.5px] font-mono text-slate-400 dark:text-white/30 block">1st–4th Year</span>
+          </div>
+
+          <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-black/6 dark:border-white/6 space-y-0.5 text-center col-span-2 sm:col-span-1">
+            <span className="text-[9.5px] font-mono uppercase text-slate-500 dark:text-white/40 block">Pubmat</span>
+            <span className="font-black text-lg sm:text-xl text-gold">{pubmatCount}</span>
+            <span className="text-[9.5px] font-mono text-slate-400 dark:text-white/30 block">Creatives</span>
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-black/5 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] font-mono text-slate-500 dark:text-white/40">
+          <span className="truncate">Adviser: <strong className="text-slate-800 dark:text-white/80">{adviser.name}</strong></span>
+          <span className="truncate">College Dean: <strong className="text-slate-800 dark:text-white/80">{dean.name}</strong></span>
         </div>
       </div>
     </div>
