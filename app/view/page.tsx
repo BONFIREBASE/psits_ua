@@ -46,7 +46,7 @@ interface VoteStatus {
 // Constants
 // ────────────────────────────────────────────────────────────────────────────
 
-const VOTING_OPENS = new Date("2026-10-05T00:00:00+08:00");
+const VOTING_OPENS = new Date("2026-10-09T12:00:00+08:00");
 const VOTING_CLOSES = new Date("2026-10-09T23:59:59+08:00");
 const ALLOWED_DOMAIN = "@antiquespride.edu.ph";
 
@@ -508,7 +508,7 @@ function DesignCard({
           {!votingOpen ? (
             <div className="w-full py-2.5 px-3 rounded-xl bg-canvas-theme/80 dark:bg-canvas-theme text-muted-foreground-theme/50 text-xs text-center border border-border-theme select-none font-mono">
               <Clock className="w-3 h-3 inline-block mr-1 -mt-0.5" />
-              Voting opens Oct 5
+              Voting opens Oct 9, 12:00 PM
             </div>
           ) : !user ? (
             <Link
@@ -825,7 +825,7 @@ export default function ViewGalleryPage() {
               ? "Voting has ended. Thank you to all BSINFO students who participated!"
               : votingOpen
                 ? "Cast your vote for your favorite design!"
-                : "Browse the approved polo shirt designs submitted by BSINFO students. Voting opens on October 5, 2026."}
+                : "Browse the approved polo shirt designs submitted by BSINFO students. Voting opens on Friday, October 9, 2026 at 12:00 PM PHT."}
           </p>
           
           {!votingEnded && (
