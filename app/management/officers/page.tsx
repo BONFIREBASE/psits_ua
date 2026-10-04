@@ -13,11 +13,16 @@ import {
   Palette,
   Trash2,
   Edit2,
+  GraduationCap,
 } from 'lucide-react'
 import {
   officers as initialOfficers,
   pubmatTeam as initialPubmat,
+  dean as fallbackDean,
+  adviser as fallbackAdviser,
   type Officer,
+  type Dean,
+  type Adviser,
 } from '@/data/officers'
 import FormField, { inputStyles } from '../_components/FormField'
 import FileUpload from '../_components/FileUpload'
@@ -29,6 +34,8 @@ import {
   createOfficerAction,
   updateOfficerAction,
   deleteOfficerAction,
+  getFacultyLeadershipAction,
+  updateFacultyMemberAction,
 } from './actions'
 import { useAuth } from '../_context/auth-context'
 
@@ -92,6 +99,23 @@ export default function OfficersManagementPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
+  // Faculty Leadership state
+  const [facultyData, setFacultyData] = useState<{ dean: Dean; adviser: Adviser }>({
+    dean: fallbackDean,
+    adviser: fallbackAdviser,
+  })
+  const [editingFacultyRole, setEditingFacultyRole] = useState<'dean' | 'adviser' | null>(null)
+  const [facultyForm, setFacultyForm] = useState({
+    name: '',
+    credentials: '',
+    title: '',
+    departmentOrCollege: '',
+    institution: 'University of Antique — Main Campus',
+  })
+  const [facultyFormImage, setFacultyFormImage] = useState<File | null>(null)
+  const [facultyFormImagePreview, setFacultyFormImagePreview] = useState<string | null>(null)
+  const [savingFaculty, setSavingFaculty] = useState(false)
+
   const loadOfficers = useCallback(async () => {
     try {
       const dbOfficers = await getOfficers()
@@ -131,11 +155,21 @@ export default function OfficersManagementPage() {
     }
   }, [toast])
 
+  const loadFaculty = useCallback(async () => {
+    try {
+      const res = await getFacultyLeadershipAction()
+      if (res.success && res.data) {
+        setFacultyData(res.data)
+      }
+    } catch {}
+  }, [])
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadOfficers()
+    loadFaculty()
 
-    const channel = supabase
+    const channel1 = supabase
       .channel('officers-realtime')
       .on(
         'postgres_changes',
@@ -146,10 +180,22 @@ export default function OfficersManagementPage() {
       )
       .subscribe()
 
+    const channel2 = supabase
+      .channel('faculty-leadership-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'faculty_leadership' },
+        () => {
+          loadFaculty()
+        }
+      )
+      .subscribe()
+
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(channel1)
+      supabase.removeChannel(channel2)
     }
-  }, [loadOfficers])
+  }, [loadOfficers, loadFaculty])
 
   // Form states
   const [form, setForm] = useState({
@@ -239,6 +285,90 @@ export default function OfficersManagementPage() {
     const requesterRole = user?.role || fallbackRole || (user?.email === 'psits-ua@antiquespride.edu.ph' ? 'admin' : '')
     const requesterEmail = user?.email || fallbackEmail || ''
     return { token, requesterRole, requesterEmail }
+  }
+
+  function startEditFaculty(role: 'dean' | 'adviser') {
+    if (!isAdmin) {
+      toast('Only Super Admin can edit faculty leadership.')
+      return
+    }
+    const isDean = role === 'dean'
+    const name = isDean ? facultyData.dean.name : facultyData.adviser.name
+    const credentials = isDean ? facultyData.dean.credentials : facultyData.adviser.credentials
+    const title = isDean ? facultyData.dean.title : facultyData.adviser.title
+    const departmentOrCollege = isDean ? facultyData.dean.college : facultyData.adviser.department
+    const institution = (isDean ? facultyData.dean.institution : facultyData.adviser.institution) || 'University of Antique — Main Campus'
+    const image = isDean ? facultyData.dean.image : facultyData.adviser.image
+
+    setEditingFacultyRole(role)
+    setFacultyForm({
+      name,
+      credentials: credentials || '',
+      title,
+      departmentOrCollege,
+      institution,
+    })
+    setFacultyFormImage(null)
+    setFacultyFormImagePreview(image || null)
+    setEditingId(null)
+    setShowAdd(false)
+  }
+
+  function cancelEditFaculty() {
+    setEditingFacultyRole(null)
+    setFacultyForm({
+      name: '',
+      credentials: '',
+      title: '',
+      departmentOrCollege: '',
+      institution: 'University of Antique — Main Campus',
+    })
+    setFacultyFormImage(null)
+    setFacultyFormImagePreview(null)
+  }
+
+  async function saveFacultyEdit() {
+    if (!editingFacultyRole) return
+    if (!facultyForm.name || !facultyForm.title) {
+      toast('Name and title are required.')
+      return
+    }
+
+    setSavingFaculty(true)
+    try {
+      const { token, requesterRole, requesterEmail } = getRequesterAuthData()
+      const formData = new FormData()
+      formData.append('name', facultyForm.name)
+      formData.append('credentials', facultyForm.credentials)
+      formData.append('title', facultyForm.title)
+      formData.append('departmentOrCollege', facultyForm.departmentOrCollege)
+      formData.append('institution', facultyForm.institution)
+      formData.append('sessionToken', token)
+      formData.append('requesterRole', requesterRole)
+      formData.append('requesterEmail', requesterEmail)
+
+      const currentImage = editingFacultyRole === 'dean' ? facultyData.dean.image : facultyData.adviser.image
+      if (currentImage) {
+        formData.append('existingImageUrl', currentImage)
+      }
+      if (facultyFormImage) {
+        formData.append('photo', facultyFormImage)
+      }
+
+      const res = await updateFacultyMemberAction(editingFacultyRole, formData)
+      if (!res.success) {
+        toast(res.error || 'Failed to update faculty member')
+        return
+      }
+
+      await loadFaculty()
+      cancelEditFaculty()
+      toast(`${editingFacultyRole === 'dean' ? 'Dean' : 'Adviser'} profile updated successfully!`)
+    } catch {
+      toast('Error saving faculty member changes')
+    } finally {
+      setSavingFaculty(false)
+    }
   }
 
   async function saveEdit() {
@@ -446,6 +576,352 @@ export default function OfficersManagementPage() {
             <span>Add Member</span>
           </button>
         )}
+      </div>
+
+      {/* ─── Faculty & Academic Leadership Section ─── */}
+      <div className="border border-border-theme/80 bg-surface-theme/80 rounded-2xl p-5 sm:p-6 space-y-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border-theme pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gold/15 border border-gold/30 flex items-center justify-center text-amber-600 dark:text-gold shadow-xs">
+              <GraduationCap size={16} />
+            </div>
+            <div>
+              <h2 className="font-display font-bold text-base text-foreground-theme leading-tight">
+                Faculty & Academic Leadership
+              </h2>
+              <p className="text-xs text-muted-foreground-theme">
+                Edit Dean and Adviser profiles, academic credentials, and official avatars.
+              </p>
+            </div>
+          </div>
+          <span className="font-mono text-[10px] text-amber-600 dark:text-gold uppercase tracking-wider font-bold bg-gold/10 border border-gold/20 px-2.5 py-1 rounded-full w-fit">
+            Academic Oversight
+          </span>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* ── Dean Card / Form ── */}
+          <div
+            className={`relative border rounded-xl overflow-hidden transition-all duration-300 ${
+              editingFacultyRole === 'dean'
+                ? 'border-gold/40 bg-surface-theme ring-1 ring-gold/25'
+                : 'border-border-theme hover:border-gold/30 bg-surface-theme'
+            }`}
+          >
+            {editingFacultyRole === 'dean' ? (
+              <div className="p-4 sm:p-5 space-y-3.5">
+                <div className="flex items-center justify-between pb-2 border-b border-border-theme">
+                  <h4 className="text-xs font-display font-bold text-amber-600 dark:text-gold uppercase tracking-wider">
+                    Edit College Dean Profile
+                  </h4>
+                  <button onClick={cancelEditFaculty} className="text-muted-foreground-theme hover:text-foreground-theme cursor-pointer">
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <FormField label="Full Name" htmlFor="faculty-dean-name" required>
+                      <input
+                        id="faculty-dean-name"
+                        type="text"
+                        value={facultyForm.name}
+                        onChange={(e) => setFacultyForm({ ...facultyForm, name: e.target.value })}
+                        placeholder="e.g. Dr. John C. Amar"
+                        className={inputStyles}
+                        required
+                      />
+                    </FormField>
+                  </div>
+                  <div>
+                    <FormField label="Credentials" htmlFor="faculty-dean-cred">
+                      <input
+                        id="faculty-dean-cred"
+                        type="text"
+                        value={facultyForm.credentials}
+                        onChange={(e) => setFacultyForm({ ...facultyForm, credentials: e.target.value })}
+                        placeholder="e.g. DM, Ph.D."
+                        className={inputStyles}
+                      />
+                    </FormField>
+                  </div>
+                </div>
+
+                <FormField label="Official Title / Position" htmlFor="faculty-dean-title" required>
+                  <input
+                    id="faculty-dean-title"
+                    type="text"
+                    value={facultyForm.title}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, title: e.target.value })}
+                    placeholder="e.g. Dean"
+                    className={inputStyles}
+                    required
+                  />
+                </FormField>
+
+                <FormField label="College / Department" htmlFor="faculty-dean-dept">
+                  <input
+                    id="faculty-dean-dept"
+                    type="text"
+                    value={facultyForm.departmentOrCollege}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, departmentOrCollege: e.target.value })}
+                    placeholder="e.g. College of Computing and Information Sciences"
+                    className={inputStyles}
+                  />
+                </FormField>
+
+                <FormField label="Institution" htmlFor="faculty-dean-inst">
+                  <input
+                    id="faculty-dean-inst"
+                    type="text"
+                    value={facultyForm.institution}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, institution: e.target.value })}
+                    placeholder="University of Antique — Main Campus"
+                    className={inputStyles}
+                  />
+                </FormField>
+
+                <FormField label="Official Avatar / Photo">
+                  <FileUpload
+                    accept="image/*"
+                    label="Upload Dean avatar"
+                    value={facultyFormImage}
+                    preview={facultyFormImagePreview}
+                    onChange={(file) => {
+                      setFacultyFormImage(file)
+                      setFacultyFormImagePreview(file ? URL.createObjectURL(file) : null)
+                    }}
+                    maxSizeMB={3}
+                  />
+                </FormField>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={saveFacultyEdit}
+                    disabled={savingFaculty}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    <Save size={13} /> {savingFaculty ? 'Saving...' : 'Save Dean Profile'}
+                  </button>
+                  <button
+                    onClick={cancelEditFaculty}
+                    className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 sm:p-5 flex items-start gap-4">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-navy via-surface to-navy border-2 border-gold/30 flex items-center justify-center font-display font-bold text-base text-gold flex-shrink-0 overflow-hidden shadow-xs">
+                  {facultyData.dean.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={facultyData.dean.image} alt={facultyData.dean.name} className="w-full h-full object-cover" />
+                  ) : (
+                    getInitials(facultyData.dean.name)
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[9px] text-amber-600 dark:text-gold font-bold uppercase tracking-[0.15em] bg-gold/10 border border-gold/20 px-2 py-0.5 rounded">
+                      College Dean
+                    </span>
+                  </div>
+                  <h3 className="font-display font-bold text-base text-foreground-theme leading-tight mt-1 truncate">
+                    {facultyData.dean.name}
+                    {facultyData.dean.credentials && (
+                      <span className="text-amber-600 dark:text-gold text-xs font-normal ml-1.5">
+                        {facultyData.dean.credentials}
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-muted-foreground-theme mt-0.5">
+                    {facultyData.dean.title}
+                  </p>
+                  <p className="font-mono text-[10px] text-muted-foreground-theme/80 mt-0.5 truncate">
+                    {facultyData.dean.college}
+                  </p>
+                  <p className="font-mono text-[9px] text-muted-foreground-theme/60 mt-0.5 truncate">
+                    {facultyData.dean.institution}
+                  </p>
+                </div>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => startEditFaculty('dean')}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-foreground-theme bg-slate-100 dark:bg-white/[0.05] border border-border-theme hover:text-amber-600 dark:hover:text-gold hover:border-gold/40 hover:bg-gold/10 transition-all shadow-xs cursor-pointer flex-shrink-0"
+                    title="Edit Dean profile"
+                  >
+                    <Edit2 size={12} />
+                    <span>Edit</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Adviser Card / Form ── */}
+          <div
+            className={`relative border rounded-xl overflow-hidden transition-all duration-300 ${
+              editingFacultyRole === 'adviser'
+                ? 'border-gold/40 bg-surface-theme ring-1 ring-gold/25'
+                : 'border-border-theme hover:border-gold/30 bg-surface-theme'
+            }`}
+          >
+            {editingFacultyRole === 'adviser' ? (
+              <div className="p-4 sm:p-5 space-y-3.5">
+                <div className="flex items-center justify-between pb-2 border-b border-border-theme">
+                  <h4 className="text-xs font-display font-bold text-amber-600 dark:text-gold uppercase tracking-wider">
+                    Edit Faculty Adviser Profile
+                  </h4>
+                  <button onClick={cancelEditFaculty} className="text-muted-foreground-theme hover:text-foreground-theme cursor-pointer">
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <FormField label="Full Name" htmlFor="faculty-adv-name" required>
+                      <input
+                        id="faculty-adv-name"
+                        type="text"
+                        value={facultyForm.name}
+                        onChange={(e) => setFacultyForm({ ...facultyForm, name: e.target.value })}
+                        placeholder="e.g. Carl Spence Percy"
+                        className={inputStyles}
+                        required
+                      />
+                    </FormField>
+                  </div>
+                  <div>
+                    <FormField label="Credentials" htmlFor="faculty-adv-cred">
+                      <input
+                        id="faculty-adv-cred"
+                        type="text"
+                        value={facultyForm.credentials}
+                        onChange={(e) => setFacultyForm({ ...facultyForm, credentials: e.target.value })}
+                        placeholder="e.g. MIT, MSCS"
+                        className={inputStyles}
+                      />
+                    </FormField>
+                  </div>
+                </div>
+
+                <FormField label="Official Title / Position" htmlFor="faculty-adv-title" required>
+                  <input
+                    id="faculty-adv-title"
+                    type="text"
+                    value={facultyForm.title}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, title: e.target.value })}
+                    placeholder="e.g. BSIT Program Head / PSITS Adviser"
+                    className={inputStyles}
+                    required
+                  />
+                </FormField>
+
+                <FormField label="Department / Program" htmlFor="faculty-adv-dept">
+                  <input
+                    id="faculty-adv-dept"
+                    type="text"
+                    value={facultyForm.departmentOrCollege}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, departmentOrCollege: e.target.value })}
+                    placeholder="e.g. College of Computing and Information Sciences"
+                    className={inputStyles}
+                  />
+                </FormField>
+
+                <FormField label="Institution" htmlFor="faculty-adv-inst">
+                  <input
+                    id="faculty-adv-inst"
+                    type="text"
+                    value={facultyForm.institution}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, institution: e.target.value })}
+                    placeholder="University of Antique — Main Campus"
+                    className={inputStyles}
+                  />
+                </FormField>
+
+                <FormField label="Official Avatar / Photo">
+                  <FileUpload
+                    accept="image/*"
+                    label="Upload Adviser avatar"
+                    value={facultyFormImage}
+                    preview={facultyFormImagePreview}
+                    onChange={(file) => {
+                      setFacultyFormImage(file)
+                      setFacultyFormImagePreview(file ? URL.createObjectURL(file) : null)
+                    }}
+                    maxSizeMB={3}
+                  />
+                </FormField>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={saveFacultyEdit}
+                    disabled={savingFaculty}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gold text-[#0D1117] font-bold text-xs hover:bg-[#FFA726] transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    <Save size={13} /> {savingFaculty ? 'Saving...' : 'Save Adviser Profile'}
+                  </button>
+                  <button
+                    onClick={cancelEditFaculty}
+                    className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground-theme border border-border-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 sm:p-5 flex items-start gap-4">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-navy via-surface to-navy border-2 border-gold/30 flex items-center justify-center font-display font-bold text-base text-gold flex-shrink-0 overflow-hidden shadow-xs">
+                  {facultyData.adviser.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={facultyData.adviser.image} alt={facultyData.adviser.name} className="w-full h-full object-cover" />
+                  ) : (
+                    getInitials(facultyData.adviser.name)
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[9px] text-amber-600 dark:text-gold font-bold uppercase tracking-[0.15em] bg-gold/10 border border-gold/20 px-2 py-0.5 rounded">
+                      Faculty Adviser
+                    </span>
+                  </div>
+                  <h3 className="font-display font-bold text-base text-foreground-theme leading-tight mt-1 truncate">
+                    {facultyData.adviser.name}
+                    {facultyData.adviser.credentials && (
+                      <span className="text-amber-600 dark:text-gold text-xs font-normal ml-1.5">
+                        {facultyData.adviser.credentials}
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-muted-foreground-theme mt-0.5">
+                    {facultyData.adviser.title}
+                  </p>
+                  <p className="font-mono text-[10px] text-muted-foreground-theme/80 mt-0.5 truncate">
+                    {facultyData.adviser.department}
+                  </p>
+                  <p className="font-mono text-[9px] text-muted-foreground-theme/60 mt-0.5 truncate">
+                    {facultyData.adviser.institution}
+                  </p>
+                </div>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => startEditFaculty('adviser')}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-foreground-theme bg-slate-100 dark:bg-white/[0.05] border border-border-theme hover:text-amber-600 dark:hover:text-gold hover:border-gold/40 hover:bg-gold/10 transition-all shadow-xs cursor-pointer flex-shrink-0"
+                    title="Edit Adviser profile"
+                  >
+                    <Edit2 size={12} />
+                    <span>Edit</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}

@@ -42,6 +42,20 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: '/officer',
+        destination: '/officers',
+        permanent: true,
+      },
+      {
+        source: '/management/officer',
+        destination: '/management/officers',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -1,12 +1,14 @@
 import type { Metadata } from 'next'
 import {
-  dean,
-  adviser,
   officers as initialOfficers,
   pubmatTeam as initialPubmat,
   Officer,
 } from '@/data/officers'
-import { getOfficers, sortOfficersByHierarchy } from '@/lib/supabase'
+import {
+  getOfficers,
+  sortOfficersByHierarchy,
+  getFacultyLeadership,
+} from '@/lib/supabase'
 import OfficersDirectoryClient from '@/components/OfficersDirectoryClient'
 
 export const metadata: Metadata = {
@@ -60,7 +62,11 @@ export const metadata: Metadata = {
 }
 
 export default async function OfficersPage() {
-  const dbOfficers = await getOfficers()
+  const [dbOfficers, facultyLeadership] = await Promise.all([
+    getOfficers(),
+    getFacultyLeadership(),
+  ])
+  const { dean, adviser } = facultyLeadership
 
   const pubmatMembers: Officer[] = sortOfficersByHierarchy(
     dbOfficers && dbOfficers.length > 0

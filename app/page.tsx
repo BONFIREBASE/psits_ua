@@ -10,13 +10,21 @@ import BannerStack from '@/components/BannerStack'
 import ScrollReveal from '@/components/ScrollReveal'
 import { socialDispatches } from '@/data/announcements'
 import { dean } from '@/data/officers'
-import { getPosts, postRowToSocialDispatch, getActiveBanners, supabase, type BannerRow } from '@/lib/supabase'
+import {
+  getPosts,
+  postRowToSocialDispatch,
+  getActiveBanners,
+  getFacultyLeadership,
+  supabase,
+  type BannerRow,
+} from '@/lib/supabase'
 import coverImage from '@/public/assets/cover.jpg'
 
 export default function HomePage() {
   const [dispatches, setDispatches] = useState(socialDispatches)
   const [activeBanners, setActiveBanners] = useState<BannerRow[]>([])
   const [bannersLoading, setBannersLoading] = useState(true)
+  const [deanData, setDeanData] = useState(dean)
   const [studentStats, setStudentStats] = useState<{ totalStudents: number; totalSections: number }>({
     totalStudents: 0,
     totalSections: 0,
@@ -25,15 +33,19 @@ export default function HomePage() {
   useEffect(() => {
     async function load() {
       try {
-        const [posts, banners] = await Promise.all([
+        const [posts, banners, faculty] = await Promise.all([
           getPosts(),
           getActiveBanners(),
+          getFacultyLeadership(),
         ])
         if (posts && posts.length > 0) {
           setDispatches(posts.map(postRowToSocialDispatch))
         }
         if (banners && banners.length > 0) {
           setActiveBanners(banners)
+        }
+        if (faculty?.dean) {
+          setDeanData(faculty.dean)
         }
       } catch {
         // Fall back cleanly to static data
@@ -75,6 +87,16 @@ export default function HomePage() {
           const banners = await getActiveBanners()
           if (banners && banners.length > 0) {
             setActiveBanners(banners)
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'faculty_leadership' },
+        async () => {
+          const faculty = await getFacultyLeadership()
+          if (faculty?.dean) {
+            setDeanData(faculty.dean)
           }
         }
       )
@@ -220,8 +242,8 @@ export default function HomePage() {
                 }}
               >
                 <Image
-                  src="/assets/dean.png"
-                  alt={`${dean.name} — ${dean.title}, ${dean.college}`}
+                  src={deanData.image || "/assets/dean.png"}
+                  alt={`${deanData.name} — ${deanData.title}, ${deanData.college}`}
                   fill
                   className="object-contain object-bottom drop-shadow-[0_20px_40px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_24px_50px_rgba(0,0,0,0.9)] pointer-events-none"
                   priority
@@ -245,13 +267,18 @@ export default function HomePage() {
 
               <div className="pt-4 border-t border-border-theme space-y-1">
                 <h3 className="font-display font-black text-lg sm:text-xl md:text-2xl text-foreground-theme tracking-tight break-words">
-                  {dean.name}
+                  {deanData.name}
+                  {deanData.credentials && (
+                    <span className="text-amber-600 dark:text-gold text-base sm:text-lg font-normal ml-2">
+                      {deanData.credentials}
+                    </span>
+                  )}
                 </h3>
                 <p className="font-mono text-[11px] sm:text-xs md:text-[13px] text-amber-600 dark:text-gold/90 uppercase tracking-wider sm:tracking-widest font-bold break-words">
-                  Dean · College of Computing and Information Sciences
+                  {deanData.title} · {deanData.college}
                 </p>
                 <p className="font-mono text-[10px] text-muted-foreground-theme uppercase tracking-wider break-words">
-                  {dean.institution}
+                  {deanData.institution}
                 </p>
               </div>
             </div>

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import ProgressiveImage from '@/components/ProgressiveImage'
 import ScrollReveal from '@/components/ScrollReveal'
-import type { Adviser, Officer } from '@/data/officers'
+import type { Adviser, Dean, Officer } from '@/data/officers'
 
 export interface OfficerProfile {
   name: string
@@ -172,9 +172,11 @@ export default function OfficersDirectoryClient({
                 </div>
                 <h2 className="font-display font-black text-xl sm:text-2xl md:text-3xl lg:text-4xl text-slate-900 dark:text-white tracking-tight break-words group-hover:text-amber-500 dark:group-hover:text-gold transition-colors">
                   {adviser.name}
-                  <span className="text-gold font-normal text-base sm:text-lg md:text-xl ml-2 inline-block">
-                    {adviser.credentials}
-                  </span>
+                  {adviser.credentials && (
+                    <span className="text-gold font-normal text-base sm:text-lg md:text-xl ml-2 inline-block">
+                      {adviser.credentials}
+                    </span>
+                  )}
                 </h2>
                 <p className="text-slate-700 dark:text-white/80 font-medium text-sm sm:text-base">
                   {adviser.title}

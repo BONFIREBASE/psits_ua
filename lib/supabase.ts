@@ -1,4 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  dean as initialDean,
+  adviser as initialAdviser,
+  type Dean,
+  type Adviser,
+} from '@/data/officers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -357,6 +363,54 @@ export async function findOfficerByEmail(email: string): Promise<OfficerRow | nu
     return data as OfficerRow;
   } catch {
     return null;
+  }
+}
+
+export interface FacultyLeadershipRow {
+  id: 'dean' | 'adviser';
+  name: string;
+  credentials: string;
+  title: string;
+  department_or_college: string;
+  institution: string;
+  image_url: string | null;
+  updated_at?: string;
+}
+
+export async function getFacultyLeadership(): Promise<{ dean: Dean; adviser: Adviser }> {
+  try {
+    const { data, error } = await supabase
+      .from('faculty_leadership')
+      .select('*');
+
+    if (error || !data || data.length === 0) {
+      return { dean: initialDean, adviser: initialAdviser };
+    }
+
+    const deanRow = data.find((r: FacultyLeadershipRow) => r.id === 'dean');
+    const adviserRow = data.find((r: FacultyLeadershipRow) => r.id === 'adviser');
+
+    const dean: Dean = {
+      name: deanRow?.name || initialDean.name,
+      credentials: deanRow?.credentials ?? initialDean.credentials,
+      title: deanRow?.title || initialDean.title,
+      college: deanRow?.department_or_college || initialDean.college,
+      institution: deanRow?.institution || initialDean.institution,
+      image: deanRow?.image_url || initialDean.image,
+    };
+
+    const adviser: Adviser = {
+      name: adviserRow?.name || initialAdviser.name,
+      credentials: adviserRow?.credentials ?? initialAdviser.credentials,
+      title: adviserRow?.title || initialAdviser.title,
+      department: adviserRow?.department_or_college || initialAdviser.department,
+      institution: adviserRow?.institution || initialAdviser.institution,
+      image: adviserRow?.image_url || initialAdviser.image,
+    };
+
+    return { dean, adviser };
+  } catch {
+    return { dean: initialDean, adviser: initialAdviser };
   }
 }
 

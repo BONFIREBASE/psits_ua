@@ -1,10 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin, getFacultyLeadership } from '@/lib/supabase';
 import { uploadToR2, deleteFromR2 } from '@/lib/r2';
 import { validateSessionAction } from '@/lib/session';
-import { officers as initialOfficers, pubmatTeam as initialPubmat } from '@/data/officers';
+import { officers as initialOfficers, pubmatTeam as initialPubmat, type Dean, type Adviser } from '@/data/officers';
 
 const SUPER_ADMIN_EMAIL = 'psits-ua@antiquespride.edu.ph';
 
@@ -328,5 +328,102 @@ export async function seedOfficersAction() {
     return { success: true, count: allRows.length };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : 'Failed to seed officers' };
+  }
+}
+
+export async function getFacultyLeadershipAction(): Promise<{
+  success: boolean;
+  data?: { dean: Dean; adviser: Adviser };
+  error?: string;
+}> {
+  try {
+    const data = await getFacultyLeadership();
+    return { success: true, data };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to load faculty leadership',
+    };
+  }
+}
+
+export async function updateFacultyMemberAction(
+  role: 'dean' | 'adviser',
+  formData: FormData
+) {
+  try {
+    const { isAdmin } = await resolveRequester(formData);
+    if (!isAdmin) {
+      return {
+        success: false,
+        error: 'Unauthorized: Only Super Admin can edit faculty leadership.',
+      };
+    }
+
+    const name = (formData.get('name') as string)?.trim();
+    const credentials = (formData.get('credentials') as string)?.trim() || '';
+    const title = (formData.get('title') as string)?.trim();
+    const departmentOrCollege = (formData.get('departmentOrCollege') as string)?.trim() || 'College of Computing and Information Sciences';
+    const institution = (formData.get('institution') as string)?.trim() || 'University of Antique — Main Campus';
+    const existingImageUrl = (formData.get('existingImageUrl') as string)?.trim() || null;
+    const photo = formData.get('photo') as File | null;
+
+    if (!name || !title) {
+      return { success: false, error: 'Name and title are required.' };
+    }
+
+    let imageUrl = existingImageUrl;
+    if (photo && photo.size > 0) {
+      const sanitized = photo.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const r2Key = `faculty/${role}-${Date.now()}-${sanitized}`;
+      const arrayBuffer = await photo.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      const r2Upload = await uploadToR2({
+        key: r2Key,
+        body: buffer,
+        contentType: photo.type || 'application/octet-stream',
+      });
+      imageUrl = r2Upload.url;
+
+      if (existingImageUrl && existingImageUrl.includes('.r2.dev')) {
+        try {
+          const parsed = new URL(existingImageUrl);
+          const oldKey = parsed.pathname.replace(/^\//, '');
+          if (oldKey) await deleteFromR2(oldKey);
+        } catch {}
+      }
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('faculty_leadership')
+      .upsert(
+        {
+          id: role,
+          name,
+          credentials,
+          title,
+          department_or_college: departmentOrCollege,
+          institution,
+          image_url: imageUrl,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      )
+      .select()
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/management/officers');
+    revalidatePath('/officers');
+    return { success: true, data };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to update faculty member',
+    };
   }
 }
