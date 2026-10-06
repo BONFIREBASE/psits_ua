@@ -11,7 +11,7 @@ import { DEFAULT_ACADEMIC_YEAR, DEFAULT_SEMESTER, getAllStandardSections } from 
 export const metadata: Metadata = {
   title: 'Membership Dues Transparency Ledger | PSITS - University of Antique',
   description:
-    'Official verifiable transparency ledger of semestral PSITS membership dues (₱25.00/semester) collection and section payment tallies.',
+    'Official verifiable transparency ledger of semestral PSITS membership dues and student registration tallies.',
 }
 
 export const dynamic = 'force-dynamic'

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Search, CheckCircle2, ChevronDown } from 'lucide-react'
 import type { PublicDuesSummary } from '@/app/management/dues/actions'
-import { DEFAULT_MEMBERSHIP_FEE, getAllStandardSections } from '@/lib/dues'
+import { getAllStandardSections } from '@/lib/dues'
 
 interface PublicDuesClientProps {
   initialData: PublicDuesSummary
@@ -137,21 +137,12 @@ export default function PublicDuesClient({
             Membership Dues
           </h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-white/50 max-w-xl">
-            Transparency ledger for PSITS membership dues — ₱{DEFAULT_MEMBERSHIP_FEE.toFixed(2)} per student, per semester.
+            Transparency ledger for PSITS membership dues and student registration tallies.
           </p>
         </div>
 
         {/* Inline stats — flat, no cards */}
         <div className="flex items-baseline gap-8 sm:gap-12 mb-10 pb-8 border-b border-black/5 dark:border-white/5">
-          <div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono text-slate-900 dark:text-white">
-              ₱{data.totalCollected.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </div>
-            <span className="text-[11px] text-slate-400 dark:text-white/40 font-mono uppercase tracking-wider">
-              Collected
-            </span>
-          </div>
-
           <div>
             <div className="text-2xl sm:text-3xl font-bold font-mono text-slate-900 dark:text-white">
               {data.totalPaid}
@@ -279,7 +270,6 @@ export default function PublicDuesClient({
                   <tr className="border-b border-black/10 dark:border-white/10 text-[11px] font-mono uppercase tracking-wider text-slate-400 dark:text-white/35">
                     <th className="pb-3 font-medium">Student</th>
                     <th className="pb-3 font-medium">Section</th>
-                    <th className="pb-3 font-medium">Amount</th>
                     <th className="pb-3 font-medium">Status</th>
                     <th className="pb-3 font-medium text-right">Date</th>
                   </tr>
@@ -300,10 +290,6 @@ export default function PublicDuesClient({
                         <span className="font-mono text-sm text-slate-500 dark:text-white/50">
                           {item.year_section}
                         </span>
-                      </td>
-
-                      <td className="py-4 pr-4 font-mono text-sm text-slate-700 dark:text-white/70">
-                        ₱{(Number(item.amount) || DEFAULT_MEMBERSHIP_FEE).toFixed(2)}
                       </td>
 
                       <td className="py-4 pr-4">
@@ -342,9 +328,6 @@ export default function PublicDuesClient({
                   </div>
 
                   <div className="text-right shrink-0">
-                    <div className="text-sm font-mono text-slate-700 dark:text-white/70">
-                      ₱{(Number(item.amount) || DEFAULT_MEMBERSHIP_FEE).toFixed(2)}
-                    </div>
                     <span className="inline-flex items-center gap-0.5 text-xs text-emerald-600 dark:text-emerald-400 font-mono">
                       <CheckCircle2 className="w-3 h-3" />
                       Registered
@@ -357,11 +340,6 @@ export default function PublicDuesClient({
             {/* Summary line */}
             <div className="mt-4 pt-4 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs font-mono text-slate-400 dark:text-white/35">
               <span>{filteredRecords.length} of {data.totalPaid} records</span>
-              <span className="text-slate-700 dark:text-white/70 font-medium">
-                ₱{filteredRecords
-                  .reduce((acc, curr) => acc + (Number(curr.amount) || DEFAULT_MEMBERSHIP_FEE), 0)
-                  .toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </span>
             </div>
           </>
         )}
