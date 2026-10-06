@@ -191,10 +191,10 @@ export default function AuditManagementPage() {
               />
             </FormField>
 
-            <FormField label="Signed Audit Document (PDF)" hint="Stored securely in cloud storage">
+            <FormField label="Signed Audit Document (PDF, PNG, JPG)" hint="Stored securely in cloud storage">
               <FileUpload
-                accept=".pdf,.doc,.docx"
-                label="Choose signed audit PDF"
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
+                label="Choose signed audit PDF or image (PNG, JPG)"
                 value={file}
                 preview={filePreview}
                 onChange={handleFile}
@@ -290,7 +290,7 @@ export default function AuditManagementPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 rounded-lg text-muted-foreground-theme hover:text-amber-600 dark:hover:text-gold hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
-                    title="Download Audit PDF"
+                    title="View / Download Document"
                   >
                     <ExternalLink size={14} />
                   </a>

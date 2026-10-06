@@ -1,5 +1,5 @@
-const XLSX = require('xlsx');
-const path = require('path');
+import XLSX from 'xlsx';
+import path from 'path';
 
 const filePath = path.join('C:', 'Users', 'BONFIRE BASE', 'Downloads', 'University_of_Antique_Master_Class_List.xlsx');
 const wb = XLSX.readFile(filePath);
