@@ -14,7 +14,7 @@ jobs:
       - name: Trigger Cleanup Endpoint
         env:
           TARGET_URL: "https://psits-ua.vercel.app"
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          CRON_SECRET: ${{ secrets['CRON_SECRET'] }}
         run: |
           echo "Sending automated cleanup request to $TARGET_URL/api/cron/cleanup..."
           RESPONSE=$(curl -s -X GET "$TARGET_URL/api/cron/cleanup" \

@@ -1,5 +1,6 @@
-import XLSX from 'xlsx';
-import path from 'path';
+import pkg from 'xlsx';
+const XLSX = pkg;
+import * as path from 'path';
 
 const filePath = path.join('C:', 'Users', 'BONFIRE BASE', 'Downloads', 'University_of_Antique_Master_Class_List.xlsx');
 const wb = XLSX.readFile(filePath);

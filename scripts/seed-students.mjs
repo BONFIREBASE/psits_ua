@@ -1,7 +1,8 @@
-import XLSX from 'xlsx';
-import path from 'path';
+import pkg from 'xlsx';
+const XLSX = pkg;
+import * as path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs';
+import * as fs from 'fs';
 import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
