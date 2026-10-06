@@ -31,16 +31,16 @@ function subscribeTheme(callback: () => void) {
 }
 
 function getStoredThemeSnapshot(): Theme {
-  if (typeof window === 'undefined') return 'system'
+  if (typeof window === 'undefined') return 'dark'
   try {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
+    if (stored === 'light' || stored === 'dark') return stored
   } catch {}
-  return 'system'
+  return 'dark'
 }
 
 function getStoredThemeServerSnapshot(): Theme {
-  return 'system'
+  return 'dark'
 }
 
 interface LegacyMediaQueryList {
@@ -139,32 +139,24 @@ function executeWithThemeTransition(callback: () => void) {
   }, 350)
 }
 
-let currentResolvedTheme: ResolvedTheme = 'dark'
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useSyncExternalStore(subscribeTheme, getStoredThemeSnapshot, getStoredThemeServerSnapshot)
   const systemTheme = useSyncExternalStore(subscribeSystem, getSystemSnapshot, getSystemServerSnapshot)
   const isManualChangeRef = useRef(false)
 
   const resolvedTheme: ResolvedTheme = theme === 'system' ? systemTheme : (theme as ResolvedTheme)
-
-  // Keep module-level state synced
-  currentResolvedTheme = resolvedTheme
+  const currentResolvedThemeRef = useRef<ResolvedTheme>(resolvedTheme)
 
   useEffect(() => {
+    currentResolvedThemeRef.current = resolvedTheme
+
     if (isManualChangeRef.current) {
       isManualChangeRef.current = false
       return
     }
 
-    const currentTheme = document.documentElement.getAttribute('data-theme')
-    if (currentTheme && currentTheme !== resolvedTheme) {
-      executeWithThemeTransition(() => {
-        applyThemeDom(resolvedTheme)
-      })
-    } else {
-      applyThemeDom(resolvedTheme)
-    }
+    // Quietly synchronize DOM attribute on mount or cross-tab storage sync without triggering animation
+    applyThemeDom(resolvedTheme)
   }, [resolvedTheme])
 
   const setTheme = useCallback((newTheme: Theme) => {
@@ -175,7 +167,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         : (newTheme as ResolvedTheme)
 
     // Synchronously track the new resolved theme so subsequent rapid clicks alternate correctly
-    currentResolvedTheme = nextResolvedTheme
+    currentResolvedThemeRef.current = nextResolvedTheme
 
     // Update storage and listeners immediately to ensure React components receive the flip
     try {
@@ -196,7 +188,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Check synchronous tracker / DOM state to guarantee 1 click = 1 flip, 2 clicks = full rotation
     const current: ResolvedTheme =
       typeof document !== 'undefined'
-        ? ((document.documentElement.getAttribute('data-theme') as ResolvedTheme) || currentResolvedTheme)
+        ? ((document.documentElement.getAttribute('data-theme') as ResolvedTheme) || currentResolvedThemeRef.current)
         : resolvedTheme
 
     const nextTheme: ResolvedTheme = current === 'dark' ? 'light' : 'dark'
@@ -222,17 +214,7 @@ export const themeScript = `
 (function() {
   try {
     var stored = localStorage.getItem('${STORAGE_KEY}');
-    var mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
-    var systemTheme = (mql && mql.matches) ? 'dark' : 'light';
-    var resolved = systemTheme;
-    if (stored === 'light' || stored === 'dark') {
-      resolved = stored;
-    } else if (stored === 'system') {
-      resolved = systemTheme;
-    } else {
-      // First landing without manual override: use system device preference
-      resolved = systemTheme;
-    }
+    var resolved = (stored === 'light' || stored === 'dark') ? stored : 'dark';
     var root = document.documentElement;
     root.setAttribute('data-theme', resolved);
     if (resolved === 'dark') {

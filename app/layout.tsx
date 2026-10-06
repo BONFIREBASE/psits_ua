@@ -188,6 +188,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-theme="dark"
       suppressHydrationWarning
       data-scroll-behavior="smooth"
       className={`${syne.variable} ${inter.variable} ${architectsDaughter.variable}`}

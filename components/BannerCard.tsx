@@ -159,8 +159,6 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
                 banner.link_url.startsWith('http') ? (
                   <a
                     href={banner.link_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-gradient-to-r from-gold to-[#FFA726] text-slate-950 font-mono font-bold text-xs sm:text-sm hover:shadow-[0_4px_24px_rgba(245,166,35,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md cursor-pointer"
                   >
                     <span>{banner.link_text}</span>
@@ -188,8 +186,6 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
                 banner.secondary_link_url.startsWith('http') ? (
                   <a
                     href={banner.secondary_link_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 hover:border-white/30 text-white/90 hover:text-white font-mono text-xs sm:text-sm transition-all backdrop-blur-md cursor-pointer"
                   >
                     <span>{banner.secondary_link_text}</span>
