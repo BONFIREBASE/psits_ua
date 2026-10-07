@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { SubmissionAuthSkeleton } from "@/components/PublicSkeletonPreloader";
 import SubmissionLockWrapper from "@/components/SubmissionLockWrapper";
+import ProgressiveImage from "@/components/ProgressiveImage";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { compressImageToWebP } from "@/lib/image-compress";
@@ -326,6 +327,7 @@ export default function SubmissionPage() {
           method: "PUT",
           headers: {
             "Content-Type": file.type || "application/octet-stream",
+            "Cache-Control": presignData.cacheControl || "public, max-age=31536000, immutable",
           },
           body: file,
         });
@@ -451,6 +453,7 @@ export default function SubmissionPage() {
           method: "PUT",
           headers: {
             "Content-Type": file.type || "application/octet-stream",
+            "Cache-Control": presignData.cacheControl || "public, max-age=31536000, immutable",
           },
           body: file,
         });
@@ -715,12 +718,11 @@ export default function SubmissionPage() {
                     <div className="flex flex-col sm:flex-row items-center gap-5">
                       {submittedData.file_url && (
                         <div className="relative w-full sm:w-36 h-36 rounded-xl overflow-hidden border border-border-theme bg-canvas-theme shrink-0 shadow-xs">
-                          <Image
+                          <ProgressiveImage
                             src={submittedData.file_url}
                             alt="Submitted polo design"
                             fill
                             className="object-cover"
-                            unoptimized
                           />
                         </div>
                       )}
@@ -823,12 +825,11 @@ export default function SubmissionPage() {
                       <div className="relative rounded-2xl border border-border-theme bg-canvas-theme/90 p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
                         <div className="flex items-center gap-4 min-w-0">
                           <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-border-theme bg-canvas-theme shrink-0">
-                            <Image
+                            <ProgressiveImage
                               src={submittedData.file_url}
                               alt="Current mockup"
                               fill
                               className="object-cover"
-                              unoptimized
                             />
                           </div>
                           <div className="min-w-0 text-left">
@@ -863,12 +864,11 @@ export default function SubmissionPage() {
                       <div className="relative rounded-2xl border border-gold/40 bg-canvas-theme/90 p-4 flex flex-col sm:flex-row items-center gap-4 shadow-xs">
                         {previewUrl && (
                           <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-canvas-theme shrink-0 border border-gold/50">
-                            <Image
+                            <ProgressiveImage
                               src={previewUrl}
                               alt="Replacement mockup preview"
                               fill
                               className="object-cover"
-                              unoptimized
                             />
                           </div>
                         )}

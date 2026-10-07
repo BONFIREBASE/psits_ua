@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Palette,
   Search,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { ManagementCardGridSkeleton } from "../_components/SkeletonPreloader";
+import ProgressiveImage from "@/components/ProgressiveImage";
 
 interface PoloSubmission {
   id: string;
@@ -214,12 +214,11 @@ export default function SubmissionsManagementPage() {
                 onClick={() => setSelectedSubmission(item)}
                 className="relative aspect-[4/3] bg-slate-100 dark:bg-zinc-950 cursor-pointer overflow-hidden border-b border-border-theme"
               >
-                <Image
+                <ProgressiveImage
                   src={item.file_url}
                   alt={item.title || "Design Mockup"}
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  unoptimized
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
                   <span className="text-[11px] text-white font-medium inline-flex items-center gap-1.5">
@@ -328,12 +327,11 @@ export default function SubmissionsManagementPage() {
             {/* Modal Body */}
             <div className="p-4 sm:p-6 space-y-4">
               <div className="relative w-full h-80 sm:h-96 rounded-xl overflow-hidden bg-slate-100 dark:bg-zinc-950 border border-border-theme">
-                <Image
+                <ProgressiveImage
                   src={selectedSubmission.file_url}
                   alt={selectedSubmission.title || "Full resolution design"}
                   fill
                   className="object-contain"
-                  unoptimized
                 />
               </div>
 

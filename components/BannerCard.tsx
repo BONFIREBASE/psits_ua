@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowUpRight, Info, ImageOff } from 'lucide-react'
 import type { BannerRow } from '@/lib/supabase'
 
@@ -61,12 +62,12 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
           </div>
 
           {/* Progressive Blur-Up Image */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={banner.image_url}
             alt={banner.title}
-            decoding="async"
-            loading={isActive ? 'eager' : 'lazy'}
+            fill
+            priority={isActive}
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 1200px, 1400px"
             onLoad={() => setLoadedUrl(banner.image_url)}
             onError={() => setFailedUrl(banner.image_url)}
             className={`w-full h-full object-cover object-top sm:object-center transition-all duration-700 ease-out group-hover:scale-[1.02] ${

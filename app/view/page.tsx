@@ -16,6 +16,7 @@ import {
   AlertCircle,
   LogIn,
   Trophy,
+  ImageOff,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
@@ -78,12 +79,15 @@ function WinnerBanner({
 }) {
   const votePercent = totalVotes > 0 ? Math.round(((winner.vote_count || 0) / totalVotes) * 100) : 0;
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+  const [winnerImgLoaded, setWinnerImgLoaded] = useState(false);
+  const [winnerImgFailed, setWinnerImgFailed] = useState(false);
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
     if (naturalWidth && naturalHeight) {
       setAspectRatio(naturalWidth / naturalHeight);
     }
+    setWinnerImgLoaded(true);
   };
 
   return (
@@ -125,7 +129,6 @@ function WinnerBanner({
                 fill
                 className="object-cover scale-125 blur-3xl opacity-30 dark:opacity-35 brightness-75 saturate-150 transform-gpu"
                 sizes="(max-width: 1024px) 100vw, 1024px"
-                unoptimized
                 aria-hidden
               />
               {/* Theatrical dark vignettes for deep contrast & theme blending */}
@@ -135,16 +138,39 @@ function WinnerBanner({
 
             {/* Foreground image: uncropped, centered, floating with depth shadow */}
             <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-8 z-10">
-              <Image
-                src={winner.file_url}
-                alt={winner.title || "Winning Polo Shirt Design"}
-                fill
-                className="object-contain p-2 sm:p-6 drop-shadow-[0_20px_40px_rgba(0,0,0,0.7)] transition-transform duration-700 ease-out group-hover:scale-[1.015]"
-                sizes="(max-width: 1024px) 100vw, 1024px"
-                unoptimized
-                priority
-                onLoad={handleImageLoad}
-              />
+              {/* Skeleton Preloader Layer */}
+              {!winnerImgFailed && (
+                <div
+                  className={`absolute inset-4 sm:inset-8 pointer-events-none rounded-xl overflow-hidden transition-opacity duration-700 ease-out z-10 ${
+                    winnerImgLoaded ? "opacity-0" : "opacity-100"
+                  }`}
+                >
+                  <div className="absolute inset-0 bg-white/[0.04] animate-pulse rounded-xl" />
+                  <div className="absolute inset-0 overflow-hidden">
+                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent animate-banner-shimmer" />
+                  </div>
+                </div>
+              )}
+
+              {!winnerImgFailed ? (
+                <Image
+                  src={winner.file_url}
+                  alt={winner.title || "Winning Polo Shirt Design"}
+                  fill
+                  className={`object-contain p-2 sm:p-6 drop-shadow-[0_20px_40px_rgba(0,0,0,0.7)] transition-all duration-700 ease-out group-hover:scale-[1.015] ${
+                    winnerImgLoaded ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-[1.02] blur-sm"
+                  }`}
+                  sizes="(max-width: 1024px) 100vw, 1024px"
+                  priority
+                  onLoad={handleImageLoad}
+                  onError={() => setWinnerImgFailed(true)}
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-white/50">
+                  <ImageOff size={32} />
+                  <span className="text-xs font-mono uppercase tracking-wider">Preview Unavailable</span>
+                </div>
+              )}
             </div>
 
             {/* Corner Badge: 1st Place */}
@@ -236,6 +262,9 @@ function Lightbox({
   customEntry?: ApprovedEntry | null;
 }) {
   const entry = customEntry || entries[currentIndex];
+  const [lightboxLoadedUrl, setLightboxLoadedUrl] = useState<string | null>(null);
+  const [lightboxFailed, setLightboxFailed] = useState(false);
+  const isImgLoaded = Boolean(entry?.file_url && lightboxLoadedUrl === entry.file_url);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -282,15 +311,40 @@ function Lightbox({
         className="relative max-w-5xl w-full mx-4 flex flex-col items-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[75vh] rounded-2xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl">
-          <Image
-            src={entry.file_url}
-            alt={entry.title || "Design entry"}
-            fill
-            className="object-contain"
-            sizes="(max-width: 1024px) 95vw, 1024px"
-            unoptimized
-          />
+        <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[75vh] rounded-2xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl flex items-center justify-center">
+          {/* Skeleton Preloader Layer */}
+          {!lightboxFailed && (
+            <div
+              className={`absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out z-10 ${
+                isImgLoaded ? "opacity-0" : "opacity-100"
+              }`}
+            >
+              <div className="absolute inset-0 bg-white/[0.04] animate-pulse" />
+              <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent animate-banner-shimmer" />
+              </div>
+            </div>
+          )}
+
+          {!lightboxFailed ? (
+            <Image
+              src={entry.file_url}
+              alt={entry.title || "Design entry"}
+              fill
+              className={`object-contain transition-all duration-500 ${
+                isImgLoaded ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-[1.02] blur-sm"
+              }`}
+              sizes="(max-width: 1024px) 95vw, 1024px"
+              unoptimized
+              onLoad={() => setLightboxLoadedUrl(entry.file_url)}
+              onError={() => setLightboxFailed(true)}
+            />
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-white/50 p-8">
+              <ImageOff size={36} />
+              <span className="text-xs font-mono uppercase tracking-wider">Preview Unavailable</span>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 text-center max-w-xl">
@@ -428,6 +482,7 @@ function DesignCard({
   isVoting: boolean;
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const hasVotedForThis = userVote === entry.id;
 
@@ -448,22 +503,39 @@ function DesignCard({
         className="relative aspect-[3/4] bg-canvas-theme/80 cursor-pointer overflow-hidden"
         onClick={() => onOpenLightbox(index)}
       >
-        {!imgLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-canvas-theme/80">
-            <Loader2 className="w-6 h-6 text-muted-foreground-theme/40 animate-spin" />
+        {/* Skeleton Preloader Layer */}
+        {!imgFailed && (
+          <div
+            className={`absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out z-10 ${
+              imgLoaded ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            <div className="absolute inset-0 bg-slate-200/80 dark:bg-white/[0.04] animate-pulse" />
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-black/[0.04] dark:via-white/[0.08] to-transparent animate-banner-shimmer" />
+            </div>
           </div>
         )}
-        <Image
-          src={entry.file_url}
-          alt={entry.title || "Polo shirt design"}
-          fill
-          className={`object-cover transition-all duration-500 group-hover:scale-[1.03] ${
-            imgLoaded ? "opacity-100" : "opacity-0"
-          }`}
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          unoptimized
-          onLoad={() => setImgLoaded(true)}
-        />
+
+        {!imgFailed ? (
+          <Image
+            src={entry.file_url}
+            alt={entry.title || "Polo shirt design"}
+            fill
+            priority={index < 3}
+            className={`object-cover transition-all duration-500 group-hover:scale-[1.03] ${
+              imgLoaded ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-[1.03] blur-xs"
+            }`}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px"
+            onLoad={() => setImgLoaded(true)}
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-canvas-theme/90 text-muted-foreground-theme/60">
+            <ImageOff size={28} className="opacity-40" />
+            <span className="text-[11px] font-mono uppercase tracking-wider">Preview Unavailable</span>
+          </div>
+        )}
 
         {/* Zoom overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">

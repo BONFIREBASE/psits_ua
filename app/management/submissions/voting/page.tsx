@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Users,
   TrendingUp,
@@ -17,6 +16,7 @@ import {
   Palette,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import ProgressiveImage from "@/components/ProgressiveImage";
 
 // ============================================================================
 // Types
@@ -802,14 +802,13 @@ export default function VotingAnalyticsPage() {
                 className="bg-surface-theme border border-border-theme rounded-xl overflow-hidden hover:border-gold/30 transition-all"
               >
                 <div className="relative aspect-[3/4] bg-canvas-theme">
-                  <Image
+                  <ProgressiveImage
                     src={design.file_url}
                     alt={design.title || "Design"}
                     fill
                     className="object-cover"
-                    unoptimized
                   />
-                  <div className="absolute top-2 left-2 bg-gold text-[#0D1117] px-3 py-1 rounded-full text-xs font-bold">
+                  <div className="absolute top-2 left-2 bg-gold text-[#0D1117] px-3 py-1 rounded-full text-xs font-bold z-20">
                     #{design.rank}
                   </div>
                 </div>

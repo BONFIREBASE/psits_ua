@@ -28,7 +28,7 @@ export default function ProgressiveImage({
   const hasError = failedSrc === src
 
   return (
-    <div className={`relative w-full h-full overflow-hidden bg-[#070A11] ${containerClassName}`}>
+    <div className={`relative w-full h-full overflow-hidden bg-slate-100 dark:bg-[#070A11] ${containerClassName}`}>
       {/* Skeleton & Shimmer Layer (Smoothly fades out once image finishes loading) */}
       {!hasError && (
         <div
@@ -36,12 +36,13 @@ export default function ProgressiveImage({
             isLoaded ? 'opacity-0' : 'opacity-100'
           }`}
         >
+          <div className="absolute inset-0 bg-slate-200/70 dark:bg-white/[0.04] animate-pulse" />
           {ambientGlow && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-gold/[0.08] dark:bg-gold/[0.05] rounded-full blur-[60px]" />
           )}
           {showShimmer && (
             <div className="absolute inset-0 overflow-hidden">
-              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.06] to-transparent animate-banner-shimmer" />
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-slate-400/20 dark:via-white/[0.08] to-transparent animate-banner-shimmer" />
             </div>
           )}
         </div>

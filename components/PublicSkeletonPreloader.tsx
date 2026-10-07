@@ -278,3 +278,35 @@ export function SubmissionPageSkeleton() {
   )
 }
 
+export function VotingPageSkeleton() {
+  return (
+    <div className="min-h-screen bg-canvas-theme text-foreground-theme pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-12 select-none">
+      {/* Header Skeleton */}
+      <div className="text-center space-y-3 pt-4">
+        <div className="w-36 h-6 rounded-full bg-gold/20 mx-auto animate-pulse" />
+        <div className="w-72 sm:w-96 h-10 sm:h-12 bg-slate-200 dark:bg-white/[0.07] rounded-xl mx-auto animate-pulse" />
+        <div className="w-64 sm:w-80 h-4 bg-slate-200 dark:bg-white/[0.03] rounded mx-auto animate-pulse" />
+      </div>
+
+      {/* Gallery Cards Grid Skeleton */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="bg-surface-theme/90 border border-border-theme rounded-2xl overflow-hidden backdrop-blur-xl shadow-lg"
+          >
+            <div className="relative aspect-[3/4] bg-slate-200/80 dark:bg-white/[0.04] overflow-hidden">
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-black/[0.04] dark:via-white/[0.08] to-transparent animate-banner-shimmer" />
+            </div>
+            <div className="p-5 space-y-2">
+              <div className="h-4 w-3/4 bg-slate-200 dark:bg-white/[0.07] rounded animate-pulse" />
+              <div className="h-3 w-1/2 bg-slate-200 dark:bg-white/[0.04] rounded animate-pulse" />
+              <div className="h-8 w-full bg-slate-200 dark:bg-white/[0.05] rounded-xl animate-pulse mt-4" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+

@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useSyncExternalStore, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
-import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
+import { AnimatePresence } from 'framer-motion'
 import ProgressiveImage from './ProgressiveImage'
 import {
   FolderGit2,
@@ -24,6 +25,8 @@ import {
   Check,
   ChevronRight,
   ChevronLeft,
+  LogOut,
+  Code2,
   type LucideIcon,
 } from 'lucide-react'
 import UseAnimations from 'react-useanimations'
@@ -35,6 +38,10 @@ import {
 import { submitPublicProjectAction } from '@/app/management/projects/actions'
 import TurnstileWidget, { TurnstileWidgetHandle } from '@/components/TurnstileWidget'
 import ScrollReveal from '@/components/ScrollReveal'
+import { supabase } from '@/lib/supabase'
+import type { User } from '@supabase/supabase-js'
+
+const ALLOWED_DOMAIN = '@antiquespride.edu.ph'
 
 const categories: { label: ProjectCategory; icon: LucideIcon }[] = [
   { label: 'All', icon: Layers },
@@ -48,15 +55,15 @@ const SUBMISSION_CATEGORIES: {
   value: ProjectCategory
   label: string
 }[] = [
-  { value: 'Capstone', label: 'Capstone' },
-  { value: 'Campus Utility', label: 'Campus Utility' },
-  { value: 'Open Source', label: 'Open Source' },
-  { value: 'Hackathon', label: 'Hackathon' },
-]
+    { value: 'Capstone', label: 'Capstone' },
+    { value: 'Campus Utility', label: 'Campus Utility' },
+    { value: 'Open Source', label: 'Open Source' },
+    { value: 'Hackathon', label: 'Hackathon' },
+  ]
 
 const QUICK_TAGS = ['Next.js', 'Flutter', 'Supabase', 'Tailwind', 'Python', 'IoT', 'TypeScript', 'PostgreSQL']
 
-const emptySubscribe = () => () => {}
+const emptySubscribe = () => () => { }
 
 export default function ProjectsClient({
   initialProjects,
@@ -66,6 +73,13 @@ export default function ProjectsClient({
   const [projects] = useState<Project[]>(initialProjects)
   const [selectedCategory, setSelectedCategory] = useState<ProjectCategory>('All')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Institutional auth state
+  const [user, setUser] = useState<User | null>(null)
+  const [sessionToken, setSessionToken] = useState<string | null>(null)
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [isSigningIn, setIsSigningIn] = useState(false)
 
   // Submit modal state
   const [showSubmitModal, setShowSubmitModal] = useState(false)
@@ -97,6 +111,130 @@ export default function ProjectsClient({
     if (!current.includes(tag)) {
       const updated = current.length > 0 ? `${current.join(', ')}, ${tag}` : tag
       setFormTags(updated)
+    }
+  }
+
+  // Check and listen to Supabase authentication session
+  useEffect(() => {
+    let isMounted = true
+
+    async function checkSession() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        if (!isMounted) return
+        if (session?.user) {
+          const email = session.user.email?.toLowerCase() || ''
+          if (email.endsWith(ALLOWED_DOMAIN)) {
+            setUser(session.user)
+            setSessionToken(session.access_token)
+            setAuthError(null)
+          } else {
+            await supabase.auth.signOut()
+            setUser(null)
+            setSessionToken(null)
+            setAuthError(
+              `Access restricted: "${email}" is not an @antiquespride.edu.ph account. Please use your official University of Antique Google Workspace email.`
+            )
+          }
+        }
+      } catch (err) {
+        console.error('Projects session check error:', err)
+      } finally {
+        if (isMounted) setIsAuthLoading(false)
+      }
+    }
+
+    checkSession()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return
+      if (session?.user) {
+        const email = session.user.email?.toLowerCase() || ''
+        if (email.endsWith(ALLOWED_DOMAIN)) {
+          setUser(session.user)
+          setSessionToken(session.access_token)
+          setAuthError(null)
+        } else {
+          await supabase.auth.signOut()
+          setUser(null)
+          setSessionToken(null)
+          setAuthError(
+            `Access restricted: "${email}" is not an @antiquespride.edu.ph account. Please sign in using your official university email.`
+          )
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setSessionToken(null)
+      }
+      setIsAuthLoading(false)
+    })
+
+    // Automatically re-open submission modal if redirected from OAuth callback (?submit=1)
+    let redirectTimer: ReturnType<typeof setTimeout> | null = null
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('submit') === '1') {
+        window.history.replaceState({}, '', window.location.pathname)
+        redirectTimer = setTimeout(() => {
+          if (isMounted) {
+            setShowSubmitModal(true)
+          }
+        }, 0)
+      }
+    }
+
+    return () => {
+      isMounted = false
+      if (redirectTimer) clearTimeout(redirectTimer)
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  const handleGoogleSignIn = async () => {
+    setAuthError(null)
+    setIsSigningIn(true)
+    try {
+      const redirectUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/projects?submit=1`
+          : ''
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          queryParams: {
+            hd: 'antiquespride.edu.ph',
+          },
+          redirectTo: redirectUrl,
+        },
+      })
+
+      if (error) {
+        setAuthError(error.message)
+      }
+    } catch (err) {
+      setAuthError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to initialize Google authentication.'
+      )
+    } finally {
+      setIsSigningIn(false)
+    }
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      setSessionToken(null)
+      setAuthError(null)
+    } catch (err) {
+      console.error('Sign out error:', err)
     }
   }
 
@@ -176,6 +314,12 @@ export default function ProjectsClient({
     e.preventDefault()
     setSubmitError(null)
 
+    if (!user || !sessionToken) {
+      setSubmitError(
+        'Institutional authentication required. Please sign in with your @antiquespride.edu.ph Google account.'
+      )
+      return
+    }
     if (!formTitle.trim()) {
       setSubmitError('Please enter the project title.')
       return
@@ -196,6 +340,7 @@ export default function ProjectsClient({
     setSubmitting(true)
     try {
       const formData = new FormData()
+      formData.append('sessionToken', sessionToken)
       formData.append('title', formTitle.trim())
       formData.append('team', formTeam.trim())
       formData.append('category', formCategory)
@@ -241,26 +386,58 @@ export default function ProjectsClient({
   })
 
   return (
-    <div className="pt-32 pb-28 max-w-6xl xl:max-w-7xl 2xl:max-w-[1400px] mx-auto px-6 space-y-12">
+    <div className="pt-28 sm:pt-32 pb-20 sm:pb-28 max-w-6xl xl:max-w-7xl 2xl:max-w-[1400px] mx-auto px-4 sm:px-6 space-y-10 sm:space-y-12">
       {/* Header with Call to Action */}
       <ScrollReveal>
-        <header className="border-b border-border-theme pb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-4 max-w-2xl">
+        <header className="border-b border-border-theme pb-8 sm:pb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-4 max-w-3xl xl:max-w-4xl">
             <p className="font-mono text-xs text-amber-600 dark:text-gold tracking-widest uppercase flex items-center gap-2 font-semibold">
               <span>04 / Student Innovations · Showcase</span>
               <span className="w-1.5 h-1.5 rounded-full bg-gold/60 animate-pulse" />
             </p>
-            <h1 className="font-display font-black text-3xl xs:text-4xl sm:text-5xl md:text-6xl text-foreground-theme tracking-tight uppercase leading-[1.08] break-words">
-              Projects & <span className="text-amber-600 dark:text-gold">Innovations</span>
+            <h1 className="font-display font-black text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-[54px] xl:text-6xl text-foreground-theme tracking-tight uppercase leading-[1.05] break-normal">
+              Projects & <span className="inline-block text-amber-600 dark:text-gold">Innovations</span>
             </h1>
-            <p className="text-muted-foreground-theme text-sm sm:text-base font-normal leading-relaxed break-words">
+            <p className="text-muted-foreground-theme text-sm sm:text-base font-normal leading-relaxed max-w-2xl break-normal">
               Explore capstone systems, open-source utilities, and competition
               builds engineered by Bachelor of Science in Information Technology
               students of the University of Antique.
             </p>
           </div>
 
-          <div className="shrink-0">
+          <div className="shrink-0 w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            {user && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-theme border border-border-theme shadow-xs">
+                {user.user_metadata?.avatar_url ? (
+                  <div className="relative w-6 h-6 rounded-full overflow-hidden shrink-0 border border-gold/40">
+                    <Image
+                      src={user.user_metadata.avatar_url}
+                      alt="Avatar"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-gold/20 text-amber-600 dark:text-gold flex items-center justify-center font-bold text-[10px]">
+                    {(user.user_metadata?.full_name || user.email || 'U')[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground-theme truncate max-w-[130px]">
+                    {user.user_metadata?.full_name || user.email?.split('@')[0]}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  title="Sign out of student account"
+                  className="text-muted-foreground-theme hover:text-foreground-theme p-1 rounded transition-colors cursor-pointer"
+                >
+                  <LogOut size={13} />
+                </button>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -277,8 +454,8 @@ export default function ProjectsClient({
       </ScrollReveal>
 
       {/* Toolbar & Filter Bar */}
-      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-surface-theme border border-border-theme rounded-xl shadow-xs">
+      <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+        <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 bg-surface-theme border border-border-theme rounded-xl shadow-xs overflow-x-auto scrollbar-none max-w-full">
           {categories.map(({ label, icon: Icon }) => {
             const isActive = selectedCategory === label
             return (
@@ -286,11 +463,10 @@ export default function ProjectsClient({
                 key={label}
                 type="button"
                 onClick={() => setSelectedCategory(label)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
-                  isActive
+                className={`flex items-center gap-2 px-3 sm:px-3.5 py-2 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer shrink-0 whitespace-nowrap ${isActive
                     ? 'bg-gold text-[#0D1117] font-bold shadow-[0_0_15px_rgba(245,166,35,0.35)]'
                     : 'text-muted-foreground-theme hover:text-foreground-theme hover:bg-black/5 dark:hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <Icon size={14} className={isActive ? 'text-[#0D1117]' : 'text-amber-600 dark:text-gold'} />
                 <span>{label}</span>
@@ -299,7 +475,7 @@ export default function ProjectsClient({
           })}
         </div>
 
-        <div className="relative w-full md:w-72">
+        <div className="relative w-full lg:w-72 shrink-0">
           <Search
             size={16}
             className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground-theme"
@@ -344,7 +520,7 @@ export default function ProjectsClient({
           </button>
         </div>
       ) : (
-        <div className={`grid grid-cols-1 ${filteredProjects.length === 1 ? 'max-w-2xl' : 'md:grid-cols-2 xl:grid-cols-3'} gap-6`}>
+        <div className={`grid grid-cols-1 ${filteredProjects.length === 1 ? 'max-w-2xl' : 'sm:grid-cols-2 lg:grid-cols-3'} gap-5 sm:gap-6`}>
           {filteredProjects.map((project: Project, index) => (
             <ScrollReveal
               key={project.id}
@@ -352,7 +528,7 @@ export default function ProjectsClient({
               className="h-full"
             >
               <div
-                className="group bg-surface-theme border border-border-theme hover:border-gold/40 rounded-2xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 shadow-xs hover:shadow-[0_0_25px_rgba(245,166,35,0.08)] h-full"
+                className="group bg-surface-theme border border-border-theme hover:border-gold/40 rounded-2xl p-5 sm:p-7 flex flex-col justify-between transition-all duration-300 shadow-xs hover:shadow-[0_0_25px_rgba(245,166,35,0.08)] h-full"
               >
                 <div className="space-y-4">
                   {project.imageUrl && (
@@ -362,7 +538,7 @@ export default function ProjectsClient({
                         alt={project.title}
                         fill
                         className="object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                        sizes="(max-width: 768px) 100vw, 700px"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 420px"
                         ambientGlow
                       />
                     </div>
@@ -378,7 +554,7 @@ export default function ProjectsClient({
                   </div>
 
                   <div>
-                    <h3 className="font-display font-bold text-lg sm:text-xl md:text-2xl text-foreground-theme group-hover:text-amber-600 dark:group-hover:text-gold transition-colors break-words">
+                    <h3 className="font-display font-bold text-base sm:text-lg md:text-xl lg:text-2xl text-foreground-theme group-hover:text-amber-600 dark:group-hover:text-gold transition-colors break-normal">
                       {project.title}
                     </h3>
                     <p className="text-xs text-muted-foreground-theme font-mono mt-1 break-words">
@@ -494,55 +670,58 @@ export default function ProjectsClient({
           <AnimatePresence>
             {showSubmitModal && (
               <div
-                className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm"
+                className="fixed inset-0 z-[200] flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-sm"
                 onClick={() => !submitting && setShowSubmitModal(false)}
               >
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.98, y: 8 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.98, y: 8 }}
-                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                <div
+                  className="bg-white dark:bg-[#0e1422] border border-border-theme rounded-xl sm:rounded-2xl w-full max-w-xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
                   onClick={(e) => e.stopPropagation()}
-                  className="relative w-full max-w-xl rounded-2xl border border-white/10 bg-[#0C1017] text-white shadow-2xl overflow-hidden flex flex-col my-auto text-left"
                 >
-                  {/* Modal Header */}
-                  <div className="flex items-center justify-between px-6 py-4 border-b border-white/8 bg-[#090D14]">
-                    <div>
-                      <h2 className="font-display font-bold text-base sm:text-lg text-white tracking-tight">
-                        Submit Project for Showcase
-                      </h2>
-                      <p className="text-xs text-white/50 mt-0.5">
-                        Share your capstone, utility, or open-source build with the CCIS community.
-                      </p>
+                  {/* Pinned Header */}
+                  <div className="flex items-center justify-between px-4 py-3.5 sm:px-6 sm:py-4 border-b border-border-theme flex-shrink-0 bg-white dark:bg-[#0e1422]">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center text-amber-600 dark:text-gold shrink-0">
+                        <Code2 size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <h2 className="font-display font-bold text-base sm:text-lg text-foreground-theme truncate">
+                          Submit Project for Showcase
+                        </h2>
+                        <p className="text-xs text-muted-foreground-theme truncate">
+                          BSIT capstone & student innovation review
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-[11px] font-mono text-white/40">
-                        {currentStep === 1 ? 'Step 1 of 2' : 'Step 2 of 2'}
-                      </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {user && !submitSuccess && (
+                        <span className="text-[11px] font-mono text-muted-foreground-theme">
+                          {currentStep === 1 ? 'Step 1 of 2' : 'Step 2 of 2'}
+                        </span>
+                      )}
                       <button
                         type="button"
                         disabled={submitting}
                         onClick={() => setShowSubmitModal(false)}
-                        className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40 cursor-pointer"
+                        className="p-1.5 rounded-lg text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
                         aria-label="Close"
                       >
-                        <X size={16} />
+                        <X size={18} />
                       </button>
                     </div>
                   </div>
 
                   {/* Modal Body */}
                   {submitSuccess ? (
-                    <div className="p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-3">
-                      <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-1">
+                    <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center space-y-3">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 dark:text-emerald-400 mb-1">
                         <CheckCircle2 size={24} />
                       </div>
-                      <h3 className="font-display font-bold text-lg text-white">
+                      <h3 className="font-display font-bold text-base sm:text-lg text-foreground-theme">
                         Submission Received
                       </h3>
-                      <p className="text-white/60 text-xs max-w-sm leading-relaxed">
-                        Your project has been submitted for verification. It will appear on the showcase once approved by the PSITS team.
+                      <p className="text-xs text-muted-foreground-theme max-w-sm leading-relaxed">
+                        Your project has been submitted for verification. It will appear on the public showcase once approved by the PSITS team.
                       </p>
                       <button
                         type="button"
@@ -550,37 +729,147 @@ export default function ProjectsClient({
                           setShowSubmitModal(false)
                           resetForm()
                         }}
-                        className="mt-4 px-5 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] font-semibold text-xs transition-colors cursor-pointer"
+                        className="mt-3 px-5 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] font-bold text-xs transition-colors cursor-pointer"
                       >
                         Done
                       </button>
                     </div>
+                  ) : isAuthLoading ? (
+                    <div className="p-12 text-center flex flex-col items-center justify-center space-y-3">
+                      <Loader2 size={24} className="animate-spin text-gold" />
+                      <p className="text-xs font-mono text-muted-foreground-theme">
+                        Checking institutional credentials...
+                      </p>
+                    </div>
+                  ) : !user ? (
+                    <div className="flex flex-col flex-1 overflow-hidden">
+                      <div className="overflow-y-auto flex-1 p-6 sm:p-8 space-y-5 text-center">
+                        <div className="w-10 h-10 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center text-amber-600 dark:text-gold mx-auto">
+                          <Code2 size={20} />
+                        </div>
+
+                        <div className="space-y-1 max-w-sm mx-auto">
+                          <h3 className="font-display font-bold text-base sm:text-lg text-foreground-theme">
+                            Sign In to Submit Project
+                          </h3>
+                          <p className="text-xs text-muted-foreground-theme leading-relaxed">
+                            Sign in with your university account to share your work with the CCIS showcase.
+                          </p>
+                        </div>
+
+                        {authError && (
+                          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/25 text-left flex items-start gap-2.5 text-xs text-rose-600 dark:text-rose-400 leading-relaxed max-w-sm mx-auto">
+                            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                            <span>{authError}</span>
+                          </div>
+                        )}
+
+                        <div className="pt-1 max-w-sm mx-auto">
+                          <button
+                            type="button"
+                            disabled={isSigningIn}
+                            onClick={handleGoogleSignIn}
+                            className="w-full inline-flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border border-border-theme bg-slate-50 dark:bg-white/[0.04] hover:bg-slate-100 dark:hover:bg-white/[0.08] text-xs sm:text-sm font-medium text-foreground-theme transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {isSigningIn ? (
+                              <Loader2 size={16} className="animate-spin text-gold" />
+                            ) : (
+                              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                                <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+                                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+                                <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z" />
+                                <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2-6.4-4.8L1.9 16.9C3.7 20.6 7.5 23.5 12 23.5z" />
+                              </svg>
+                            )}
+                            <span>Continue with Google</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Gating Footer */}
+                      <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-t border-border-theme flex-shrink-0 bg-white dark:bg-[#0e1422] text-center">
+                        <p className="text-[11px] text-muted-foreground-theme leading-relaxed">
+                          By signing in, you agree to our{' '}
+                          <Link
+                            href="/terms"
+                            target="_blank"
+                            className="text-foreground-theme hover:text-amber-600 dark:hover:text-gold underline underline-offset-2 transition-colors font-medium"
+                          >
+                            Terms of Service
+                          </Link>{' '}
+                          and{' '}
+                          <Link
+                            href="/privacy"
+                            target="_blank"
+                            className="text-foreground-theme hover:text-amber-600 dark:hover:text-gold underline underline-offset-2 transition-colors font-medium"
+                          >
+                            Privacy Policy
+                          </Link>
+                          .
+                        </p>
+                      </div>
+                    </div>
                   ) : (
-                    <form onSubmit={handleSubmitProject} className="flex flex-col">
-                      <div className="p-6 space-y-4">
+                    <form onSubmit={handleSubmitProject} className="flex flex-col flex-1 overflow-hidden">
+                      <div className="overflow-y-auto flex-1 p-4 sm:p-6 space-y-4 scrollbar-minimal overscroll-contain">
+                        {/* Submitter Strip */}
+                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-white/[0.03] border border-border-theme">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {user.user_metadata?.avatar_url ? (
+                              <div className="relative w-7 h-7 rounded-full overflow-hidden shrink-0 border border-gold/40">
+                                <Image
+                                  src={user.user_metadata.avatar_url}
+                                  alt="Avatar"
+                                  fill
+                                  className="object-cover"
+                                  unoptimized
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-gold/20 text-amber-600 dark:text-gold flex items-center justify-center font-bold text-xs shrink-0">
+                                {(user.user_metadata?.full_name || user.email || 'U')[0].toUpperCase()}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-semibold text-foreground-theme truncate">
+                                  {user.user_metadata?.full_name || user.email?.split('@')[0]}
+                                </p>
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-emerald-500/15 border border-emerald-500/30 text-[9px] font-mono font-medium text-emerald-600 dark:text-emerald-400">
+                                  <Check size={9} /> Verified
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground-theme font-mono truncate">
+                                {user.email}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleSignOut}
+                            title="Sign out"
+                            className="p-1 rounded-md text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-200/60 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                          >
+                            <LogOut size={13} />
+                          </button>
+                        </div>
+
                         {submitError && (
-                          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
-                            <AlertCircle size={15} className="shrink-0 text-rose-400" />
+                          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
+                            <AlertCircle size={15} className="shrink-0 text-rose-500" />
                             <span>{submitError}</span>
                           </div>
                         )}
 
                         {currentStep === 1 ? (
                           /* STEP 1: Details */
-                          <motion.div
-                            key="step1"
-                            initial={{ opacity: 0, x: -6 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 6 }}
-                            transition={{ duration: 0.15 }}
-                            className="space-y-4"
-                          >
-                            {/* Track / Category Segmented Control */}
-                            <div>
-                              <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5">
+                          <div className="space-y-4">
+                            {/* Category Track */}
+                            <div className="space-y-1.5">
+                              <label className="block font-mono text-[11px] text-slate-600 dark:text-white/60 uppercase tracking-[0.1em] font-semibold">
                                 Category Track
                               </label>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-white/[0.02] border border-white/8 rounded-xl">
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-slate-100 dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-lg">
                                 {SUBMISSION_CATEGORIES.map((cat) => {
                                   const isSelected = formCategory === cat.value
                                   return (
@@ -588,11 +877,10 @@ export default function ProjectsClient({
                                       key={cat.value}
                                       type="button"
                                       onClick={() => setFormCategory(cat.value)}
-                                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all text-center truncate cursor-pointer ${
-                                        isSelected
-                                          ? 'bg-gold text-[#0D1117] font-semibold shadow-sm'
-                                          : 'text-white/60 hover:text-white hover:bg-white/5'
-                                      }`}
+                                      className={`py-1.5 px-2 rounded-md text-xs font-medium transition-colors text-center cursor-pointer ${isSelected
+                                          ? 'bg-gold text-[#0a0e17] font-bold shadow-xs'
+                                          : 'text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-200/60 dark:hover:bg-white/5'
+                                        }`}
                                     >
                                       {cat.label}
                                     </button>
@@ -601,43 +889,43 @@ export default function ProjectsClient({
                               </div>
                             </div>
 
-                            {/* Title */}
-                            <div>
-                              <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5">
-                                Project Title <span className="text-gold">*</span>
+                            {/* Project Title */}
+                            <div className="space-y-1.5">
+                              <label className="block font-mono text-[11px] text-slate-600 dark:text-white/60 uppercase tracking-[0.1em] font-semibold">
+                                Project Title <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                               </label>
                               <input
                                 type="text"
                                 required
-                                placeholder="e.g. KasUbAy Campus Route Finder"
+                                placeholder="e.g. Sugalaw PSITS Photobooth"
                                 value={formTitle}
                                 onChange={(e) => setFormTitle(e.target.value)}
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all"
+                                className="w-full bg-slate-50 dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20 hover:border-black/20 dark:hover:border-white/20"
                               />
                             </div>
 
                             {/* Authors / Team */}
-                            <div>
-                              <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5">
-                                Authors / Team <span className="text-gold">*</span>
+                            <div className="space-y-1.5">
+                              <label className="block font-mono text-[11px] text-slate-600 dark:text-white/60 uppercase tracking-[0.1em] font-semibold">
+                                Development Team / Authors <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                               </label>
                               <input
                                 type="text"
                                 required
-                                placeholder="e.g. BSIT 3-A Capstone Group 2"
+                                placeholder="e.g. BSIT 4-A Capstone Group 3"
                                 value={formTeam}
                                 onChange={(e) => setFormTeam(e.target.value)}
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all"
+                                className="w-full bg-slate-50 dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20 hover:border-black/20 dark:hover:border-white/20"
                               />
                             </div>
 
-                            {/* Pitch / Description */}
-                            <div>
-                              <div className="flex items-center justify-between mb-1.5">
-                                <label className="text-[11px] font-mono uppercase tracking-wider text-white/60">
-                                  Pitch / Description <span className="text-gold">*</span>
+                            {/* Description */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <label className="block font-mono text-[11px] text-slate-600 dark:text-white/60 uppercase tracking-[0.1em] font-semibold">
+                                  Project Description <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                                 </label>
-                                <span className="text-[10px] font-mono text-white/35">
+                                <span className="text-[10px] font-mono text-muted-foreground-theme">
                                   {formDescription.length}/500
                                 </span>
                               </div>
@@ -645,43 +933,36 @@ export default function ProjectsClient({
                                 rows={3}
                                 maxLength={500}
                                 required
-                                placeholder="Briefly describe what your system does and its campus impact..."
+                                placeholder="Explain what the project does and the campus problem it addresses..."
                                 value={formDescription}
                                 onChange={(e) => setFormDescription(e.target.value)}
-                                className="w-full p-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all resize-none leading-relaxed"
+                                className="w-full bg-slate-50 dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20 hover:border-black/20 dark:hover:border-white/20 resize-none min-h-[90px]"
                               />
                             </div>
-                          </motion.div>
+                          </div>
                         ) : (
                           /* STEP 2: Links & Media */
-                          <motion.div
-                            key="step2"
-                            initial={{ opacity: 0, x: 6 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -6 }}
-                            transition={{ duration: 0.15 }}
-                            className="space-y-4"
-                          >
+                          <div className="space-y-4">
                             {/* Tech Stack */}
-                            <div>
-                              <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5">
-                                Tech Stack
+                            <div className="space-y-1.5">
+                              <label className="block font-mono text-[11px] text-slate-600 dark:text-white/60 uppercase tracking-[0.1em] font-semibold">
+                                Tech Stack / Tags
                               </label>
                               <input
                                 type="text"
                                 placeholder="e.g. Next.js, Flutter, Tailwind, Supabase"
                                 value={formTags}
                                 onChange={(e) => setFormTags(e.target.value)}
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all"
+                                className="w-full bg-slate-50 dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20 hover:border-black/20 dark:hover:border-white/20"
                               />
-                              <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                <span className="text-[10px] font-mono text-white/35">Quick add:</span>
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                <span className="text-[10px] font-mono text-muted-foreground-theme">Quick add:</span>
                                 {QUICK_TAGS.map((t) => (
                                   <button
                                     key={t}
                                     type="button"
                                     onClick={() => addTag(t)}
-                                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.03] hover:bg-gold/15 border border-white/8 hover:border-gold/40 text-white/60 hover:text-gold transition-colors cursor-pointer"
+                                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-white/[0.04] border border-border-theme hover:border-gold/40 text-muted-foreground-theme hover:text-foreground-theme transition-colors cursor-pointer"
                                   >
                                     +{t}
                                   </button>
@@ -691,39 +972,39 @@ export default function ProjectsClient({
 
                             {/* Demo URL & GitHub */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5 truncate">
-                                  Live Demo / Video URL
+                              <div className="space-y-1.5">
+                                <label className="block font-mono text-[11px] text-slate-600 dark:text-white/60 uppercase tracking-[0.1em] font-semibold truncate">
+                                  Live Demo or Video URL
                                 </label>
                                 <input
                                   type="url"
                                   placeholder="https://..."
                                   value={formDemoUrl}
                                   onChange={(e) => setFormDemoUrl(e.target.value)}
-                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all"
+                                  className="w-full bg-slate-50 dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20 hover:border-black/20 dark:hover:border-white/20"
                                 />
                               </div>
-                              <div>
-                                <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5 truncate">
-                                  GitHub Repository
+                              <div className="space-y-1.5">
+                                <label className="block font-mono text-[11px] text-slate-600 dark:text-white/60 uppercase tracking-[0.1em] font-semibold truncate">
+                                  GitHub / Source Code URL
                                 </label>
                                 <input
                                   type="url"
                                   placeholder="https://github.com/..."
                                   value={formGithubUrl}
                                   onChange={(e) => setFormGithubUrl(e.target.value)}
-                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder:text-white/30 text-xs focus:outline-none focus:border-gold/60 focus:bg-white/[0.05] transition-all"
+                                  className="w-full bg-slate-50 dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/25 outline-none transition-all duration-200 focus:border-gold/50 focus:ring-1 focus:ring-gold/20 hover:border-black/20 dark:hover:border-white/20"
                                 />
                               </div>
                             </div>
 
-                            {/* Banner / Screenshot upload */}
-                            <div>
-                              <label className="block text-[11px] font-mono uppercase tracking-wider text-white/60 mb-1.5">
-                                Banner / Screenshot <span className="text-white/35 font-normal">(optional)</span>
+                            {/* Cover / Screenshot */}
+                            <div className="space-y-1.5">
+                              <label className="block font-mono text-[11px] text-slate-600 dark:text-white/60 uppercase tracking-[0.1em] font-semibold">
+                                Project Cover Image / Screenshot <span className="text-muted-foreground-theme font-normal font-sans">(optional)</span>
                               </label>
                               {thumbnailPreview ? (
-                                <div className="relative w-full h-24 rounded-xl overflow-hidden border border-white/15 bg-black/40 group">
+                                <div className="relative w-full h-24 rounded-lg overflow-hidden border border-border-theme bg-black/40 group">
                                   <Image
                                     src={thumbnailPreview}
                                     alt="Preview"
@@ -748,11 +1029,11 @@ export default function ProjectsClient({
                                   </div>
                                 </div>
                               ) : (
-                                <label className="flex items-center gap-3 p-3.5 border border-dashed border-white/15 hover:border-white/30 rounded-xl cursor-pointer bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
-                                  <UploadCloud size={18} className="text-white/40 shrink-0" />
-                                  <div className="text-xs text-white/70">
-                                    <span>Upload screenshot or banner</span>
-                                    <span className="text-[10px] text-white/35 font-mono block mt-0.5">
+                                <label className="flex items-center gap-3 p-3.5 border border-dashed border-border-theme hover:border-gold/50 rounded-lg cursor-pointer bg-slate-50/70 hover:bg-slate-100/70 dark:bg-white/[0.02] dark:hover:bg-white/[0.04] transition-colors">
+                                  <UploadCloud size={18} className="text-muted-foreground-theme shrink-0" />
+                                  <div className="text-xs text-foreground-theme">
+                                    <span className="font-medium">Upload screenshot or cover</span>
+                                    <span className="text-[10px] text-muted-foreground-theme font-mono block mt-0.5">
                                       PNG, JPG, WebP up to 5MB (16:9 ratio recommended)
                                     </span>
                                   </div>
@@ -765,26 +1046,26 @@ export default function ProjectsClient({
                                 </label>
                               )}
                             </div>
-                          </motion.div>
+                          </div>
                         )}
                       </div>
 
-                      {/* Footer */}
-                      <div className="px-6 py-3.5 border-t border-white/8 bg-[#090D14] flex items-center justify-between gap-3">
+                      {/* Pinned Footer */}
+                      <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-3.5 border-t border-border-theme flex-shrink-0 bg-white dark:bg-[#0e1422]">
                         {currentStep === 1 ? (
                           <>
                             <button
                               type="button"
                               disabled={submitting}
                               onClick={() => setShowSubmitModal(false)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-mono text-white/50 hover:text-white transition-colors cursor-pointer"
+                              className="px-4 py-2 rounded-lg border border-border-theme text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] text-xs font-medium transition-colors cursor-pointer"
                             >
                               Cancel
                             </button>
                             <button
                               type="button"
                               onClick={handleNextStep}
-                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] font-semibold text-xs transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] text-xs font-bold transition-colors shadow-sm cursor-pointer"
                             >
                               <span>Continue</span>
                               <ChevronRight size={13} />
@@ -796,7 +1077,7 @@ export default function ProjectsClient({
                               type="button"
                               disabled={submitting}
                               onClick={() => setCurrentStep(1)}
-                              className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-lg text-xs font-mono text-white/60 hover:text-white transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1 px-3.5 py-2 rounded-lg border border-border-theme text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-100 dark:hover:bg-white/[0.04] text-xs font-medium transition-colors cursor-pointer"
                             >
                               <ChevronLeft size={13} />
                               <span>Back</span>
@@ -821,7 +1102,7 @@ export default function ProjectsClient({
                                 <button
                                   type="submit"
                                   disabled={submitting}
-                                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] font-semibold text-xs transition-colors disabled:opacity-50 cursor-pointer"
+                                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0a0e17] text-xs font-bold transition-colors shadow-sm cursor-pointer disabled:opacity-50"
                                 >
                                   {submitting ? (
                                     <>
@@ -842,7 +1123,7 @@ export default function ProjectsClient({
                       </div>
                     </form>
                   )}
-                </motion.div>
+                </div>
               </div>
             )}
           </AnimatePresence>,
