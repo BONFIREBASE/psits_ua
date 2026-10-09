@@ -15,7 +15,7 @@ const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
 export const isUpstashConfigured = Boolean(redisUrl && redisToken)
 
 // 2. Initialize Redis client conditionally
-let redis: Redis | null = null
+export let redis: Redis | null = null
 let authRateLimiter: Ratelimit | null = null
 let cronRateLimiter: Ratelimit | null = null
 let voteRateLimiter: Ratelimit | null = null

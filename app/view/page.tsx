@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useSyncExternalStore } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -428,9 +429,28 @@ function Lightbox({
 // Countdown Pill
 // ────────────────────────────────────────────────────────────────────────────
 
+function AnimatedDigitPair({ value }: { value: string }) {
+  return (
+    <span className="relative inline-flex h-4.5 w-[18px] items-center justify-center overflow-hidden">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={value}
+          initial={{ y: -8, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 8, opacity: 0 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="text-sm font-semibold text-foreground-theme tabular-nums font-display leading-none select-none inline-block text-center"
+        >
+          {value}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
 const emptySubscribe = () => () => {};
 
-function CountdownPill() {
+function CountdownPill(): React.JSX.Element | null {
   const isClient = useSyncExternalStore(emptySubscribe, () => true, () => false);
   const [, setTick] = useState<number>(0);
 
@@ -441,14 +461,27 @@ function CountdownPill() {
     return () => clearInterval(timer);
   }, []);
 
-  // Show identical placeholder during server render and initial hydration
+  // Show identical pill container with skeleton preloader for digits during SSR & hydration
   if (!isClient) {
     return (
       <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-xl bg-surface-theme/90 border border-border-theme backdrop-blur-xl shadow-lg">
-        <Clock className="w-4 h-4 text-gold shrink-0" />
+        <Clock className="w-4 h-4 text-gold shrink-0 animate-pulse" />
         <span className="text-xs text-muted-foreground-theme font-mono">
-          Loading...
+          Voting opens in
         </span>
+        <div className="flex items-center gap-1">
+          {["d", "h", "m", "s"].map((label) => (
+            <span
+              key={label}
+              className="inline-flex items-center gap-0.5"
+            >
+              <span className="inline-block w-[18px] h-4.5 rounded bg-muted-foreground-theme/20 dark:bg-white/10 animate-pulse" />
+              <span className="text-[10px] text-muted-foreground-theme/60 uppercase font-mono">
+                {label}
+              </span>
+            </span>
+          ))}
+        </div>
       </div>
     );
   }
@@ -479,11 +512,9 @@ function CountdownPill() {
         ].map((unit) => (
           <span
             key={unit.label}
-            className="inline-flex items-baseline gap-0.5"
+            className="inline-flex items-center gap-0.5"
           >
-            <span className="text-sm font-semibold text-foreground-theme tabular-nums font-display">
-              {String(unit.value).padStart(2, "0")}
-            </span>
+            <AnimatedDigitPair value={String(unit.value).padStart(2, "0")} />
             <span className="text-[10px] text-muted-foreground-theme/60 uppercase font-mono">
               {unit.label}
             </span>

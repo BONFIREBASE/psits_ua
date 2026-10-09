@@ -68,6 +68,7 @@ export default function ProgressiveImage({
           src={activeSrc}
           alt={alt}
           fill={fill}
+          unoptimized={fallbackAttempted || (typeof activeSrc === 'string' && activeSrc.startsWith('/api/')) || rest.unoptimized}
           onLoad={() => setLoadedSrc(activeSrc)}
           onError={handleError}
           className={`transition-all duration-700 ease-out ${

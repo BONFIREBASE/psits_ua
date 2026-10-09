@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { Quote } from 'lucide-react'
@@ -29,6 +29,11 @@ export default function HomePage() {
     totalStudents: 0,
     totalSections: 0,
   })
+  const [viewsData, setViewsData] = useState<{ totalViews: number; activeNow: number }>({
+    totalViews: 2194,
+    activeNow: 1,
+  })
+  const [viewsLoading, setViewsLoading] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -66,8 +71,60 @@ export default function HomePage() {
         // Keep fallback
       }
     }
+
     load()
 
+    // 1. Initial page view fetch & atomic counter update
+    let sid = typeof window !== 'undefined' ? sessionStorage.getItem('psits_sid') : null
+    if (!sid && typeof window !== 'undefined') {
+      sid = 'sid_' + Math.random().toString(36).substring(2, 10)
+      sessionStorage.setItem('psits_sid', sid)
+    }
+
+    fetch(`/api/analytics/views?sid=${encodeURIComponent(sid || 'guest')}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setViewsData((prev) => ({
+            ...prev,
+            totalViews: data.totalViews || prev.totalViews,
+          }))
+        }
+      })
+      .catch(() => {})
+      .finally(() => setViewsLoading(false))
+
+    // 2. Real-time active viewers tracking via Supabase Presence (WebSockets)
+    const presenceChannel = supabase.channel('online-visitors', {
+      config: {
+        presence: {
+          key: sid || 'guest',
+        },
+      },
+    })
+
+    const updatePresenceCount = () => {
+      const state = presenceChannel.presenceState()
+      const uniqueCount = Object.keys(state).length
+      setViewsData((prev) => ({
+        ...prev,
+        activeNow: Math.max(1, uniqueCount),
+      }))
+    }
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, updatePresenceCount)
+      .on('presence', { event: 'join' }, updatePresenceCount)
+      .on('presence', { event: 'leave' }, updatePresenceCount)
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            online_at: new Date().toISOString(),
+          })
+        }
+      })
+
+    // 3. Database change listener for posts, banners, and leadership
     const channel = supabase
       .channel('homepage-realtime')
       .on(
@@ -104,6 +161,7 @@ export default function HomePage() {
 
     return () => {
       supabase.removeChannel(channel)
+      supabase.removeChannel(presenceChannel)
     }
   }, [])
 
@@ -194,7 +252,7 @@ export default function HomePage() {
           <div className="bg-surface-theme/75 backdrop-blur-md border border-border-theme rounded-2xl p-4 sm:p-6 md:p-8 shadow-xs">
             <div className="grid grid-cols-3 divide-x divide-border-theme items-center">
               <div className="text-center px-1 sm:px-4 md:px-8">
-                <p className="font-display font-black text-xl sm:text-2xl md:text-3xl lg:text-4xl text-foreground-theme tracking-tight mb-1 whitespace-nowrap">
+                <p className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-foreground-theme tracking-tight mb-1 whitespace-nowrap pt-1">
                   600+
                 </p>
                 <p className="text-[8.5px] xs:text-[9.5px] sm:text-[11px] font-mono uppercase tracking-tight xs:tracking-normal sm:tracking-[0.2em] text-amber-600 dark:text-gold/80 font-bold">
@@ -203,16 +261,34 @@ export default function HomePage() {
               </div>
 
               <div className="text-center px-1 sm:px-4 md:px-8">
-                <p className="font-display font-black text-xl sm:text-2xl md:text-3xl lg:text-4xl text-foreground-theme tracking-tight mb-1 whitespace-nowrap">
-                  5+
+                <p
+                  className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-foreground-theme tracking-tight mb-1 whitespace-nowrap inline-flex items-center justify-center pt-1"
+                  title={`${viewsData.totalViews.toLocaleString()} total views · ${viewsData.activeNow} active right now`}
+                >
+                  {viewsLoading ? (
+                    <span className="inline-block w-20 sm:w-28 h-6 sm:h-8 rounded bg-muted-foreground-theme/20 dark:bg-white/10 animate-pulse my-auto" />
+                  ) : (
+                    <>
+                      <AnimatedCounter value={viewsData.totalViews} />
+                      <span className="relative inline-flex items-center justify-center ml-0.5">
+                        <span>+</span>
+                        <span
+                          className="absolute -top-2 sm:-top-2.5 left-1/2 -translate-x-1/2 text-[8px] sm:text-[10px] font-mono font-bold text-emerald-500 dark:text-emerald-400 select-none leading-none"
+                          title={`${viewsData.activeNow} active visitor${viewsData.activeNow > 1 ? 's' : ''} right now`}
+                        >
+                          {viewsData.activeNow}
+                        </span>
+                      </span>
+                    </>
+                  )}
                 </p>
                 <p className="text-[8.5px] xs:text-[9.5px] sm:text-[11px] font-mono uppercase tracking-tight xs:tracking-normal sm:tracking-[0.2em] text-amber-600 dark:text-gold/80 font-bold">
-                  Events per Year
+                  Page Views
                 </p>
               </div>
 
               <div className="text-center px-1 sm:px-4 md:px-8">
-                <p className="font-display font-black text-xl sm:text-2xl md:text-3xl lg:text-4xl text-foreground-theme tracking-tight mb-1 whitespace-nowrap">
+                <p className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-foreground-theme tracking-tight mb-1 whitespace-nowrap pt-1">
                   1993
                 </p>
                 <p className="text-[8.5px] xs:text-[9.5px] sm:text-[11px] font-mono uppercase tracking-tight xs:tracking-normal sm:tracking-[0.2em] text-amber-600 dark:text-gold/80 font-bold">
@@ -302,4 +378,45 @@ export default function HomePage() {
       <BannerStack banners={activeBanners} isLoading={bannersLoading} />
     </>
   )
+}
+
+function AnimatedCounter({ value }: { value: number }) {
+  const baseHundred = Math.max(0, Math.floor(value / 100) * 100)
+  const [displayValue, setDisplayValue] = useState<number>(baseHundred)
+  const prevValueRef = useRef<number>(baseHundred)
+  const isFirstRender = useRef(true)
+
+  useEffect(() => {
+    if (!value) return
+
+    const from = isFirstRender.current ? baseHundred : prevValueRef.current
+    const duration = isFirstRender.current ? 800 : 350
+    isFirstRender.current = false
+    prevValueRef.current = value
+
+    const startTime = performance.now()
+    let frameId: number
+
+    const tick = (currentTime: number) => {
+      const elapsed = currentTime - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      // Ease out cubic: fast rise with smooth deceleration
+      const ease = 1 - Math.pow(1 - progress, 3)
+      const current = Math.round(from + (value - from) * ease)
+      setDisplayValue(current)
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(tick)
+      }
+    }
+
+    frameId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frameId)
+  }, [value, baseHundred])
+
+  if (displayValue >= 1000000) {
+    return <span>{(displayValue / 1000000).toFixed(1)}M</span>
+  }
+
+  return <span>{displayValue.toLocaleString()}</span>
 }
