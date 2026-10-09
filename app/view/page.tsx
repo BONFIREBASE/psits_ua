@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -81,6 +81,19 @@ function WinnerBanner({
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
   const [winnerImgLoaded, setWinnerImgLoaded] = useState(false);
   const [winnerImgFailed, setWinnerImgFailed] = useState(false);
+  const [winnerFallbackAttempted, setWinnerFallbackAttempted] = useState(false);
+
+  const winnerImgSrc = winnerFallbackAttempted
+    ? `/api/submissions/polo/image?url=${encodeURIComponent(winner.file_url)}`
+    : winner.file_url;
+
+  const handleWinnerError = () => {
+    if (!winnerFallbackAttempted && winner.file_url) {
+      setWinnerFallbackAttempted(true);
+    } else {
+      setWinnerImgFailed(true);
+    }
+  };
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
@@ -124,7 +137,8 @@ function WinnerBanner({
             {/* Ambient dynamic backdrop matching the winner photo */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
               <Image
-                src={winner.file_url}
+                key={`winner-glow-${winnerImgSrc}`}
+                src={winnerImgSrc}
                 alt=""
                 fill
                 className="object-cover scale-125 blur-3xl opacity-30 dark:opacity-35 brightness-75 saturate-150 transform-gpu"
@@ -154,7 +168,8 @@ function WinnerBanner({
 
               {!winnerImgFailed ? (
                 <Image
-                  src={winner.file_url}
+                  key={`winner-fg-${winnerImgSrc}`}
+                  src={winnerImgSrc}
                   alt={winner.title || "Winning Polo Shirt Design"}
                   fill
                   className={`object-contain p-2 sm:p-6 drop-shadow-[0_20px_40px_rgba(0,0,0,0.7)] transition-all duration-700 ease-out group-hover:scale-[1.015] ${
@@ -163,7 +178,7 @@ function WinnerBanner({
                   sizes="(max-width: 1024px) 100vw, 1024px"
                   priority
                   onLoad={handleImageLoad}
-                  onError={() => setWinnerImgFailed(true)}
+                  onError={handleWinnerError}
                 />
               ) : (
                 <div className="flex flex-col items-center gap-2 text-white/50">
@@ -246,6 +261,61 @@ function WinnerBanner({
 // Lightbox Component
 // ────────────────────────────────────────────────────────────────────────────
 
+function LightboxImageViewer({ entry }: { entry: ApprovedEntry }) {
+  const [fallbackAttempted, setFallbackAttempted] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
+
+  const currentSrc = fallbackAttempted
+    ? `/api/submissions/polo/image?url=${encodeURIComponent(entry.file_url)}`
+    : entry.file_url;
+
+  const handleImageError = () => {
+    if (!fallbackAttempted && entry.file_url) {
+      setFallbackAttempted(true);
+    } else {
+      setImgFailed(true);
+    }
+  };
+
+  return (
+    <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[75vh] rounded-2xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl flex items-center justify-center">
+      {/* Skeleton Preloader Layer */}
+      {!imgFailed && (
+        <div
+          className={`absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out z-10 ${
+            imgLoaded ? "opacity-0" : "opacity-100"
+          }`}
+        >
+          <div className="absolute inset-0 bg-white/[0.04] animate-pulse" />
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent animate-banner-shimmer" />
+          </div>
+        </div>
+      )}
+
+      {!imgFailed ? (
+        <Image
+          src={currentSrc}
+          alt={entry.title || "Design entry"}
+          fill
+          className={`object-contain transition-all duration-500 ${
+            imgLoaded ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-[1.02] blur-sm"
+          }`}
+          sizes="(max-width: 1024px) 95vw, 1024px"
+          onLoad={() => setImgLoaded(true)}
+          onError={handleImageError}
+        />
+      ) : (
+        <div className="flex flex-col items-center gap-2 text-white/50 p-8">
+          <ImageOff size={36} />
+          <span className="text-xs font-mono uppercase tracking-wider">Preview Unavailable</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Lightbox({
   entries,
   currentIndex,
@@ -262,9 +332,6 @@ function Lightbox({
   customEntry?: ApprovedEntry | null;
 }) {
   const entry = customEntry || entries[currentIndex];
-  const [lightboxLoadedUrl, setLightboxLoadedUrl] = useState<string | null>(null);
-  const [lightboxFailed, setLightboxFailed] = useState(false);
-  const isImgLoaded = Boolean(entry?.file_url && lightboxLoadedUrl === entry.file_url);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -311,41 +378,7 @@ function Lightbox({
         className="relative max-w-5xl w-full mx-4 flex flex-col items-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[75vh] rounded-2xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl flex items-center justify-center">
-          {/* Skeleton Preloader Layer */}
-          {!lightboxFailed && (
-            <div
-              className={`absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out z-10 ${
-                isImgLoaded ? "opacity-0" : "opacity-100"
-              }`}
-            >
-              <div className="absolute inset-0 bg-white/[0.04] animate-pulse" />
-              <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent animate-banner-shimmer" />
-              </div>
-            </div>
-          )}
-
-          {!lightboxFailed ? (
-            <Image
-              src={entry.file_url}
-              alt={entry.title || "Design entry"}
-              fill
-              className={`object-contain transition-all duration-500 ${
-                isImgLoaded ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-[1.02] blur-sm"
-              }`}
-              sizes="(max-width: 1024px) 95vw, 1024px"
-              unoptimized
-              onLoad={() => setLightboxLoadedUrl(entry.file_url)}
-              onError={() => setLightboxFailed(true)}
-            />
-          ) : (
-            <div className="flex flex-col items-center gap-2 text-white/50 p-8">
-              <ImageOff size={36} />
-              <span className="text-xs font-mono uppercase tracking-wider">Preview Unavailable</span>
-            </div>
-          )}
-        </div>
+        <LightboxImageViewer key={entry.id || entry.file_url} entry={entry} />
 
         <div className="mt-4 text-center max-w-xl">
           {entry.title && (
@@ -395,20 +428,21 @@ function Lightbox({
 // Countdown Pill
 // ────────────────────────────────────────────────────────────────────────────
 
+const emptySubscribe = () => () => {};
+
 function CountdownPill() {
-  const [remaining, setRemaining] = useState<ReturnType<typeof getTimeRemaining> | undefined>(
-    () => (typeof window !== "undefined" ? getTimeRemaining() : undefined)
-  );
+  const isClient = useSyncExternalStore(emptySubscribe, () => true, () => false);
+  const [, setTick] = useState<number>(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setRemaining(getTimeRemaining());
+      setTick((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Show placeholder during initial server render and hydration
-  if (remaining === undefined) {
+  // Show identical placeholder during server render and initial hydration
+  if (!isClient) {
     return (
       <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-xl bg-surface-theme/90 border border-border-theme backdrop-blur-xl shadow-lg">
         <Clock className="w-4 h-4 text-gold shrink-0" />
@@ -418,6 +452,8 @@ function CountdownPill() {
       </div>
     );
   }
+
+  const remaining = getTimeRemaining();
 
   if (!remaining) {
     return (
@@ -483,8 +519,21 @@ function DesignCard({
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
+  const [fallbackAttempted, setFallbackAttempted] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const hasVotedForThis = userVote === entry.id;
+
+  const currentSrc = fallbackAttempted
+    ? `/api/submissions/polo/image?url=${encodeURIComponent(entry.file_url)}`
+    : entry.file_url;
+
+  const handleImgError = () => {
+    if (!fallbackAttempted && entry.file_url) {
+      setFallbackAttempted(true);
+    } else {
+      setImgFailed(true);
+    }
+  };
 
   const handleVoteClick = () => {
     if (hasVotedForThis) return;
@@ -519,7 +568,8 @@ function DesignCard({
 
         {!imgFailed ? (
           <Image
-            src={entry.file_url}
+            key={`card-${currentSrc}`}
+            src={currentSrc}
             alt={entry.title || "Polo shirt design"}
             fill
             priority={index < 3}
@@ -528,7 +578,7 @@ function DesignCard({
             }`}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px"
             onLoad={() => setImgLoaded(true)}
-            onError={() => setImgFailed(true)}
+            onError={handleImgError}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-canvas-theme/90 text-muted-foreground-theme/60">

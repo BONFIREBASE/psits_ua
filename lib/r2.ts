@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
+  GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -136,4 +137,17 @@ export async function listR2Objects(prefix = "", maxKeys = 50) {
     })),
     isTruncated: response.IsTruncated,
   };
+}
+
+/**
+ * Retrieve an object directly from Cloudflare R2 bucket.
+ */
+export async function getR2Object(key: string) {
+  const cleanKey = key.replace(/^\//, "");
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: cleanKey,
+  });
+
+  return await r2Client.send(command);
 }
