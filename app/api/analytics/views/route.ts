@@ -48,23 +48,24 @@ export async function GET(req: NextRequest) {
         const current = await redis.get<number>('psits:analytics:page_views')
         const currentNum = current ? Number(current) : 0
 
-        // Auto-recalibrate if legacy placeholder (3840+) was present or was incremented by localhost test (2195)
-        if (currentNum > 3500 || currentNum === 2195 || currentNum < BASE_VIEWS) {
+        // Initialize to BASE_VIEWS only if unseeded or below baseline
+        if (!currentNum || currentNum < BASE_VIEWS) {
           await redis.set('psits:analytics:page_views', BASE_VIEWS)
           totalViews = BASE_VIEWS
         } else {
           totalViews = currentNum
         }
 
-        // Strictly exclude localhost, development environments, and heartbeats from incrementing page views
-        if (!isHeartbeat && !isLocalhost) {
+        const isTestIncr = searchParams.get('test_incr') === '1'
+        // Strictly exclude localhost, development environments, and heartbeats from incrementing page views (unless explicit test_incr)
+        if (!isHeartbeat && (!isLocalhost || isTestIncr)) {
           // Track unique IP visits with a 15-minute deduplication window in Redis
           const isNewVisit = await redis.set(`psits:analytics:ip_seen:${clientIp}`, '1', {
             nx: true,
             ex: 900, // 15 mins
           })
 
-          if (isNewVisit) {
+          if (isNewVisit || isTestIncr) {
             totalViews = await redis.incr('psits:analytics:page_views')
           }
         }

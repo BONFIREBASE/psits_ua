@@ -8,6 +8,8 @@ import SectionHeader from '@/components/SectionHeader'
 import DispatchCarousel from '@/components/DispatchCarousel'
 import BannerStack from '@/components/BannerStack'
 import ScrollReveal from '@/components/ScrollReveal'
+import KasubayPatrol from '@/components/KasubayPatrol'
+import KasubayHeroNest from '@/components/KasubayHeroNest'
 import { socialDispatches } from '@/data/announcements'
 import { dean } from '@/data/officers'
 import {
@@ -34,6 +36,16 @@ export default function HomePage() {
     activeNow: 1,
   })
   const [viewsLoading, setViewsLoading] = useState(false)
+  const [kasubayStage, setKasubayStage] = useState<'hero' | 'leaping' | 'patrol'>('hero')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.scrollY > 50) {
+      const id = requestAnimationFrame(() => {
+        setKasubayStage('patrol')
+      })
+      return () => cancelAnimationFrame(id)
+    }
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -91,7 +103,7 @@ export default function HomePage() {
           }))
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setViewsLoading(false))
 
     // 2. Real-time active viewers tracking via Supabase Presence (WebSockets)
@@ -223,16 +235,29 @@ export default function HomePage() {
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col items-center"
           >
-            <div className="inline-flex items-center justify-center h-9 px-5 rounded-full border border-black/10 dark:border-white/15 bg-white/70 dark:bg-white/[0.06] backdrop-blur-md mb-6 shadow-xs">
+            <div className="inline-flex items-center justify-center h-9 px-5 rounded-full border border-black/10 dark:border-white/15 bg-white/70 dark:bg-white/[0.06] backdrop-blur-md mb-9 xs:mb-10 sm:mb-8 shadow-xs">
               <span className="text-slate-800 dark:text-white/90 text-xs sm:text-sm font-medium tracking-wide">
                 &quot;Transforming Lives, Building Communities&quot;
               </span>
             </div>
 
-            <h1 className="font-display font-black text-5xl xs:text-6xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight leading-none mb-6 select-none break-words">
-              <span className="text-slate-950 dark:text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">PSITS </span>
-              <span className="text-[#F5A623] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">U</span>
-              <span className="text-[#E63946] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">A</span>
+            <h1 className="font-display font-black text-4xl xs:text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight leading-none mb-6 select-none">
+              <span className="text-slate-950 dark:text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                PSITS{' '}
+              </span>
+              <span className="inline-flex items-baseline whitespace-nowrap">
+                <span className="relative inline-block text-[#F5A623] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                  U
+                  <KasubayHeroNest
+                    stage={kasubayStage}
+                    onStartLeap={() => setKasubayStage('leaping')}
+                    onLeapComplete={() => setKasubayStage('patrol')}
+                  />
+                </span>
+                <span className="text-[#E63946] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                  A
+                </span>
+              </span>
             </h1>
 
             <p className="text-slate-800 dark:text-white/90 text-sm sm:text-base md:text-lg lg:text-xl mb-4 font-normal tracking-wide max-w-3xl drop-shadow-[0_1px_4px_rgba(255,255,255,0.8)] dark:drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] break-words">
@@ -247,13 +272,14 @@ export default function HomePage() {
       </section>
 
       {/* Stats Bar */}
-      <section className="relative max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-8 lg:py-12">
+      <section className="relative max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 pt-24 sm:pt-14 pb-8 sm:pb-12 lg:py-12">
         <ScrollReveal>
-          <div className="bg-surface-theme/75 backdrop-blur-md border border-border-theme rounded-2xl p-4 sm:p-6 md:p-8 shadow-xs">
+          <div className="relative bg-surface-theme/75 backdrop-blur-md border border-border-theme rounded-2xl p-4 sm:p-6 md:p-8 shadow-xs">
+            <KasubayPatrol isReady={kasubayStage === 'patrol'} />
             <div className="grid grid-cols-3 divide-x divide-border-theme items-center">
               <div className="text-center px-1 sm:px-4 md:px-8">
                 <p className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-foreground-theme tracking-tight mb-1 whitespace-nowrap pt-1">
-                  600+
+                  {studentStats.totalStudents > 0 ? `${studentStats.totalStudents}+` : '600+'}
                 </p>
                 <p className="text-[8.5px] xs:text-[9.5px] sm:text-[11px] font-mono uppercase tracking-tight xs:tracking-normal sm:tracking-[0.2em] text-amber-600 dark:text-gold/80 font-bold">
                   Active Members
@@ -270,14 +296,14 @@ export default function HomePage() {
                   ) : (
                     <>
                       <AnimatedCounter value={viewsData.totalViews} />
-                      <span className="relative inline-flex items-center justify-center ml-0.5">
-                        <span>+</span>
-                        <span
-                          className="absolute -top-2 sm:-top-2.5 left-1/2 -translate-x-1/2 text-[8px] sm:text-[10px] font-mono font-bold text-emerald-500 dark:text-emerald-400 select-none leading-none"
+                      <span className="inline-flex items-center ml-0.5">
+                        {viewsData.totalViews >= 10000 && <span>+</span>}
+                        <sup
+                          className="-translate-y-1.5 sm:-translate-y-2.5 ml-0.5 text-[10px] sm:text-xs font-mono font-bold text-emerald-500 dark:text-emerald-400 select-none leading-none"
                           title={`${viewsData.activeNow} active visitor${viewsData.activeNow > 1 ? 's' : ''} right now`}
                         >
                           {viewsData.activeNow}
-                        </span>
+                        </sup>
                       </span>
                     </>
                   )}
@@ -301,7 +327,7 @@ export default function HomePage() {
       </section>
 
       {/* Dean's Message */}
-      <section className="relative max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 sm:px-8 py-8 sm:py-14 lg:py-20">
+      <section className="relative max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 sm:px-8 pt-24 sm:pt-14 pb-12 sm:pb-14 lg:py-20">
         <ScrollReveal>
           <div className="grid md:grid-cols-12 gap-6 md:gap-8 lg:gap-14 items-center">
             <div className="md:col-span-5 flex justify-center relative">
@@ -334,8 +360,20 @@ export default function HomePage() {
                 </h2>
               </div>
 
-              <blockquote className="relative">
-                <Quote size={28} className="text-gold/35 mb-3" />
+              <blockquote className="relative group/message">
+                <a
+                  href="https://www.facebook.com/share/1LrVi4RRjW/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="View original statement on Facebook"
+                  title="View original statement on Facebook"
+                  className="inline-flex items-center gap-2 text-amber-600/40 dark:text-gold/35 group-hover/message:text-amber-600 dark:group-hover/message:text-gold hover:!text-amber-500 dark:hover:!text-amber-300 transition-all duration-300 mb-3 cursor-pointer group/icon"
+                >
+                  <Quote
+                    size={28}
+                    className="transition-all duration-300 group-hover/message:scale-110 group-hover/icon:scale-125 group-hover/message:drop-shadow-[0_0_10px_rgba(245,166,35,0.45)] group-active/icon:scale-95"
+                  />
+                </a>
                 <p className="font-display font-medium text-sm sm:text-base md:text-lg lg:text-xl text-foreground-theme/90 leading-relaxed italic break-words">
                   &ldquo;One of my developmental goals is all about digital and smart campus transformation. I think it&apos;s good that the University of Antique has started the implementation of the AIMS. With this, there is a need to continue the implementation of the AIMS system of the university.&rdquo;
                 </p>
