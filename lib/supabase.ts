@@ -593,6 +593,8 @@ export async function getArchivePhotos(onlyActive: boolean = false): Promise<Arc
 
 export interface MembershipDueRow {
   id: string;
+  student_id?: string | null;
+  student_no?: string | null;
   student_name: string;
   student_name_normalized: string;
   program: string;

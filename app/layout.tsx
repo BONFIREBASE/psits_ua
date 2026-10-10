@@ -194,7 +194,10 @@ export default function RootLayout({
       className={`${syne.variable} ${inter.variable} ${architectsDaughter.variable}`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}

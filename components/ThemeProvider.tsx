@@ -2,8 +2,15 @@
 
 import React, { createContext, useContext, useEffect, useCallback, useSyncExternalStore, useRef } from 'react'
 
-type Theme = 'light' | 'dark' | 'system'
-type ResolvedTheme = 'light' | 'dark'
+export type Theme = 'light' | 'dark' | 'system'
+export type ResolvedTheme = 'light' | 'dark'
+
+export interface SolarDetails {
+  theme: ResolvedTheme
+  isDaylight: boolean
+  sunriseHour: number
+  sunsetHour: number
+}
 
 interface ThemeContextType {
   theme: Theme
@@ -15,6 +22,69 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 const STORAGE_KEY = 'psits-theme'
+
+// Coordinates for Sibalom, Antique, Philippines
+const ANTIQUE_LAT = 10.78
+const ANTIQUE_LNG = 122.01
+
+/**
+ * Computes astronomical solar sunrise and sunset for Sibalom, Antique, Philippines (UTC+8).
+ * Uses standard NOAA solar positioning equations.
+ */
+export function getPhilippineSolarDetails(date = new Date()): SolarDetails {
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const toDeg = (r: number) => (r * 180) / Math.PI
+
+  // Anchor to Philippine Standard Time (UTC+8)
+  const pht = new Date(date.getTime() + 8 * 3600000)
+  const y = pht.getUTCFullYear()
+  const startOfYear = new Date(Date.UTC(y, 0, 1))
+  const dayOfYear = Math.floor((pht.getTime() - startOfYear.getTime()) / 86400000) + 1
+  const lngHour = ANTIQUE_LNG / 15
+
+  function calcSolarHour(isRise: boolean): number {
+    const t = dayOfYear + ((isRise ? 6 : 18) - lngHour) / 24
+    const M = 0.9856 * t - 3.289
+    let L = M + 1.916 * Math.sin(toRad(M)) + 0.02 * Math.sin(toRad(2 * M)) + 282.634
+    L = ((L % 360) + 360) % 360
+
+    let RA = toDeg(Math.atan(0.91764 * Math.tan(toRad(L))))
+    RA = ((RA % 360) + 360) % 360
+    const Lquadrant = Math.floor(L / 90) * 90
+    const RAquadrant = Math.floor(RA / 90) * 90
+    RA = (RA + (Lquadrant - RAquadrant)) / 15
+
+    const sinDec = 0.39782 * Math.sin(toRad(L))
+    const cosDec = Math.cos(Math.asin(sinDec))
+    const cosH = (Math.cos(toRad(90.8333)) - sinDec * Math.sin(toRad(ANTIQUE_LAT))) / (cosDec * Math.cos(toRad(ANTIQUE_LAT)))
+
+    if (cosH > 1 || cosH < -1) return isRise ? 5.75 : 18.0
+
+    let H = isRise ? 360 - toDeg(Math.acos(cosH)) : toDeg(Math.acos(cosH))
+    H = H / 15
+
+    const T = H + RA - 0.06571 * t - 6.622
+    let UT = T - lngHour
+    UT = ((UT % 24) + 24) % 24
+    return (UT + 8) % 24
+  }
+
+  const sunriseHour = calcSolarHour(true)
+  const sunsetHour = calcSolarHour(false)
+  const currentPHT = pht.getUTCHours() + pht.getUTCMinutes() / 60 + pht.getUTCSeconds() / 3600
+
+  const isDaylight = currentPHT >= sunriseHour && currentPHT < sunsetHour
+  return {
+    theme: isDaylight ? 'light' : 'dark',
+    isDaylight,
+    sunriseHour,
+    sunsetHour,
+  }
+}
+
+export function getPhilippineSolarTheme(date = new Date()): ResolvedTheme {
+  return getPhilippineSolarDetails(date).theme
+}
 
 const themeListeners = new Set<() => void>()
 
@@ -31,21 +101,16 @@ function subscribeTheme(callback: () => void) {
 }
 
 function getStoredThemeSnapshot(): Theme {
-  if (typeof window === 'undefined') return 'dark'
+  if (typeof window === 'undefined') return 'system'
   try {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null
     if (stored === 'light' || stored === 'dark') return stored
   } catch {}
-  return 'dark'
+  return 'system'
 }
 
 function getStoredThemeServerSnapshot(): Theme {
-  return 'dark'
-}
-
-interface LegacyMediaQueryList {
-  addListener?: (listener: () => void) => void
-  removeListener?: (listener: () => void) => void
+  return 'system'
 }
 
 interface ViewTransitionInstance {
@@ -60,27 +125,43 @@ interface DocumentWithViewTransition {
 }
 
 function subscribeSystem(callback: () => void) {
-  if (typeof window === 'undefined' || !window.matchMedia) return () => {}
-  const mql = window.matchMedia('(prefers-color-scheme: dark)')
-  if (typeof mql.addEventListener === 'function') {
-    mql.addEventListener('change', callback)
-    return () => mql.removeEventListener('change', callback)
+  if (typeof window === 'undefined') return () => {}
+
+  let lastTheme = getPhilippineSolarTheme()
+
+  const checkSolar = () => {
+    const currentTheme = getPhilippineSolarTheme()
+    if (currentTheme !== lastTheme) {
+      lastTheme = currentTheme
+      callback()
+    }
   }
-  const legacyMql = mql as unknown as LegacyMediaQueryList
-  if (typeof legacyMql.addListener === 'function') {
-    legacyMql.addListener(callback)
-    return () => legacyMql.removeListener?.(callback)
+
+  // Poll solar calculation every 60 seconds for smooth sunrise/sunset transitions
+  const intervalId = window.setInterval(checkSolar, 60000)
+
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      checkSolar()
+    }
   }
-  return () => {}
+
+  window.addEventListener('visibilitychange', onVisibility)
+  window.addEventListener('focus', checkSolar)
+
+  return () => {
+    window.clearInterval(intervalId)
+    window.removeEventListener('visibilitychange', onVisibility)
+    window.removeEventListener('focus', checkSolar)
+  }
 }
 
 function getSystemSnapshot(): ResolvedTheme {
-  if (typeof window === 'undefined' || !window.matchMedia) return 'dark'
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return getPhilippineSolarTheme()
 }
 
 function getSystemServerSnapshot(): ResolvedTheme {
-  return 'dark'
+  return getPhilippineSolarTheme()
 }
 
 function applyThemeDom(resolved: ResolvedTheme) {
@@ -163,7 +244,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     isManualChangeRef.current = true
     const nextResolvedTheme: ResolvedTheme =
       newTheme === 'system'
-        ? (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        ? getPhilippineSolarTheme()
         : (newTheme as ResolvedTheme)
 
     // Synchronously track the new resolved theme so subsequent rapid clicks alternate correctly
@@ -210,21 +291,4 @@ export function useTheme() {
   return context
 }
 
-export const themeScript = `
-(function() {
-  try {
-    var stored = localStorage.getItem('${STORAGE_KEY}');
-    var resolved = (stored === 'light' || stored === 'dark') ? stored : 'dark';
-    var root = document.documentElement;
-    root.setAttribute('data-theme', resolved);
-    if (resolved === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    }
-    root.style.colorScheme = resolved;
-  } catch (e) {}
-})();
-`.trim()
+export const themeScript = `(function(){try{var s=localStorage.getItem('${STORAGE_KEY}'),r;if(s==='light'||s==='dark'){r=s;}else{var d=new Date(),p=new Date(d.getTime()+28800000),y=p.getUTCFullYear(),doy=Math.floor((p.getTime()-Date.UTC(y,0,1))/86400000)+1,lh=122.01/15;function c(rise){var t=doy+((rise?6:18)-lh)/24,M=0.9856*t-3.289,rad=Math.PI/180,L=((M+1.916*Math.sin(M*rad)+0.02*Math.sin(2*M*rad)+282.634)%360+360)%360,RA=((Math.atan(0.91764*Math.tan(L*rad))*180/Math.PI)%360+360)%360,adj=(RA+(Math.floor(L/90)*90-Math.floor(RA/90)*90))/15,sD=0.39782*Math.sin(L*rad),cD=Math.cos(Math.asin(sD)),cH=(Math.cos(90.8333*rad)-sD*Math.sin(10.78*rad))/(cD*Math.cos(10.78*rad));if(cH>1||cH<-1)return rise?5.75:18.0;var H=(rise?360-Math.acos(cH)*180/Math.PI:Math.acos(cH)*180/Math.PI)/15,UT=((H+adj-0.06571*t-6.622-lh)%24+24)%24;return(UT+8)%24;}var cur=p.getUTCHours()+p.getUTCMinutes()/60+p.getUTCSeconds()/3600;r=(cur>=c(true)&&cur<c(false))?'light':'dark';}var root=document.documentElement;root.setAttribute('data-theme',r);if(r==='dark'){root.classList.add('dark');root.classList.remove('light');}else{root.classList.add('light');root.classList.remove('dark');}root.style.colorScheme=r;}catch(e){}})();`

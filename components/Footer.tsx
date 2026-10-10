@@ -15,7 +15,7 @@ const navLinks = [
   { href: '/officers', label: 'Leadership Directory' },
   { href: '/events', label: 'COA (Calendar of Activities)' },
   { href: '/projects', label: 'Student Projects' },
-  { href: '/resources', label: 'Resources Page' },
+  { href: '/community', label: 'Community' },
   { href: '/submission', label: 'Polo Shirt Contest' },
   { href: '/merch', label: 'Official Merch' },
   { href: '/dues', label: 'Membership Dues' },

@@ -10,6 +10,7 @@ import BannerStack from '@/components/BannerStack'
 import ScrollReveal from '@/components/ScrollReveal'
 import KasubayPatrol from '@/components/KasubayPatrol'
 import KasubayHeroNest from '@/components/KasubayHeroNest'
+import { useTheme } from '@/components/ThemeProvider'
 import { socialDispatches } from '@/data/announcements'
 import { dean } from '@/data/officers'
 import {
@@ -23,6 +24,8 @@ import {
 import coverImage from '@/public/assets/cover.jpg'
 
 export default function HomePage() {
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
   const [dispatches, setDispatches] = useState(socialDispatches)
   const [activeBanners, setActiveBanners] = useState<BannerRow[]>([])
   const [bannersLoading, setBannersLoading] = useState(true)
@@ -242,17 +245,30 @@ export default function HomePage() {
             </div>
 
             <h1 className="font-display font-black text-4xl xs:text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight leading-none mb-6 select-none">
-              <span className="text-slate-950 dark:text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
-                PSITS{' '}
-              </span>
-              <span className="inline-flex items-baseline whitespace-nowrap">
-                <span className="relative inline-block text-[#F5A623] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
-                  U
+              <span className="relative inline-block text-slate-950 dark:text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                PSITS
+                {isDark && (
                   <KasubayHeroNest
+                    key="psits-night"
+                    variant="lay-psits"
                     stage={kasubayStage}
                     onStartLeap={() => setKasubayStage('leaping')}
                     onLeapComplete={() => setKasubayStage('patrol')}
                   />
+                )}
+              </span>{' '}
+              <span className="inline-flex items-baseline whitespace-nowrap">
+                <span className="relative inline-block text-[#F5A623] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                  U
+                  {!isDark && (
+                    <KasubayHeroNest
+                      key="u-day"
+                      variant="sit-u"
+                      stage={kasubayStage}
+                      onStartLeap={() => setKasubayStage('leaping')}
+                      onLeapComplete={() => setKasubayStage('patrol')}
+                    />
+                  )}
                 </span>
                 <span className="text-[#E63946] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
                   A

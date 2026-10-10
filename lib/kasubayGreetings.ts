@@ -29,13 +29,22 @@ const EVENING_GREETINGS = [
 ]
 
 /**
+ * Helper to get current hour and day anchored strictly to Philippine Standard Time (UTC+8 / Antique)
+ */
+function getPhilippineTime(): { hour: number; day: number } {
+  const pht = new Date(Date.now() + 8 * 3600000)
+  return {
+    hour: pht.getUTCHours(),
+    day: pht.getUTCDay(), // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  }
+}
+
+/**
  * Checks if the upcoming daylight session is a weekend (Saturday or Sunday)
- * Takes into account late-night hours (12:00 AM - 4:59 AM)
+ * Takes into account late-night hours (12:00 AM - 4:59 AM) in Philippine time
  */
 function isTomorrowWeekend(): boolean {
-  const now = new Date()
-  const day = now.getDay() // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
-  const hour = now.getHours()
+  const { hour, day } = getPhilippineTime()
 
   // If late night between 12:00 AM - 4:59 AM, check current calendar day
   if (hour < 5) {
@@ -71,17 +80,17 @@ function getLateNightPool(): string[] {
 }
 
 export function getTimeGreeting(exclude?: string | null): string {
-  const hour = new Date().getHours()
+  const { hour } = getPhilippineTime()
 
   let pool: string[]
   if (hour >= 5 && hour < 12) {
-    // 5:00 AM – 11:59 AM
+    // 5:00 AM – 11:59 AM (Morning)
     pool = MORNING_GREETINGS
   } else if (hour >= 12 && hour < 18) {
-    // 12:00 PM – 5:59 PM
+    // 12:00 PM – 5:59 PM (Afternoon)
     pool = AFTERNOON_GREETINGS
   } else if (hour >= 18 && hour < 22) {
-    // 6:00 PM – 9:59 PM
+    // 6:00 PM – 9:59 PM (Evening)
     pool = EVENING_GREETINGS
   } else {
     // 10:00 PM – 4:59 AM (Late Night / Midnight)
@@ -92,3 +101,18 @@ export function getTimeGreeting(exclude?: string | null): string {
   const candidatePool = filtered.length > 0 ? filtered : pool
   return candidatePool[Math.floor(Math.random() * candidatePool.length)]
 }
+
+export function getDefaultTimeGreeting(): string {
+  const { hour } = getPhilippineTime()
+
+  if (hour >= 5 && hour < 12) {
+    return MORNING_GREETINGS[0]
+  } else if (hour >= 12 && hour < 18) {
+    return AFTERNOON_GREETINGS[0]
+  } else if (hour >= 18 && hour < 22) {
+    return EVENING_GREETINGS[0]
+  } else {
+    return getLateNightPool()[0]
+  }
+}
+

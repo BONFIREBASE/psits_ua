@@ -20,8 +20,10 @@ export const TIER1_CRITICAL_SPRITES = [
   '/assets/kasubay/kasubay-cheer.png', // Needed the instant user scrolls (500ms jump)
   '/assets/kasubay/kasubay-sit.png',   // Needed upon landing (wake-up phase) & sitting rest
   '/assets/kasubay/kasubay-wave.png',  // Needed for landing greeting wave
-  '/assets/kasubay/lay/lean-0.png',    // Needed for lounging rest posture
-  '/assets/kasubay/lay/lean-1.png',    // Needed for idle lounging breathing
+  '/assets/kasubay/lay/lean-0.png',    // Needed for daytime lounging rest posture
+  '/assets/kasubay/lay/lean-1.png',    // Needed for idle daytime breathing
+  '/assets/kasubay/lay/lay-top.png',   // Needed for nighttime lounging on top of PSITS
+  '/assets/kasubay/lay/lay-0.png',     // Needed for idle nighttime breathing
 ]
 
 export const TIER2_RUN_FRAMES = [

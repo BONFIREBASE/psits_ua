@@ -92,7 +92,7 @@ const RUN_FRAMES = [
 ]
 
 const MIN_X = 8 // Left border boundary % (prevents bubble overhang on narrow mobile screens)
-const MAX_X = 82 // Right border boundary %
+const MAX_X = 76 // Right border boundary % (prevents bubble overhang and clipping on right border)
 const SPEED = 8.2 // Percentage traveled per second (~10s for full traversal)
 
 // Safe external store subscription for prefers-reduced-motion (no cascading renders)
@@ -561,13 +561,25 @@ export default function KasubayPatrol({ isReady = true }: KasubayPatrolProps) {
               animate={{ opacity: 1, y: -10, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.95 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="absolute -top-11 sm:-top-12 left-1/2 -translate-x-1/2 whitespace-nowrap z-30 pointer-events-none"
+              className={`absolute -top-11 sm:-top-12 whitespace-nowrap z-30 pointer-events-none ${
+                state === 'pause-right'
+                  ? 'right-0 sm:right-2'
+                  : state === 'pause-left'
+                    ? 'left-0 sm:left-2'
+                    : 'left-1/2 -translate-x-1/2'
+              }`}
             >
-              <div className="relative px-2.5 py-1 rounded-md bg-white/95 dark:bg-[#0D1117]/95 backdrop-blur-md border border-black/10 dark:border-white/15 text-neutral-800 dark:text-neutral-100 shadow-sm text-[11px] sm:text-xs font-medium tracking-tight">
+              <div className="relative px-2.5 py-1 rounded-md bg-white/95 dark:bg-[#0D1117]/95 backdrop-blur-md border border-black/10 dark:border-white/15 text-neutral-800 dark:text-neutral-100 shadow-md text-[11px] sm:text-xs font-semibold tracking-tight">
                 {speechBubble}
                 <div
                   aria-hidden="true"
-                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-white/95 dark:bg-[#0D1117]/95 border-r border-b border-black/10 dark:border-white/15"
+                  className={`absolute -bottom-1 w-2 h-2 rotate-45 bg-white/95 dark:bg-[#0D1117]/95 border-r border-b border-black/10 dark:border-white/15 ${
+                    state === 'pause-right'
+                      ? 'right-6 sm:right-8'
+                      : state === 'pause-left'
+                        ? 'left-6 sm:left-8'
+                        : 'left-1/2 -translate-x-1/2'
+                  }`}
                 />
               </div>
             </motion.div>
