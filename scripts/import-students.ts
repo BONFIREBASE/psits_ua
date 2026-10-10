@@ -65,6 +65,7 @@ function parseExcelFile(filePath: string): StudentRow[] {
   const worksheet = workbook.Sheets[sheetName]
   
   // Convert to JSON
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawData: any[] = XLSX.utils.sheet_to_json(worksheet)
   
   console.log(`📊 Found ${rawData.length} rows in Excel file`)
@@ -81,7 +82,7 @@ function parseExcelFile(filePath: string): StudentRow[] {
       let studentNo = row['Student No'] || row['Student Number'] || row['ID'] || row['student_no'] || row['No.'] || row['No']
       let fullName = row['Name'] || row['Full Name'] || row['Student Name'] || row['full_name'] || row['STUDENT NAME']
       let yearLevel = row['Year'] || row['Year Level'] || row['year_level'] || row['YEAR LEVEL']
-      let section = row['Section'] || row['section'] || row['SECTION']
+      const section = row['Section'] || row['section'] || row['SECTION']
       
       // Additional fallback: Try to parse from concatenated fields
       if (!studentNo && row['STUDENT NO.']) studentNo = row['STUDENT NO.']
@@ -187,7 +188,7 @@ async function importStudents(students: StudentRow[]) {
   // Batch insert (Supabase recommends batches of 1000 or less)
   const BATCH_SIZE = 100
   let imported = 0
-  let skipped = 0
+  const skipped = 0
   let errors = 0
   
   for (let i = 0; i < students.length; i += BATCH_SIZE) {

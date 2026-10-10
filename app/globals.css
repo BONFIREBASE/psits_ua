@@ -194,6 +194,31 @@
     animation: banner-shimmer 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 
+  @keyframes scroll-carousel {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(calc(-100% / 3));
+    }
+  }
+
+  .animate-scroll-carousel {
+    display: flex;
+    width: fit-content;
+    animation: scroll-carousel 42s linear infinite;
+  }
+
+  .animate-scroll-carousel:hover {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-scroll-carousel {
+      animation: none !important;
+    }
+  }
+
   .scrollbar-minimal {
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.12) transparent;
