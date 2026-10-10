@@ -29,11 +29,10 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const [prevPathname, setPrevPathname] = useState(pathname)
-  if (prevPathname !== pathname) {
-    setPrevPathname(pathname)
+  // Close mobile drawer on route change
+  useEffect(() => {
     setOpen(false)
-  }
+  }, [pathname])
 
   useEffect(() => {
     if (open) {
@@ -58,7 +57,7 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-[110] flex justify-center pointer-events-none px-4 pt-3 sm:pt-4">
+      <header className="fixed top-0 left-0 right-0 z-[130] flex justify-center pointer-events-none px-4 pt-3 sm:pt-4">
         <motion.nav
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -192,11 +191,12 @@ export default function Navbar() {
                 text-gold hover:bg-black/5 dark:hover:bg-white/[0.08]
                 transition-colors duration-200
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60
+                cursor-pointer select-none
               "
               aria-label="Toggle menu"
               aria-expanded={open}
             >
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="wait" initial={false}>
                 {open ? (
                   <motion.div
                     key="close"
@@ -236,7 +236,7 @@ export default function Navbar() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
             onClick={() => setOpen(false)}
-            className="fixed inset-0 z-[90] bg-black/40 dark:bg-black/75 backdrop-blur-md md:hidden"
+            className="fixed inset-0 z-[125] bg-black/40 dark:bg-black/75 backdrop-blur-md md:hidden pointer-events-auto"
           />
         )}
 
@@ -247,7 +247,7 @@ export default function Navbar() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.97 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed top-20 left-4 right-4 z-[100] md:hidden pointer-events-auto"
+            className="fixed top-20 left-4 right-4 z-[128] md:hidden pointer-events-auto"
           >
             <div className="
               relative overflow-hidden

@@ -18,8 +18,9 @@ const privacySections = [
   { id: 'coa-activities', num: '04', label: 'COA Activities & Career' },
   { id: 'subprocessors', num: '05', label: 'Infrastructure & Storage' },
   { id: 'security-storage', num: '06', label: 'Security & Data Storage' },
-  { id: 'inquiries', num: '07', label: 'Data Inquiries (DSAR)' },
-  { id: 'rights', num: '08', label: 'Legal Rights & Contact' },
+  { id: 'community-privacy', num: '07', label: 'Community Hub & Privacy' },
+  { id: 'inquiries', num: '08', label: 'Data Inquiries (DSAR)' },
+  { id: 'rights', num: '09', label: 'Legal Rights & Contact' },
 ]
 
 export default function PrivacyPolicyPage() {
@@ -290,10 +291,59 @@ export default function PrivacyPolicyPage() {
 
           <hr className="border-border/40" />
 
-          {/* Section 07: Student Data Inquiries */}
+          {/* Section 07: Community Hub & Data Privacy */}
+          <section id="community-privacy" className="scroll-mt-24 space-y-3">
+            <p className="text-xs font-mono text-gold uppercase tracking-wider">
+              07 · Community Hub &amp; Privacy Architecture
+            </p>
+            <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
+              Community Hub Privacy, Masked Identities &amp; Data Isolation
+            </h2>
+            <p>
+              In accordance with the Data Privacy Act of 2012 (R.A. 10173), student participation within the PSITS Community
+              Hub is safeguarded through structural data minimization and architectural boundary isolation:
+            </p>
+            <ul className="list-disc list-outside pl-5 space-y-2">
+              <li>
+                <strong className="text-slate-900 dark:text-white">Server-Side Identity Sanitization:</strong> When a student
+                selects Anonymous Mode, all personal identifying elements—including real name, institutional email address,
+                year level, section, and profile photo—are permanently redacted on the server before the content is serialized.
+                The broadcasted network payload delivered to client browsers physically omits personal identifiers, preventing
+                inspection or de-anonymization via client-side developer tooling.
+              </li>
+              <li>
+                <strong className="text-slate-900 dark:text-white">Architectural Partitioning &amp; Data Isolation:</strong> Community
+                discussions, peer comments, and academic attachments are processed within an isolated cloud partition completely
+                decoupled from official institutional databases (membership ledgers, voting records, and attendance histories).
+                No cross-service data contamination occurs between academic forums and organizational records.
+              </li>
+              <li>
+                <strong className="text-slate-900 dark:text-white">Encrypted Document Vaults:</strong> Academic resources and
+                study files uploaded by students are stored in encrypted regional cloud object vaults with strict MIME-type
+                enforcement, automated malware and script rejection, and single-file size quotas.
+              </li>
+              <li>
+                <strong className="text-slate-900 dark:text-white">Accountability Audit Logs:</strong> To protect the student body
+                from unlawful harassment, defamation, or academic misconduct, a confidential cryptographic audit reference is
+                securely bound to the author&apos;s institutional account. This audit link is stored in an encrypted administrative
+                partition, shielded from peer access, and reviewable solely by authorized student discipline administrators
+                under formal institutional investigation.
+              </li>
+              <li>
+                <strong className="text-slate-900 dark:text-white">Local Device Storage for Offline Resilience:</strong> To maintain
+                service continuity during campus connectivity interruptions, the platform temporarily caches recent discussion
+                threads in the student&apos;s local browser storage. This data remains strictly on the student&apos;s personal device
+                and can be cleared at any time via browser settings.
+              </li>
+            </ul>
+          </section>
+
+          <hr className="border-border/40" />
+
+          {/* Section 08: Student Data Inquiries */}
           <section id="inquiries" className="scroll-mt-24 space-y-3">
             <p className="text-xs font-mono text-gold uppercase tracking-wider">
-              07 · DSAR Protocol &amp; Inquiries
+              08 · DSAR Protocol &amp; Inquiries
             </p>
             <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
               Student Data Inquiries: How to Inquire, Inspect, or Delete Your Data
@@ -329,10 +379,10 @@ export default function PrivacyPolicyPage() {
 
           <hr className="border-border/40" />
 
-          {/* Section 08: Legal Rights & Contact */}
+          {/* Section 09: Legal Rights & Contact */}
           <section id="rights" className="scroll-mt-24 space-y-3">
             <p className="text-xs font-mono text-gold uppercase tracking-wider">
-              08 · Statutory Rights &amp; Escalation
+              09 · Statutory Rights &amp; Escalation
             </p>
             <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
               Your Legal Rights &amp; Official Contact
