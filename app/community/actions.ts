@@ -9,7 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { detectProhibitedHandle } from '@/lib/community-validation'
 
 const FEED_CACHE_KEY = 'psits:community:feed:recent'
-const FEED_CACHE_TTL = 45 // 45 seconds Stale-While-Revalidate
+const FEED_CACHE_TTL = 45
 const SUPER_ADMIN_EMAIL = 'psits-ua@antiquespride.edu.ph'
 
 export interface CommunityPostItem {
@@ -137,11 +137,7 @@ function normalizeWords(str: string): string[] {
   return str.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean)
 }
 
-/**
- * 100% Automated Background Resolver for Community Access.
- * Resolves ID-based emails (1st/2nd years), initial-based emails (3rd/4th years),
- * and Executive/Faculty accounts with zero manual user input directly via Supabase.
- */
+
 export async function autoResolveStudentEligibilityAction(params: {
   email: string
   googleName?: string
@@ -159,10 +155,10 @@ export async function autoResolveStudentEligibilityAction(params: {
     }
   }
 
-  // 1. Resolve Enrolled Student Record from public.students
+
   let studentMatch: { student_no: string; full_name: string; year_section: string } | null = null
 
-  // A. ID-Based Email (1st & 2nd Years, e.g. 2024s00002@... -> 2024-S00002)
+
   const idMatch = cleanEmail.match(/^(\d{4})s(\d{5})@antiquespride\.edu\.ph$/i)
   if (idMatch) {
     const studentNo = `${idMatch[1]}-S${idMatch[2]}`
@@ -179,7 +175,7 @@ export async function autoResolveStudentEligibilityAction(params: {
     }
   }
 
-  // B. Name & Senior Initial Decomposition (3rd & 4th Years, e.g. eblabanon@...)
+
   if (!studentMatch) {
     const prefix = cleanEmail.split('@')[0]
     const { data: allStudents } = await supabaseAdmin
@@ -189,7 +185,7 @@ export async function autoResolveStudentEligibilityAction(params: {
       .eq('is_active', true)
 
     if (allStudents && allStudents.length > 0) {
-      // Token set match against Google Full Name
+
       if (cleanGoogleName) {
         const googleTokens = new Set(normalizeWords(cleanGoogleName))
         for (const s of allStudents) {
@@ -208,7 +204,7 @@ export async function autoResolveStudentEligibilityAction(params: {
         }
       }
 
-      // Initial + surname match against prefix
+
       if (!studentMatch) {
         for (const s of allStudents) {
           const parts = s.full_name.split(',').map((p: string) => p.trim())
@@ -229,10 +225,10 @@ export async function autoResolveStudentEligibilityAction(params: {
     }
   }
 
-  // 2. Check Leadership / Executive Status from public.officers
+
   const officerCheck = await resolveOfficerStatus(cleanEmail, cleanGoogleName)
 
-  // A. Verified Officer / Executive (Includes real enrolled class section)
+
   if (officerCheck.isOfficer) {
     return {
       verified: true,
@@ -244,7 +240,7 @@ export async function autoResolveStudentEligibilityAction(params: {
     }
   }
 
-  // B. Verified Regular CCIS BSIT Student
+
   if (studentMatch) {
     return {
       verified: true,
@@ -255,7 +251,6 @@ export async function autoResolveStudentEligibilityAction(params: {
     }
   }
 
-  // C. Non-IT or Unenrolled Account
   return {
     verified: false,
     isOfficer: false,
@@ -265,7 +260,6 @@ export async function autoResolveStudentEligibilityAction(params: {
   }
 }
 
-/* ─── 1. Get Feed (with Upstash Redis Edge Caching) ─── */
 export async function getCommunityFeedAction(tag?: string): Promise<{
   success: boolean
   posts: CommunityPostItem[]
@@ -275,13 +269,11 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
   try {
     const cacheKey = tag ? `${FEED_CACHE_KEY}:${tag}` : FEED_CACHE_KEY
 
-    // Try Redis cache first (0 DB queries)
     const cached = await getCache<CommunityPostItem[]>(cacheKey)
     if (cached && Array.isArray(cached) && cached.length > 0) {
       return { success: true, posts: cached, fromCache: true }
     }
 
-    // Cache miss -> Query Appwrite Singapore
     const { databases } = createServerAppwriteClient()
     const queries = [
       Query.equal('status', 'active'),
@@ -299,7 +291,7 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
       queries
     )
 
-    // Mask author_student_no for public consumption
+
     const sanitizedPosts: CommunityPostItem[] = (res.documents as unknown as AppwritePostRecord[]).map(doc => {
       const isAnon = Boolean(doc.is_anonymous)
       const isOff = Boolean(doc.is_officer) && !isAnon
@@ -309,7 +301,7 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
         $id: doc.$id,
         $createdAt: doc.$createdAt,
         content: String(doc.content || ''),
-        author_student_no: undefined, // Strictly stripped! Never leak student ID or institutional email to public clients
+        author_student_no: undefined,
         author_display_name: isAnon
           ? 'Anonymous Kasubay'
           : (String(doc.author_display_name || '').startsWith('@')
@@ -318,7 +310,7 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
         author_avatar: isAnon ? '' : (doc.author_avatar ? String(doc.author_avatar) : ''),
         author_year_section: isAnon ? 'BSIT Student' : (doc.author_year_section ? String(doc.author_year_section) : 'BSIT'),
         is_anonymous: isAnon,
-        is_verified: false, // Regular students have NO badge
+        is_verified: false,
         is_officer: isOff,
         officer_title: offTitle,
         attachments: Array.isArray(doc.attachments) ? doc.attachments.map(String) : [],

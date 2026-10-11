@@ -1,7 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Image from 'next/image'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   FileText,
   ThumbsUp,
@@ -9,6 +11,7 @@ import {
   Share2,
   ShieldAlert,
   UserCheck,
+  User,
   Sparkles,
   UploadCloud,
   WifiOff,
@@ -16,7 +19,6 @@ import {
   Send,
   X,
   RefreshCw,
-  Globe,
   Search,
   Terminal,
   Code2,
@@ -24,7 +26,17 @@ import {
   Layers,
   GraduationCap,
   ShieldCheck,
-  Settings,
+  Bell,
+  Clock,
+  Flame,
+  Bookmark,
+  Check,
+  Copy,
+  FileCode,
+  ImageIcon,
+  CheckCircle2,
+  Plus,
+  Users,
 } from 'lucide-react'
 import { appwrite, appwriteStorage, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
@@ -45,6 +57,134 @@ import CommunityOnboardingModal, { type CommunityUserProfile } from '@/component
 
 const LOCAL_STORAGE_KEY = 'psits_community_cached_posts_v4'
 const TAGS = ['All', 'Academics', 'Tech & Code', 'Projects', 'Discussions', 'Campus Life']
+
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const now = Date.now()
+    const past = new Date(dateStr).getTime()
+    const diffSec = Math.max(0, Math.floor((now - past) / 1000))
+
+    if (diffSec < 60) return 'Just now'
+    const diffMin = Math.floor(diffSec / 60)
+    if (diffMin < 60) return `${diffMin}m ago`
+    const diffHours = Math.floor(diffMin / 60)
+    if (diffHours < 24) return `${diffHours}h ago`
+    const diffDays = Math.floor(diffHours / 24)
+    if (diffDays < 7) return `${diffDays}d ago`
+
+    return new Date(dateStr).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    })
+  } catch {
+    return 'Recently'
+  }
+}
+
+function CodeBlock({ language, code }: { language?: string; code: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="my-3.5 rounded-2xl overflow-hidden border border-black/[0.08] dark:border-white/[0.1] bg-[#0c1017] shadow-xl text-left">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-[#161b22] border-b border-white/[0.06] text-xs font-mono">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+          </div>
+          <span className="text-slate-400 text-[11px] uppercase tracking-wider pl-1 font-semibold flex items-center gap-1.5">
+            <Terminal className="w-3.5 h-3.5 text-gold" />
+            {language || 'code'}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 hover:text-white transition-colors cursor-pointer text-[11px] font-mono"
+          title="Copy code snippet"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-emerald-400 font-semibold">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="p-4 overflow-x-auto text-xs font-mono text-slate-200 leading-relaxed scrollbar-thin max-h-96">
+        <code>{code}</code>
+      </pre>
+    </div>
+  )
+}
+
+function PostMarkdownContent({ content }: { content: string }) {
+  const hasMarkdown = /[`#*_[\]<>]/.test(content)
+
+  if (!hasMarkdown) {
+    return <div className="text-sm sm:text-base text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed pt-1">{content}</div>
+  }
+
+  return (
+    <div className="text-sm sm:text-base text-slate-800 dark:text-slate-200 leading-relaxed pt-1">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ className, children, ...props }: React.ComponentPropsWithoutRef<'code'>) {
+            const match = /language-(\w+)/.exec(className || '')
+            const codeString = String(children).replace(/\n$/, '')
+            if (match || codeString.includes('\n')) {
+              return <CodeBlock language={match ? match[1] : 'snippet'} code={codeString} />
+            }
+            return (
+              <code className="px-1.5 py-0.5 rounded bg-black/[0.06] dark:bg-white/[0.08] font-mono text-[12px] text-amber-600 dark:text-amber-400 font-semibold" {...props}>
+                {children}
+              </code>
+            )
+          },
+          pre({ children }: React.ComponentPropsWithoutRef<'pre'>) {
+            return <div className="my-1">{children}</div>
+          },
+          a({ href, children }: React.ComponentPropsWithoutRef<'a'>) {
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gold hover:underline font-medium inline-flex items-center gap-0.5"
+              >
+                {children}
+              </a>
+            )
+          },
+          p({ children }: React.ComponentPropsWithoutRef<'p'>) {
+            return <p className="mb-2.5 last:mb-0 leading-relaxed">{children}</p>
+          },
+          ul({ children }: React.ComponentPropsWithoutRef<'ul'>) {
+            return <ul className="list-disc list-inside space-y-1 mb-2.5 text-slate-800 dark:text-slate-200">{children}</ul>
+          },
+          ol({ children }: React.ComponentPropsWithoutRef<'ol'>) {
+            return <ol className="list-decimal list-inside space-y-1 mb-2.5 text-slate-800 dark:text-slate-200">{children}</ol>
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  )
+}
 
 function renderAvatarIcon(avatarStr?: string, nameStr?: string, className = 'w-5 h-5 text-gold') {
   if (avatarStr?.startsWith('preset:')) {
@@ -118,6 +258,206 @@ export default function CommunityPage() {
   const [isSubmittingPost, setIsSubmittingPost] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Feed Controls & Engagement State
+  const [sortBy, setSortBy] = useState<'latest' | 'popular' | 'discussed'>('latest')
+  const [filterOnlyWithFiles, setFilterOnlyWithFiles] = useState(false)
+  const [filterOnlyOfficers, setFilterOnlyOfficers] = useState(false)
+  const [filterOnlySaved, setFilterOnlySaved] = useState(false)
+  const [filterOnlyMyPosts, setFilterOnlyMyPosts] = useState(false)
+  const [notifTab, setNotifTab] = useState<'broadcasts' | 'mentions'>('broadcasts')
+  const [copiedPostId, setCopiedPostId] = useState<string | null>(null)
+
+  // Custom Community Creator State
+  const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false)
+  const [newCommunityName, setNewCommunityName] = useState('')
+  const [newCommunityCategory, setNewCommunityCategory] = useState('Tech & Code')
+  const [newCommunityDesc, setNewCommunityDesc] = useState('')
+  const [newCommunityLogo, setNewCommunityLogo] = useState('')
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const logoFileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (PNG, JPG, WebP).')
+      return
+    }
+
+    setIsUploadingLogo(true)
+    try {
+      const compressed = await compressImageToWebP(file, { maxWidth: 256, maxHeight: 256, quality: 0.85 })
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const previewUrl = event.target?.result as string
+        setNewCommunityLogo(previewUrl)
+      }
+      reader.readAsDataURL(compressed)
+    } catch (err) {
+      console.error('Logo compression error:', err)
+    } finally {
+      setIsUploadingLogo(false)
+      if (logoFileInputRef.current) logoFileInputRef.current.value = ''
+    }
+  }
+
+  const [customCommunities, setCustomCommunities] = useState<{ name: string; description?: string; category?: string; logo?: string }[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const cached = localStorage.getItem('psits_custom_communities')
+      return cached ? JSON.parse(cached) : []
+    } catch {
+      return []
+    }
+  })
+
+  const [joinedCommunities, setJoinedCommunities] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return ['Academics', 'Tech & Code', 'WebDev']
+    try {
+      const cached = localStorage.getItem('psits_joined_communities')
+      return cached ? JSON.parse(cached) : ['Academics', 'Tech & Code', 'WebDev']
+    } catch {
+      return ['Academics', 'Tech & Code', 'WebDev']
+    }
+  })
+
+  const PRESET_COMMUNITIES = useMemo(() => [
+    { name: 'WebDev', topic: 'Fullstack & APIs', category: 'Tech & Code', isCustom: false, logo: undefined },
+    { name: 'CyberSec', topic: 'Ethical Hacking & CTF', category: 'Tech & Code', isCustom: false, logo: undefined },
+    { name: 'Capstone2026', topic: 'Senior Project Defense', category: 'Projects', isCustom: false, logo: undefined },
+    { name: 'GameDev', topic: 'Unity & Godot Assets', category: 'Projects', isCustom: false, logo: undefined },
+  ], [])
+
+  const displayCommunities = useMemo(() => {
+    const list: { name: string; topic?: string; category?: string; isCustom: boolean; logo?: string }[] = []
+    for (const c of customCommunities) {
+      list.push({
+        name: c.name,
+        topic: c.description || c.category,
+        category: c.category,
+        isCustom: true,
+        logo: c.logo,
+      })
+    }
+    for (const p of PRESET_COMMUNITIES) {
+      if (!list.some(item => item.name.toLowerCase() === p.name.toLowerCase())) {
+        list.push(p)
+      }
+    }
+    return list
+  }, [customCommunities, PRESET_COMMUNITIES])
+
+  const allTags = useMemo(() => {
+    const list = [...TAGS]
+    for (const p of PRESET_COMMUNITIES) {
+      if (!list.includes(p.name)) list.push(p.name)
+    }
+    for (const c of customCommunities) {
+      if (!list.includes(c.name)) list.push(c.name)
+    }
+    return list
+  }, [customCommunities, PRESET_COMMUNITIES])
+
+  const toggleJoinCommunity = (communityName: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    setJoinedCommunities(prev => {
+      const updated = prev.includes(communityName)
+        ? prev.filter(c => c !== communityName)
+        : [...prev, communityName]
+      try {
+        localStorage.setItem('psits_joined_communities', JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+  }
+
+  const handleCreateCommunity = () => {
+    const cleanName = newCommunityName.trim().toLowerCase().replace(/^c\//, '').replace(/[^a-z0-9-]/g, '')
+    if (cleanName.length < 3) {
+      alert('Community name must be at least 3 characters.')
+      return
+    }
+    if (allTags.map(t => t.toLowerCase()).includes(cleanName)) {
+      alert('A community with this name already exists.')
+      return
+    }
+
+    const updated = [
+      ...customCommunities,
+      {
+        name: cleanName,
+        description: newCommunityDesc.trim(),
+        category: newCommunityCategory,
+        logo: newCommunityLogo || undefined,
+      }
+    ]
+    setCustomCommunities(updated)
+    setJoinedCommunities(prev => {
+      const next = prev.includes(cleanName) ? prev : [...prev, cleanName]
+      try {
+        localStorage.setItem('psits_joined_communities', JSON.stringify(next))
+      } catch {}
+      return next
+    })
+    try {
+      localStorage.setItem('psits_custom_communities', JSON.stringify(updated))
+    } catch {}
+
+    setSelectedTag(cleanName)
+    setIsCreateCommunityOpen(false)
+    setNewCommunityName('')
+    setNewCommunityDesc('')
+    setNewCommunityLogo('')
+  }
+  const [savedPostIds, setSavedPostIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const cached = localStorage.getItem('psits_community_saved_posts')
+      return cached ? JSON.parse(cached) : []
+    } catch {
+      return []
+    }
+  })
+  const [userLikedPosts, setUserLikedPosts] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const cached = localStorage.getItem('psits_community_liked_posts')
+      return cached ? JSON.parse(cached) : []
+    } catch {
+      return []
+    }
+  })
+
+  const handleToggleSavePost = (postId: string) => {
+    setSavedPostIds(prev => {
+      const updated = prev.includes(postId) ? prev.filter(id => id !== postId) : [...prev, postId]
+      try {
+        localStorage.setItem('psits_community_saved_posts', JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+  }
+
+  const handleCopyPostLink = (post: CommunityPostItem) => {
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/community#post-${post.$id}` : ''
+    if (navigator.clipboard && url) {
+      navigator.clipboard.writeText(url)
+      setCopiedPostId(post.$id)
+      setTimeout(() => setCopiedPostId(null), 2500)
+    }
+  }
+
+  const handleQuickStarter = (starterText: string, tag: string) => {
+    setSelectedPostTag(tag)
+    setPostContent(starterText)
+    if (!user) {
+      setOnboardingInitialStep(1)
+      setIsOnboardingOpen(true)
+      return
+    }
+    setIsCreateOpen(true)
+  }
+
   // Active Comment Thread Modal
   const [activeCommentPost, setActiveCommentPost] = useState<CommunityPostItem | null>(null)
   const [comments, setComments] = useState<CommunityCommentItem[]>([])
@@ -173,6 +513,29 @@ export default function CommunityPage() {
       window.removeEventListener('offline', handleOffline)
     }
   }, [reloadFeed, selectedTag])
+
+  /* ─── 2.5 Navbar Action Listeners (Profile, Onboarding & My Posts Triggers) ─── */
+  useEffect(() => {
+    const handleOpenProfile = () => {
+      setOnboardingInitialStep(4)
+      setIsOnboardingOpen(true)
+    }
+    const handleOpenOnboarding = () => {
+      setOnboardingInitialStep(1)
+      setIsOnboardingOpen(true)
+    }
+    const handleFilterMyPosts = () => {
+      setFilterOnlyMyPosts(prev => !prev)
+    }
+    window.addEventListener('psits:open-profile', handleOpenProfile)
+    window.addEventListener('psits:open-onboarding', handleOpenOnboarding)
+    window.addEventListener('psits:filter-my-posts', handleFilterMyPosts)
+    return () => {
+      window.removeEventListener('psits:open-profile', handleOpenProfile)
+      window.removeEventListener('psits:open-onboarding', handleOpenOnboarding)
+      window.removeEventListener('psits:filter-my-posts', handleFilterMyPosts)
+    }
+  }, [])
 
   /* ─── 3. Auth State Sync & Institutional Onboarding Check ─── */
   useEffect(() => {
@@ -428,7 +791,7 @@ export default function CommunityPage() {
     }
   }
 
-  /* ─── 8. Handle Reaction Toggle (Optimistic UI) ─── */
+  /* ─── 8. Handle Reaction Toggle (Optimistic UI & Cache Sync) ─── */
   const handleReaction = async (post: CommunityPostItem) => {
     if (!user) {
       setOnboardingInitialStep(1)
@@ -436,24 +799,53 @@ export default function CommunityPage() {
       return
     }
 
+    const isLiked = userLikedPosts.includes(post.$id)
+    const nextLiked = !isLiked
+
     // Optimistic UI update in 0ms
+    setUserLikedPosts(prev => {
+      const updated = nextLiked ? [...prev, post.$id] : prev.filter(id => id !== post.$id)
+      try {
+        localStorage.setItem('psits_community_liked_posts', JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+
     setPosts(prev =>
       prev.map(p =>
-        p.$id === post.$id ? { ...p, likes_count: p.likes_count + 1 } : p
+        p.$id === post.$id
+          ? { ...p, likes_count: Math.max(0, p.likes_count + (nextLiked ? 1 : -1)) }
+          : p
       )
     )
 
     try {
-      await togglePostReactionAction({
+      const res = await togglePostReactionAction({
         postId: post.$id,
         userEmail: user.email,
         reactionType: 'like',
       })
+      if (res.success && typeof res.newLikesCount === 'number') {
+        setPosts(prev =>
+          prev.map(p =>
+            p.$id === post.$id ? { ...p, likes_count: res.newLikesCount! } : p
+          )
+        )
+      }
     } catch {
       // Revert if network failed
+      setUserLikedPosts(prev => {
+        const reverted = isLiked ? [...prev, post.$id] : prev.filter(id => id !== post.$id)
+        try {
+          localStorage.setItem('psits_community_liked_posts', JSON.stringify(reverted))
+        } catch {}
+        return reverted
+      })
       setPosts(prev =>
         prev.map(p =>
-          p.$id === post.$id ? { ...p, likes_count: Math.max(0, p.likes_count - 1) } : p
+          p.$id === post.$id
+            ? { ...p, likes_count: Math.max(0, p.likes_count + (isLiked ? 1 : -1)) }
+            : p
         )
       )
     }
@@ -545,196 +937,176 @@ export default function CommunityPage() {
     }
   }
 
-  // Filtered post results based on search input
-  const filteredPosts = posts.filter(post => {
-    if (!searchQuery.trim()) return true
-    const q = searchQuery.toLowerCase().trim()
-    return (
-      post.content.toLowerCase().includes(q) ||
-      post.author_display_name.toLowerCase().includes(q) ||
-      (post.author_year_section && post.author_year_section.toLowerCase().includes(q)) ||
-      (post.tags && post.tags.some(t => t.toLowerCase().includes(q))) ||
-      (post.attachment_names && post.attachment_names.some(n => n.toLowerCase().includes(q)))
-    )
-  })
+  // Notification sidebar memoized items (Option C Hybrid)
+  const broadcastItems = useMemo(() => {
+    return posts.filter(p => p.is_officer || p.tags?.includes('Announcements') || p.tags?.includes('Academics')).slice(0, 5)
+  }, [posts])
+
+  const userActivityItems = useMemo(() => {
+    if (!user) return []
+    const myName = (userProfile?.name || user.name || '').toLowerCase()
+    const myUsername = (userProfile?.username || '').replace(/^@/, '').toLowerCase()
+    return posts.filter(p => {
+      const author = p.author_display_name.toLowerCase()
+      const isMine = (myName && author === myName) || (myUsername && author.includes(myUsername))
+      return isMine && (p.comments_count > 0 || p.likes_count > 0)
+    }).slice(0, 5)
+  }, [posts, user, userProfile])
+
+  // Filtered & Sorted post results based on search input, category, tags, and quick-filters
+  const filteredPosts = useMemo(() => {
+    let list = posts.filter(post => {
+      // 1. Search Query Filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim()
+        const matches =
+          post.content.toLowerCase().includes(q) ||
+          post.author_display_name.toLowerCase().includes(q) ||
+          (post.author_year_section && post.author_year_section.toLowerCase().includes(q)) ||
+          (post.tags && post.tags.some(t => t.toLowerCase().includes(q))) ||
+          (post.attachment_names && post.attachment_names.some(n => n.toLowerCase().includes(q)))
+        if (!matches) return false
+      }
+
+      // 2. Attachments Only Filter
+      if (filterOnlyWithFiles && (!post.attachments || post.attachments.length === 0)) {
+        return false
+      }
+
+      // 3. Officers Only Filter
+      if (filterOnlyOfficers && !post.is_officer) {
+        return false
+      }
+
+      // 4. Saved / Bookmarked Only Filter
+      if (filterOnlySaved && !savedPostIds.includes(post.$id)) {
+        return false
+      }
+
+      // 5. My Posts Only Filter
+      if (filterOnlyMyPosts) {
+        const myName = (userProfile?.name || user?.name || '').toLowerCase()
+        const myUsername = (userProfile?.username || '').replace(/^@/, '').toLowerCase()
+        const author = post.author_display_name.toLowerCase()
+        const isMine = (myName && author === myName) || (myUsername && author.includes(myUsername))
+        if (!isMine) return false
+      }
+
+      return true
+    })
+
+    // 6. Sorting
+    if (sortBy === 'popular') {
+      list = [...list].sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0))
+    } else if (sortBy === 'discussed') {
+      list = [...list].sort((a, b) => (b.comments_count || 0) - (a.comments_count || 0))
+    } else {
+      // Latest first
+      list = [...list].sort((a, b) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime())
+    }
+
+    return list
+  }, [posts, searchQuery, filterOnlyWithFiles, filterOnlyOfficers, filterOnlySaved, filterOnlyMyPosts, savedPostIds, sortBy, user, userProfile])
 
   return (
-    <div className="pt-28 sm:pt-32 pb-24 sm:pb-28 max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 space-y-10 sm:space-y-12">
+    <div className="pt-20 sm:pt-24 pb-20 max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
       {/* ─── Sticky Offline Resilience Banner ─── */}
       {isOffline && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[92%] bg-gold text-slate-950 font-semibold px-4 py-2.5 rounded-full shadow-2xl text-xs flex items-center justify-center gap-2 border border-gold/40 animate-pulse">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[92%] bg-gold text-slate-950 font-semibold px-4 py-2 rounded-full shadow-2xl text-xs flex items-center justify-center gap-2 border border-gold/40 animate-pulse">
           <WifiOff className="w-4 h-4 text-slate-950 shrink-0" />
           <span className="truncate">Offline Mode: Viewing cached threads. Actions will sync when connected.</span>
         </div>
       )}
 
-      {/* ─── Minimalist Editorial Header (Matches Events & Projects Style) ─── */}
-      <ScrollReveal>
-        <header className="border-b border-black/[0.06] dark:border-white/[0.08] pb-8 sm:pb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-amber-600 dark:text-gold uppercase tracking-[0.2em] font-semibold">
-                05 / Student Community · Peer Exchange
-              </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-gold/60 animate-pulse" />
-            </div>
-            <h1 className="font-display font-black text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-[54px] text-slate-900 dark:text-white tracking-tight uppercase leading-[1.05]">
-              Community <span className="text-gold">&amp;</span> Notes
-            </h1>
-            <p className="text-slate-600 dark:text-white/60 text-sm sm:text-base font-normal leading-relaxed">
-              An isolated, high-speed exchange for BSIT students to collaborate on technical topics, capstone architectures, and course modules.
-            </p>
-          </div>
-
-          {/* Account Status Pill / iOS Onboarding Trigger */}
-          <div className="shrink-0 flex items-center gap-2.5 self-start md:self-end">
-            {user ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOnboardingInitialStep(1)
-                    setIsOnboardingOpen(true)
-                  }}
-                  className="px-3.5 py-2.5 rounded-2xl bg-surface border border-black/[0.08] dark:border-white/[0.08] hover:border-gold/40 text-xs font-mono text-slate-600 dark:text-white/60 hover:text-gold transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
-                  title="Test and preview the full-screen onboarding walkthrough"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-gold" />
-                  <span className="hidden sm:inline">Onboarding Tour</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOnboardingInitialStep(4)
-                    setIsOnboardingOpen(true)
-                  }}
-                  className="group flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-surface border border-black/[0.08] dark:border-white/[0.08] hover:border-gold/50 dark:hover:border-gold/40 shadow-sm transition-all duration-300 text-left cursor-pointer"
-                  title="Click to customize student profile"
-                >
-                  <div className="w-9 h-9 rounded-full bg-surface-subtle border border-gold/30 overflow-hidden flex items-center justify-center text-gold font-bold text-xs shrink-0 ring-2 ring-gold/20">
-                    {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
-                      <Image
-                        src={userProfile.avatar}
-                        alt={userProfile.name}
-                        width={36}
-                        height={36}
-                        className="object-cover w-full h-full"
-                      />
-                    ) : (
-                      renderAvatarIcon(userProfile?.avatar, userProfile?.name || user.name)
-                    )}
-                  </div>
-                  <div className="text-xs pr-1">
-                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 leading-tight group-hover:text-gold transition-colors">
-                      <span className="truncate max-w-[140px]">{userProfile?.name || user.name}</span>
-                      <UserCheck className="w-3.5 h-3.5 text-gold shrink-0" />
-                    </div>
-                    <div className="text-slate-500 dark:text-white/40 text-[10px] truncate max-w-[140px] font-mono pt-0.5">
-                      {userProfile?.yearSection || 'BSIT'} · Settings
-                    </div>
-                  </div>
-                  <Settings className="w-3.5 h-3.5 text-slate-400 group-hover:text-gold transition-colors ml-1" />
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setOnboardingInitialStep(1)
-                  setIsOnboardingOpen(true)
-                }}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gold hover:bg-gold-muted text-[#0D1117] font-mono font-bold text-xs uppercase tracking-wider transition-all duration-200 active:scale-95 shadow-[0_0_20px_rgba(245,166,35,0.25)] hover:shadow-[0_0_30px_rgba(245,166,35,0.4)] cursor-pointer"
-              >
-                <Globe size={15} />
-                <span>Connect @antiquespride.edu.ph</span>
-              </button>
-            )}
-          </div>
-        </header>
-      </ScrollReveal>
-
-      {/* ─── Restrained Minimalist Navigation & Filter Bar (Matching Events) ─── */}
-      <ScrollReveal delay={0.05}>
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-black/[0.06] dark:border-white/[0.08]">
-            {/* Subtle Underline Status Tabs */}
-            <nav className="flex items-center gap-6 text-xs font-mono tracking-wider uppercase overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-              {TAGS.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setSelectedTag(tag)}
-                  className={`transition-colors cursor-pointer relative pb-1 whitespace-nowrap ${
-                    selectedTag === tag
-                      ? 'text-slate-900 dark:text-white font-bold border-b-2 border-gold'
-                      : 'text-slate-400 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/80'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </nav>
-
-            {/* Minimalist Search Input */}
-            <div className="relative w-full sm:w-64">
-              <Search
-                size={13}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/30"
-              />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search discussions & notes..."
-                className="w-full bg-transparent border border-black/[0.08] dark:border-white/10 rounded-lg pl-8 pr-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none focus:border-gold transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </ScrollReveal>
-
-      {/* ─── Main Content Container (Maximized Gap and Padding) ─── */}
-      <main className="space-y-10 sm:space-y-12">
-        {/* Floating Indicator for New Realtime Posts */}
-        {hasNewPosts && (
-          <div className="sticky top-20 z-40 flex justify-center">
+      {/* ─── Reddit Category Flairs & Search Bar ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-black/[0.06] dark:border-white/[0.08]">
+        {/* Category Flairs */}
+        <nav className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-xs font-mono">
+          {allTags.map((tag) => (
             <button
-              onClick={() => reloadFeed(selectedTag)}
-              className="px-5 py-2.5 rounded-full bg-gold text-slate-950 font-bold text-xs shadow-2xl flex items-center gap-2 transition-transform hover:scale-105 cursor-pointer"
+              key={tag}
+              type="button"
+              onClick={() => setSelectedTag(tag)}
+              className={`px-3 py-1.5 rounded-full transition-all cursor-pointer whitespace-nowrap ${
+                selectedTag === tag
+                  ? 'bg-gold text-slate-950 font-bold shadow-sm'
+                  : 'bg-surface border border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white hover:border-gold/30'
+              }`}
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>↑ New discussions published — Click to reload</span>
+              {tag === 'All' ? 'c/All' : `c/${tag}`}
             </button>
-          </div>
-        )}
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              if (!user) {
+                setOnboardingInitialStep(1)
+                setIsOnboardingOpen(true)
+                return
+              }
+              setIsCreateCommunityOpen(true)
+            }}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-dashed border-gold/40 text-gold hover:bg-gold/10 transition-colors cursor-pointer text-xs font-mono font-medium whitespace-nowrap"
+            title="Create a new student community"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Community</span>
+          </button>
+        </nav>
 
-        {/* ─── Create Post Card (Maximized Spacing & Minimalist Design) ─── */}
-        <section className="rounded-2xl sm:rounded-3xl border border-black/[0.08] dark:border-white/[0.08] hover:border-gold/40 dark:hover:border-gold/30 bg-surface p-7 sm:p-9 md:p-10 shadow-sm dark:shadow-none space-y-6 transition-all duration-300">
-          <div className="flex items-center gap-5">
-            <div className="w-12 h-12 rounded-full bg-surface-subtle border border-black/[0.08] dark:border-white/[0.1] flex items-center justify-center shrink-0 ring-2 ring-gold/20 overflow-hidden">
+        {/* Search Input */}
+        <div className="relative w-full sm:w-64">
+          <Search
+            size={13}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/30"
+          />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search discussions & notes..."
+            className="w-full bg-surface border border-black/[0.08] dark:border-white/10 rounded-full pl-8 pr-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none focus:border-gold transition-colors"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ─── Reddit 2-Column Layout Grid ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* ─── Main Feed Column (Left / Center, 8 cols) ─── */}
+        <div className="lg:col-span-8 space-y-4">
+          {/* Realtime Post Update Floating Alert */}
+          {hasNewPosts && (
+            <div className="sticky top-20 z-40 flex justify-center">
+              <button
+                onClick={() => reloadFeed(selectedTag)}
+                className="px-5 py-2 rounded-full bg-gold text-slate-950 font-bold text-xs shadow-2xl flex items-center gap-2 transition-transform hover:scale-105 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>↑ New discussions published — Reload</span>
+              </button>
+            </div>
+          )}
+
+          {/* Reddit Compact Create Post Box */}
+          <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-3.5 sm:p-4 flex items-center gap-3 shadow-sm dark:shadow-none">
+            <div className="w-9 h-9 rounded-full bg-surface-subtle border border-gold/30 flex items-center justify-center shrink-0 ring-2 ring-gold/20 overflow-hidden text-gold font-bold text-xs">
               {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
-                <Image
-                  src={userProfile.avatar}
-                  alt="Student"
-                  width={48}
-                  height={48}
-                  className="rounded-full object-cover w-full h-full"
-                />
+                <Image src={userProfile.avatar} alt="Avatar" width={36} height={36} className="w-full h-full object-cover" />
               ) : (
                 renderAvatarIcon(userProfile?.avatar, userProfile?.name || user?.name)
               )}
             </div>
             <button
+              type="button"
               onClick={() => {
                 if (!user) {
                   setOnboardingInitialStep(1)
@@ -743,263 +1115,759 @@ export default function CommunityPage() {
                 }
                 setIsCreateOpen(true)
               }}
-              className="flex-1 bg-surface-subtle hover:bg-black/[0.04] dark:hover:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] text-left px-6 py-4 rounded-2xl text-slate-400 dark:text-white/40 text-sm transition-colors cursor-pointer"
+              className="flex-1 bg-surface-subtle hover:bg-black/[0.04] dark:hover:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] text-left px-4 py-2.5 rounded-xl text-slate-400 dark:text-white/40 text-xs sm:text-sm transition-colors cursor-pointer"
             >
-              Start a technical discussion, share course notes, or ask a question...
+              Create Post...
             </button>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-black/[0.05] dark:border-white/[0.06] text-xs">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 shrink-0">
               <button
+                type="button"
                 onClick={() => {
                   if (!user) {
                     setOnboardingInitialStep(1)
                     setIsOnboardingOpen(true)
                     return
                   }
+                  setSelectedPostTag('Academics')
                   setIsCreateOpen(true)
                   setTimeout(() => fileInputRef.current?.click(), 100)
                 }}
-                className="flex items-center gap-2 text-slate-500 dark:text-white/50 hover:text-gold px-4 py-2.5 rounded-xl hover:bg-surface-subtle transition-colors font-medium cursor-pointer"
+                className="p-2 rounded-xl text-slate-400 hover:text-gold hover:bg-surface-subtle transition-colors cursor-pointer"
+                title="Attach Course Module PDF"
               >
-                <FileText className="w-4 h-4 text-gold shrink-0" />
-                <span>Attach Module PDF</span>
+                <FileText className="w-4 h-4" />
               </button>
               <button
+                type="button"
                 onClick={() => {
                   if (!user) {
                     setOnboardingInitialStep(1)
                     setIsOnboardingOpen(true)
                     return
                   }
+                  setSelectedPostTag('Tech & Code')
+                  setPostContent('```typescript\n// Share code snippet, debugging issue, or architecture question\n\n```\n')
                   setIsCreateOpen(true)
                 }}
-                className="flex items-center gap-2 text-slate-500 dark:text-white/50 hover:text-gold px-4 py-2.5 rounded-xl hover:bg-surface-subtle transition-colors font-medium cursor-pointer"
+                className="p-2 rounded-xl text-slate-400 hover:text-gold hover:bg-surface-subtle transition-colors cursor-pointer"
+                title="Share Code Snippet"
               >
-                <Sparkles className="w-4 h-4 text-gold shrink-0" />
-                <span>Project Question</span>
+                <Code2 className="w-4 h-4" />
               </button>
             </div>
-
-            <div className="text-slate-400 dark:text-white/40 font-mono text-[11px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-subtle">
-              <UserCheck className="w-3.5 h-3.5 text-gold" />
-              <span>
-                {user
-                  ? userProfile?.username
-                    ? userProfile.username.startsWith('@')
-                      ? userProfile.username
-                      : `@${userProfile.username}`
-                    : 'Setup Username'
-                  : 'Connect Account'}
-              </span>
-            </div>
           </div>
-        </section>
 
-        {/* ─── Discussions Feed (Spacious Gap & Minimalist Cards) ─── */}
-        {loading && posts.length === 0 ? (
-          <div className="space-y-8 sm:space-y-10">
-            {[1, 2, 3].map(n => (
-              <div key={n} className="rounded-2xl sm:rounded-3xl border border-black/[0.06] dark:border-white/[0.08] bg-surface p-8 sm:p-10 space-y-6 animate-pulse">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-surface-subtle" />
-                  <div className="space-y-2 flex-1">
-                    <div className="w-36 h-3.5 bg-surface-subtle rounded-md" />
-                    <div className="w-24 h-2.5 bg-surface-subtle/70 rounded-md" />
-                  </div>
-                </div>
-                <div className="space-y-3 pt-2">
-                  <div className="w-full h-3 bg-surface-subtle rounded-md" />
-                  <div className="w-4/5 h-3 bg-surface-subtle rounded-md" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : filteredPosts.length === 0 ? (
-          <div className="py-20 text-center border border-dashed border-black/10 dark:border-white/10 rounded-2xl sm:rounded-3xl space-y-3 p-10 bg-surface/40">
-            <MessageSquare className="w-10 h-10 text-slate-400 dark:text-white/30 mx-auto opacity-50" />
-            <h3 className="font-display font-bold text-base text-slate-900 dark:text-white uppercase tracking-wider">
-              No discussions found
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-white/50 max-w-sm mx-auto">
-              {searchQuery ? `No matches found for "${searchQuery}".` : 'Be the first student to publish notes or ask an engineering question in this category.'}
-            </p>
-            {searchQuery && (
+          {/* Feed Sort & Quick Filters Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs py-1">
+            {/* Sort Modes */}
+            <div className="flex items-center gap-1 bg-surface-subtle p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08]">
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
-                className="text-xs font-mono text-gold hover:underline underline-offset-4 uppercase tracking-wider cursor-pointer pt-2"
+                onClick={() => setSortBy('latest')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
+                  sortBy === 'latest'
+                    ? 'bg-surface text-gold font-bold shadow-sm border border-gold/30'
+                    : 'text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
+                }`}
               >
-                Clear Search
+                <Clock className="w-3 h-3" />
+                <span>Latest</span>
               </button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-8 sm:space-y-10">
-            {filteredPosts.map((post, idx) => (
-              <ScrollReveal key={post.$id} delay={(idx % 3) * 0.05}>
-                <article className="rounded-2xl sm:rounded-3xl border border-black/[0.08] dark:border-white/[0.08] hover:border-gold/50 dark:hover:border-gold/40 bg-surface p-7 sm:p-9 md:p-10 transition-all duration-300 shadow-sm dark:shadow-none space-y-6">
-                  {/* Author Header */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-surface-subtle border border-black/[0.08] dark:border-white/[0.1] flex items-center justify-center shrink-0 overflow-hidden ring-2 ring-gold/20">
-                        {post.author_avatar && !post.author_avatar.startsWith('preset:') ? (
-                          <Image
-                            src={post.author_avatar}
-                            alt={post.author_display_name}
-                            width={48}
-                            height={48}
-                            className="object-cover w-full h-full"
-                          />
-                        ) : (
-                          renderAvatarIcon(post.author_avatar, post.author_display_name)
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <span className="font-display font-bold text-sm sm:text-base text-slate-900 dark:text-white font-mono">
-                            {post.author_display_name.startsWith('@') || post.author_display_name.startsWith('Anonymous')
-                              ? post.author_display_name
-                              : `@${post.author_display_name.toLowerCase().replace(/[^a-z0-9_.]/g, '')}`}
-                          </span>
+              <button
+                type="button"
+                onClick={() => setSortBy('popular')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
+                  sortBy === 'popular'
+                    ? 'bg-surface text-gold font-bold shadow-sm border border-gold/30'
+                    : 'text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Flame className="w-3 h-3" />
+                <span>Trending</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortBy('discussed')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
+                  sortBy === 'discussed'
+                    ? 'bg-surface text-gold font-bold shadow-sm border border-gold/30'
+                    : 'text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <MessageSquare className="w-3 h-3" />
+                <span>Active</span>
+              </button>
+            </div>
 
-                          {/* 🌟 Exclusive Gold / Yellow Officer Badge (Regular students have NO badge) */}
+            {/* Quick Filter Toggles */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setFilterOnlyWithFiles(!filterOnlyWithFiles)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer ${
+                  filterOnlyWithFiles
+                    ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
+                    : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <FileText className="w-3 h-3" />
+                <span>Modules Only</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterOnlyOfficers(!filterOnlyOfficers)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer ${
+                  filterOnlyOfficers
+                    ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
+                    : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>Officers</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterOnlySaved(!filterOnlySaved)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer ${
+                  filterOnlySaved
+                    ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
+                    : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Bookmark className="w-3 h-3" />
+                <span>Saved ({savedPostIds.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterOnlyMyPosts(!filterOnlyMyPosts)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer ${
+                  filterOnlyMyPosts
+                    ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
+                    : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <User className="w-3 h-3" />
+                <span>My Posts</span>
+              </button>
+            </div>
+          </div>
+
+          {/* ─── Discussions Feed ─── */}
+          {loading && posts.length === 0 ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(n => (
+                <div key={n} className="rounded-2xl border border-black/[0.06] dark:border-white/[0.08] bg-surface p-6 space-y-4 animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-surface-subtle" />
+                    <div className="space-y-1.5 flex-1">
+                      <div className="w-32 h-3 bg-surface-subtle rounded-md" />
+                      <div className="w-20 h-2 bg-surface-subtle/70 rounded-md" />
+                    </div>
+                  </div>
+                  <div className="space-y-2 pt-1">
+                    <div className="w-full h-3 bg-surface-subtle rounded-md" />
+                    <div className="w-3/4 h-3 bg-surface-subtle rounded-md" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredPosts.length === 0 ? (
+            <div className="py-14 text-center border border-dashed border-black/10 dark:border-white/10 rounded-2xl p-8 bg-surface/50 space-y-5">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-gold/10 border border-gold/20 flex items-center justify-center text-gold shadow-inner">
+                <MessageSquare className="w-7 h-7" />
+              </div>
+
+              <div className="space-y-1.5 max-w-md mx-auto">
+                <h3 className="font-display font-black text-base text-slate-900 dark:text-white uppercase tracking-wider">
+                  {searchQuery
+                    ? `No results for "${searchQuery}"`
+                    : filterOnlySaved
+                    ? 'No bookmarked discussions yet'
+                    : filterOnlyWithFiles
+                    ? 'No discussions with modules attached'
+                    : `No discussions in ${selectedTag}`}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-white/50 leading-relaxed">
+                  {searchQuery
+                    ? 'Try different keywords or clearing active filters.'
+                    : filterOnlySaved
+                    ? 'Save discussions with the bookmark icon to review them here.'
+                    : 'Be the first student to publish notes or ask an engineering question.'}
+                </p>
+              </div>
+
+              {/* Quick Discussion Starter Chips */}
+              {!searchQuery && !filterOnlySaved && (
+                <div className="pt-1 space-y-2 max-w-md mx-auto">
+                  <span className="text-[10px] font-mono text-slate-400 dark:text-white/40 uppercase tracking-widest block font-semibold">
+                    Starter Topics:
+                  </span>
+                  <div className="flex flex-col gap-1.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleQuickStarter(
+                          '📚 CC104: Algorithm Complexity & Tree Traversal Practice Reviewer\n\nSharing lecture notes and midterm problem sets for fellow BSIT 2nd years...',
+                          'Academics'
+                        )
+                      }
+                      className="px-3 py-2 rounded-xl bg-surface hover:bg-gold/15 text-slate-700 dark:text-slate-300 hover:text-gold border border-black/[0.08] dark:border-white/[0.08] text-xs font-mono transition-all text-left cursor-pointer"
+                    >
+                      📚 CC104 Reviewer Notes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleQuickStarter(
+                          '⚡ What are the best state management patterns for Next.js 15 App Router?\n\n```typescript\n// How are you structuring shared state across server and client components?\n```\n',
+                          'Tech & Code'
+                        )
+                      }
+                      className="px-3 py-2 rounded-xl bg-surface hover:bg-gold/15 text-slate-700 dark:text-slate-300 hover:text-gold border border-black/[0.08] dark:border-white/[0.08] text-xs font-mono transition-all text-left cursor-pointer"
+                    >
+                      ⚡ Next.js Architecture Question
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleQuickStarter(
+                          '🛠️ Looking for Capstone Project Teammates (IoT / Mobile / Web)\n\nSeeking collaborators proficient in Flutter or Next.js for our upcoming BSIT capstone...',
+                          'Projects'
+                        )
+                      }
+                      className="px-3 py-2 rounded-xl bg-surface hover:bg-gold/15 text-slate-700 dark:text-slate-300 hover:text-gold border border-black/[0.08] dark:border-white/[0.08] text-xs font-mono transition-all text-left cursor-pointer"
+                    >
+                      🛠️ Capstone Team Callout
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-center gap-3 pt-2">
+                {(searchQuery || filterOnlyWithFiles || filterOnlyOfficers || filterOnlySaved) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('')
+                      setFilterOnlyWithFiles(false)
+                      setFilterOnlyOfficers(false)
+                      setFilterOnlySaved(false)
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-mono text-slate-500 hover:text-slate-900 dark:hover:text-white border border-black/[0.08] dark:border-white/[0.1] cursor-pointer transition-colors"
+                  >
+                    Reset Filters
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!user) {
+                      setOnboardingInitialStep(1)
+                      setIsOnboardingOpen(true)
+                      return
+                    }
+                    setSelectedPostTag(selectedTag === 'All' ? 'Discussions' : selectedTag)
+                    setIsCreateOpen(true)
+                  }}
+                  className="px-5 py-2 rounded-xl bg-gold hover:bg-gold-muted text-slate-950 font-bold text-xs uppercase tracking-wider transition-colors shadow-sm cursor-pointer"
+                >
+                  Create Post
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredPosts.map((post, idx) => {
+                const isLiked = userLikedPosts.includes(post.$id)
+                const isSaved = savedPostIds.includes(post.$id)
+                const isCopied = copiedPostId === post.$id
+
+                return (
+                  <ScrollReveal key={post.$id} delay={(idx % 3) * 0.04}>
+                    <article
+                      id={`post-${post.$id}`}
+                      className={`relative overflow-hidden rounded-2xl border transition-all duration-300 p-5 sm:p-6 space-y-4 shadow-sm dark:shadow-none ${
+                        post.is_officer
+                          ? 'border-gold/40 dark:border-gold/30 hover:border-gold bg-surface dark:bg-gradient-to-b dark:from-gold/[0.04] dark:to-surface'
+                          : 'border-black/[0.08] dark:border-white/[0.08] hover:border-gold/50 dark:hover:border-gold/40 bg-surface'
+                      }`}
+                    >
+                      {/* Officer Accent Top Glow */}
+                      {post.is_officer && (
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-gold to-transparent" />
+                      )}
+
+                      {/* Reddit-Style Post Header */}
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Community Flair */}
+                          <span className="font-mono text-[11px] font-bold text-gold px-2.5 py-0.5 rounded-full bg-gold/10 border border-gold/30">
+                            c/{post.tags?.[0] || 'Discussions'}
+                          </span>
+                          <span className="text-slate-300 dark:text-white/20">•</span>
+                          {/* Author */}
+                          <span className="font-mono text-[12px] font-semibold text-slate-700 dark:text-slate-300">
+                            u/{post.author_display_name.startsWith('@') ? post.author_display_name.slice(1) : post.author_display_name}
+                          </span>
+                          {/* Officer Badge */}
                           {post.is_officer && (
-                            <span
-                              className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gold/10 dark:bg-gold/15 border border-gold/30 text-gold text-[10px] font-mono font-bold uppercase tracking-wider"
-                              title={`Official PSITS Executive: ${post.officer_title || 'Officer'}`}
-                            >
-                              <Sparkles className="w-3 h-3 text-gold" />
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gold/15 border border-gold/40 text-gold text-[10px] font-mono font-bold uppercase tracking-wider">
+                              <Sparkles className="w-2.5 h-2.5" />
                               <span>PSITS {post.officer_title || 'Officer'}</span>
                             </span>
                           )}
+                          <span className="text-slate-300 dark:text-white/20">•</span>
+                          <span className="text-[11px] font-mono text-slate-400 dark:text-white/40">
+                            {post.author_year_section || 'BSIT'}
+                          </span>
+                          <span className="text-slate-300 dark:text-white/20">•</span>
+                          <span className="text-[11px] font-mono text-slate-400 dark:text-white/40" title={new Date(post.$createdAt).toLocaleString()}>
+                            {formatRelativeTime(post.$createdAt)}
+                          </span>
                         </div>
-                        <div className="text-[11px] font-mono text-slate-500 dark:text-white/40 pt-1 flex items-center gap-2">
-                          <span>{post.author_year_section || 'BSIT'}</span>
-                          <span>•</span>
-                          <span>{new Date(post.$createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+
+                        {/* Admin Takedown */}
+                        {isAdmin && (
+                          <button
+                            onClick={() => setTakedownTarget(post)}
+                            className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors cursor-pointer"
+                            title="Moderator Action: Takedown Post"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Post Markdown & Code Content */}
+                      <PostMarkdownContent content={post.content} />
+
+                      {/* Document Attachments */}
+                      {post.attachments && post.attachments.length > 0 && (
+                        <div className="space-y-2 pt-1">
+                          {post.attachments.map((fileId, i) => {
+                            const name = post.attachment_names?.[i] || 'Document Attachment'
+                            const size = post.attachment_sizes?.[i] || ''
+                            const isPdf = name.toLowerCase().endsWith('.pdf')
+                            const isImg = /\.(jpg|jpeg|png|webp|gif)$/i.test(name)
+                            const isCode = /\.(zip|rar|tar|gz|json|js|ts|py|cpp|java|sql)$/i.test(name)
+
+                            return (
+                              <div
+                                key={fileId}
+                                className="flex items-center justify-between p-3.5 rounded-xl bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08] hover:border-gold/40 transition-colors group"
+                              >
+                                <div className="flex items-center gap-3 overflow-hidden pr-3">
+                                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border ${
+                                    isPdf
+                                      ? 'bg-rose-500/15 border-rose-500/30 text-rose-500'
+                                      : isImg
+                                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-500'
+                                      : 'bg-gold/15 border-gold/30 text-gold'
+                                  }`}>
+                                    {isPdf ? (
+                                      <FileText className="w-4 h-4" />
+                                    ) : isImg ? (
+                                      <ImageIcon className="w-4 h-4" />
+                                    ) : isCode ? (
+                                      <FileCode className="w-4 h-4" />
+                                    ) : (
+                                      <FileText className="w-4 h-4" />
+                                    )}
+                                  </div>
+                                  <div className="truncate">
+                                    <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-gold transition-colors truncate">
+                                      {name}
+                                    </div>
+                                    <div className="text-[10px] font-mono text-slate-500 dark:text-white/40 flex items-center gap-2 pt-0.5">
+                                      <span>{isPdf ? 'PDF Module' : isImg ? 'Image' : isCode ? 'Code Archive' : 'File'}</span>
+                                      {size && <span>• {size}</span>}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <a
+                                  href={appwriteStorage.getFileView(APPWRITE_STORAGE_BUCKET_ID, fileId)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-lg bg-surface hover:bg-gold hover:text-slate-950 text-slate-800 dark:text-slate-200 border border-black/[0.08] dark:border-white/[0.1] font-bold text-[11px] font-mono transition-colors shrink-0 shadow-sm"
+                                >
+                                  Download
+                                </a>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Reddit-Style Bottom Action Strip */}
+                      <div className="flex items-center gap-2 pt-3 border-t border-black/[0.05] dark:border-white/[0.06] text-xs text-slate-500 dark:text-white/40 flex-wrap">
+                        {/* Reaction / Upvote Pill */}
+                        <button
+                          type="button"
+                          onClick={() => handleReaction(post)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors font-mono text-[11px] cursor-pointer ${
+                            isLiked
+                              ? 'bg-gold/15 text-gold font-bold border border-gold/40'
+                              : 'bg-surface-subtle hover:bg-gold/10 hover:text-gold border border-black/[0.06] dark:border-white/[0.08]'
+                          }`}
+                        >
+                          <ThumbsUp className={`w-3.5 h-3.5 ${isLiked ? 'fill-gold text-gold' : ''}`} />
+                          <span>{post.likes_count}</span>
+                        </button>
+
+                        {/* Comments Pill */}
+                        <button
+                          type="button"
+                          onClick={() => openComments(post)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-subtle hover:bg-gold/10 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] transition-colors font-mono text-[11px] cursor-pointer"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>{post.comments_count} Replies</span>
+                        </button>
+
+                        {/* Share Pill */}
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPostLink(post)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-subtle hover:bg-black/5 dark:hover:bg-white/10 border border-black/[0.06] dark:border-white/[0.08] transition-colors font-mono text-[11px] cursor-pointer"
+                        >
+                          {isCopied ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-emerald-400 font-bold">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Share2 className="w-3.5 h-3.5" />
+                              <span>Share</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* Bookmark Pill */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSavePost(post.$id)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-colors font-mono text-[11px] cursor-pointer ${
+                            isSaved
+                              ? 'bg-gold/15 text-gold font-bold border-gold/40'
+                              : 'bg-surface-subtle hover:bg-black/5 dark:hover:bg-white/10 border-black/[0.06] dark:border-white/[0.08]'
+                          }`}
+                          title={isSaved ? 'Saved to bookmarks' : 'Save discussion'}
+                        >
+                          <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-gold text-gold' : ''}`} />
+                          <span>{isSaved ? 'Saved' : 'Save'}</span>
+                        </button>
+                      </div>
+                    </article>
+                  </ScrollReveal>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ─── Reddit-Style Right Sidebar (4 cols, Sticky) ─── */}
+        <aside className="hidden lg:flex flex-col gap-5 lg:col-span-4 sticky top-20">
+          {/* About Community Card */}
+          <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-5 space-y-4 shadow-sm dark:shadow-none">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/30 flex items-center justify-center text-gold font-bold text-xs">
+                UA
+              </div>
+              <div>
+                <h3 className="font-display font-black text-sm text-slate-900 dark:text-white uppercase tracking-tight">
+                  c/BSIT-Community
+                </h3>
+                <p className="text-[10px] font-mono text-slate-400 dark:text-white/40">University of Antique</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!user) {
+                  setOnboardingInitialStep(1)
+                  setIsOnboardingOpen(true)
+                  return
+                }
+                setIsCreateCommunityOpen(true)
+              }}
+              className="w-full py-2.5 rounded-xl bg-gold hover:bg-gold-muted text-slate-950 font-bold text-xs uppercase tracking-wider transition-colors shadow-sm cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Community</span>
+            </button>
+
+            {/* Created & Joined Community Tiles */}
+            <div className="space-y-2 pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
+              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                <span className="uppercase tracking-wider font-bold">Communities & Guilds</span>
+                <span>{joinedCommunities.length} Joined</span>
+              </div>
+
+              <div className="space-y-1.5 max-h-60 overflow-y-auto pr-0.5 scrollbar-thin">
+                {displayCommunities.map((comm) => {
+                  const isJoined = joinedCommunities.includes(comm.name)
+                  const isSelected = selectedTag === comm.name
+                  return (
+                    <div
+                      key={comm.name}
+                      onClick={() => setSelectedTag(comm.name)}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer group ${
+                        isSelected
+                          ? 'bg-gold/15 border-gold shadow-xs text-gold'
+                          : 'bg-surface-subtle hover:bg-gold/10 border-black/[0.05] dark:border-white/[0.06] hover:border-gold/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 overflow-hidden ${
+                          isSelected
+                            ? 'bg-gold text-slate-950 shadow-xs'
+                            : 'bg-gold/15 text-gold border border-gold/30'
+                        }`}>
+                          {comm.logo ? (
+                            <Image
+                              src={comm.logo}
+                              alt={comm.name}
+                              width={28}
+                              height={28}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span>{comm.name.charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-bold text-xs truncate text-slate-900 dark:text-white group-hover:text-gold transition-colors">
+                            c/{comm.name}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-400 truncate">
+                            {comm.isCustom ? (comm.category || 'Student Created') : (comm.topic || 'Guild')}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Moderator Takedown Button (Admins only) */}
-                    {isAdmin && (
                       <button
-                        onClick={() => setTakedownTarget(post)}
-                        className="text-slate-400 hover:text-rose-500 p-2 rounded-xl hover:bg-rose-500/10 transition-colors cursor-pointer"
-                        title="Moderator Action: Takedown Post"
+                        type="button"
+                        onClick={(e) => toggleJoinCommunity(comm.name, e)}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold transition-all cursor-pointer shrink-0 ${
+                          isJoined
+                            ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 hover:bg-rose-500/15 hover:text-rose-500 hover:border-rose-500/30'
+                            : 'bg-surface hover:bg-gold hover:text-slate-950 text-slate-600 dark:text-white/60 border border-black/[0.08] dark:border-white/10'
+                        }`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {isJoined ? 'Joined' : '+ Join'}
                       </button>
-                    )}
-                  </div>
-
-                  {/* Content with maximized breathing room */}
-                  <div className="text-sm sm:text-base text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed pt-1">
-                    {post.content}
-                  </div>
-
-                  {/* Document Attachments (Spacious Card Design) */}
-                  {post.attachments && post.attachments.length > 0 && (
-                    <div className="space-y-3 pt-2">
-                      {post.attachments.map((fileId, i) => {
-                        const name = post.attachment_names?.[i] || 'Document Attachment'
-                        const size = post.attachment_sizes?.[i] || ''
-                        const isPdf = name.toLowerCase().endsWith('.pdf')
-
-                        return (
-                          <div
-                            key={fileId}
-                            className="flex items-center justify-between p-4 sm:p-5 rounded-2xl bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08] hover:border-gold/40 transition-colors group"
-                          >
-                            <div className="flex items-center gap-4 overflow-hidden pr-3">
-                              <div className="w-11 h-11 rounded-xl bg-gold/15 border border-gold/30 flex items-center justify-center text-gold shrink-0">
-                                <FileText className="w-5 h-5" />
-                              </div>
-                              <div className="truncate">
-                                <div className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white group-hover:text-gold transition-colors truncate">
-                                  {name}
-                                </div>
-                                <div className="text-[10px] font-mono text-slate-500 dark:text-white/40 flex items-center gap-2 pt-0.5">
-                                  <span>{isPdf ? 'PDF Module' : 'Media Asset'}</span>
-                                  {size && <span>• {size}</span>}
-                                </div>
-                              </div>
-                            </div>
-
-                            <a
-                              href={appwriteStorage.getFileView(APPWRITE_STORAGE_BUCKET_ID, fileId)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-4 py-2 rounded-xl bg-surface hover:bg-gold hover:text-slate-950 text-slate-800 dark:text-slate-200 border border-black/[0.08] dark:border-white/[0.1] font-bold text-xs transition-colors shrink-0 shadow-sm"
-                            >
-                              Download
-                            </a>
-                          </div>
-                        )
-                      })}
                     </div>
-                  )}
+                  )
+                })}
+              </div>
+            </div>
 
-                  {/* Tag Chips */}
-                  {post.tags && post.tags.length > 0 && (
-                    <div className="flex items-center gap-2 pt-1">
-                      {post.tags.map(t => (
-                        <span
-                          key={t}
-                          className="text-[11px] font-mono font-medium px-3 py-1 rounded-lg bg-surface-subtle text-gold/90 border border-black/[0.06] dark:border-white/[0.08]"
-                        >
-                          #{t}
+            <button
+              type="button"
+              onClick={() => {
+                setOnboardingInitialStep(1)
+                setIsOnboardingOpen(true)
+              }}
+              className="w-full text-center text-[11px] font-mono text-slate-400 hover:text-gold transition-colors cursor-pointer pt-1"
+            >
+              View Onboarding Tour →
+            </button>
+          </div>
+
+          {/* Community Notifications & Live Activity Card (Option C Hybrid) */}
+          <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-5 space-y-3.5 shadow-sm dark:shadow-none text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="flex items-center gap-2 font-display font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-white">
+                <Bell className="w-4 h-4 text-gold" />
+                <span>Notices & Activity</span>
+              </div>
+              <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                isOffline
+                  ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                  : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-rose-500' : 'bg-emerald-500 animate-pulse'}`} />
+                {isOffline ? 'OFFLINE' : 'LIVE'}
+              </span>
+            </div>
+
+            {/* Sub-tabs: Broadcasts vs Mentions */}
+            <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl border border-black/[0.04] dark:border-white/[0.04] text-[11px] font-medium">
+              <button
+                type="button"
+                onClick={() => setNotifTab('broadcasts')}
+                className={`flex-1 py-1 px-2 rounded-lg text-center transition-all cursor-pointer ${
+                  notifTab === 'broadcasts'
+                    ? 'bg-surface shadow-xs text-slate-900 dark:text-white font-bold'
+                    : 'text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Broadcasts
+              </button>
+              <button
+                type="button"
+                onClick={() => setNotifTab('mentions')}
+                className={`flex-1 py-1 px-2 rounded-lg text-center transition-all cursor-pointer ${
+                  notifTab === 'mentions'
+                    ? 'bg-surface shadow-xs text-slate-900 dark:text-white font-bold'
+                    : 'text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Mentions
+              </button>
+            </div>
+
+            {/* Content Area */}
+            {notifTab === 'broadcasts' ? (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5 scrollbar-thin">
+                {broadcastItems.length > 0 ? (
+                  broadcastItems.map(post => (
+                    <div
+                      key={post.$id}
+                      onClick={() => openComments(post)}
+                      className="group p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.04] hover:border-gold/30 transition-all cursor-pointer space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-semibold text-gold truncate max-w-[130px]">
+                          {post.is_officer ? `PSITS ${post.officer_title || 'Officer'}` : (post.tags?.[0] ? `c/${post.tags[0]}` : 'c/Community')}
                         </span>
+                        <span className="text-slate-400 font-mono text-[9px]">
+                          {new Date(post.$createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-700 dark:text-white/70 line-clamp-2 leading-relaxed group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                        {post.content}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-4 text-center text-slate-400 text-[11px]">
+                    No active dispatches right now.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {user ? (
+                  userActivityItems.length > 0 ? (
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5 scrollbar-thin">
+                      {userActivityItems.map(post => (
+                        <div
+                          key={post.$id}
+                          onClick={() => openComments(post)}
+                          className="group p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.04] hover:border-gold/30 transition-all cursor-pointer space-y-1"
+                        >
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="font-medium text-emerald-500 font-mono flex items-center gap-1">
+                              <MessageSquare className="w-3 h-3" />
+                              {post.comments_count} {post.comments_count === 1 ? 'reply' : 'replies'}
+                            </span>
+                            <span className="text-gold font-mono text-[9px]">{post.likes_count} upvotes</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 dark:text-white/70 line-clamp-2 leading-relaxed">
+                            {post.content}
+                          </p>
+                        </div>
                       ))}
                     </div>
-                  )}
-
-                  {/* Engagement Strip */}
-                  <div className="flex items-center justify-between pt-5 border-t border-black/[0.05] dark:border-white/[0.06] text-xs text-slate-500 dark:text-white/40">
-                    <div className="flex items-center gap-6">
-                      <button
-                        onClick={() => handleReaction(post)}
-                        className="flex items-center gap-2 hover:text-gold transition-colors font-medium group cursor-pointer"
-                      >
-                        <ThumbsUp className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                        <span>{post.likes_count} Reactions</span>
-                      </button>
-                      <button
-                        onClick={() => openComments(post)}
-                        className="flex items-center gap-2 hover:text-gold transition-colors font-medium group cursor-pointer"
-                      >
-                        <MessageSquare className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                        <span>{post.comments_count} Replies</span>
-                      </button>
+                  ) : (
+                    <div className="py-5 text-center space-y-1">
+                      <div className="w-8 h-8 rounded-full bg-surface-subtle mx-auto flex items-center justify-center text-slate-400">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <div className="text-[11px] font-semibold text-slate-700 dark:text-white/80">All caught up!</div>
+                      <p className="text-[10px] text-slate-400 leading-tight">No unread mentions or replies on your posts.</p>
                     </div>
-
+                  )
+                ) : (
+                  <div className="p-3.5 rounded-xl bg-surface-subtle border border-dashed border-gold/30 text-center space-y-2">
+                    <p className="text-[11px] text-slate-600 dark:text-white/60 leading-relaxed">
+                      Connect your student ID to receive mention alerts and reply notifications.
+                    </p>
                     <button
+                      type="button"
                       onClick={() => {
-                        if (navigator.share) {
-                          navigator.share({
-                            title: 'PSITS Community Post',
-                            text: post.content.slice(0, 100),
-                            url: window.location.href,
-                          })
-                        } else {
-                          navigator.clipboard.writeText(window.location.href)
-                          alert('Link copied to clipboard!')
-                        }
+                        setOnboardingInitialStep(1)
+                        setIsOnboardingOpen(true)
                       }}
-                      className="flex items-center gap-2 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-gold hover:bg-gold-muted text-slate-950 font-bold text-[10px] tracking-wide transition-colors cursor-pointer w-full"
                     >
-                      <Share2 className="w-4 h-4" />
-                      <span>Share</span>
+                      Connect Student ID
                     </button>
                   </div>
-                </article>
-              </ScrollReveal>
-            ))}
+                )}
+              </div>
+            )}
           </div>
-        )}
-      </main>
+
+          {/* Quick Resource Shortcuts Card */}
+          <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-5 space-y-3 shadow-sm dark:shadow-none text-xs font-mono">
+            <div className="font-bold text-[11px] uppercase tracking-wider text-slate-400 dark:text-white/40">
+              Quick Shortcuts
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => setFilterOnlyWithFiles(prev => !prev)}
+                className={`flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer text-left ${
+                  filterOnlyWithFiles ? 'bg-gold/15 text-gold font-bold' : 'hover:bg-surface-subtle text-slate-600 dark:text-white/70'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5 text-gold" />
+                  <span>PDF Course Modules</span>
+                </span>
+                <span className="text-[10px] text-slate-400">Filter</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterOnlyOfficers(prev => !prev)}
+                className={`flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer text-left ${
+                  filterOnlyOfficers ? 'bg-gold/15 text-gold font-bold' : 'hover:bg-surface-subtle text-slate-600 dark:text-white/70'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-gold" />
+                  <span>Executive Dispatches</span>
+                </span>
+                <span className="text-[10px] text-slate-400">Filter</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterOnlySaved(prev => !prev)}
+                className={`flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer text-left ${
+                  filterOnlySaved ? 'bg-gold/15 text-gold font-bold' : 'hover:bg-surface-subtle text-slate-600 dark:text-white/70'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Bookmark className="w-3.5 h-3.5 text-gold" />
+                  <span>My Saved Posts</span>
+                </span>
+                <span className="text-[10px] text-slate-400">({savedPostIds.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterOnlyMyPosts(prev => !prev)}
+                className={`flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer text-left ${
+                  filterOnlyMyPosts ? 'bg-gold/15 text-gold font-bold' : 'hover:bg-surface-subtle text-slate-600 dark:text-white/70'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <User className="w-3.5 h-3.5 text-gold" />
+                  <span>My Published Posts</span>
+                </span>
+                <span className="text-[10px] text-slate-400">Filter</span>
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
 
       {/* ─── Premium iOS-Style Community Onboarding Modal ─── */}
       <CommunityOnboardingModal
@@ -1010,9 +1878,185 @@ export default function CommunityPage() {
         onProfileUpdated={(updated) => {
           setUserProfile(updated)
           setUser(prev => prev ? { ...prev, name: updated.name, avatar: updated.avatar } : null)
+          window.dispatchEvent(new CustomEvent('psits:profile-updated'))
         }}
         initialStep={onboardingInitialStep}
       />
+
+      {/* ─── Create Community Modal ─── */}
+      {isCreateCommunityOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6">
+          <div className="w-full max-w-lg rounded-[28px] sm:rounded-[36px] bg-surface border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-7 sm:p-9 space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.08] pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-display font-black text-lg text-slate-900 dark:text-white uppercase tracking-tight">
+                    Create a Community
+                  </h3>
+                  <p className="text-[11px] font-mono text-slate-400">Launch a specialized student guild or topic circle</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateCommunityOpen(false)}
+                className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-2 rounded-full hover:bg-surface-subtle transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <div className="space-y-4">
+              {/* Community Avatar / Logo Picker */}
+              <div className="flex items-center gap-4 p-3.5 rounded-2xl bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08]">
+                <div className="relative group shrink-0">
+                  <div className="w-16 h-16 rounded-2xl bg-gold/15 border border-gold/40 flex items-center justify-center overflow-hidden shadow-xs">
+                    {newCommunityLogo ? (
+                      <Image
+                        src={newCommunityLogo}
+                        alt="Community Logo"
+                        width={64}
+                        height={64}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="font-mono font-black text-2xl text-gold select-none">
+                        {(newCommunityName.trim().charAt(0) || 'C').toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  {newCommunityLogo && (
+                    <button
+                      type="button"
+                      onClick={() => setNewCommunityLogo('')}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs shadow-md cursor-pointer hover:bg-rose-600 transition-colors"
+                      title="Remove custom logo (use default letter)"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white">
+                    Community Avatar
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-white/50 leading-tight">
+                    {newCommunityLogo
+                      ? 'Custom logo uploaded. Click X to revert to default letter avatar.'
+                      : `Upload a custom logo or auto-use "${(newCommunityName.trim().charAt(0) || 'C').toUpperCase()}" as the default avatar.`}
+                  </p>
+                  <div className="pt-1">
+                    <input
+                      ref={logoFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      onChange={handleLogoFileChange}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploadingLogo}
+                      onClick={() => logoFileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/[0.08] dark:border-white/10 hover:border-gold/40 bg-surface hover:bg-gold/10 text-[11px] font-mono text-slate-700 dark:text-white/80 hover:text-gold transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5 text-gold" />
+                      <span>{isUploadingLogo ? 'Processing...' : (newCommunityLogo ? 'Change Custom Logo' : 'Upload Community Logo')}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Community Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-white/80 block">
+                  Community Name
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-4 font-mono font-bold text-gold text-sm select-none">
+                    c/
+                  </span>
+                  <input
+                    type="text"
+                    value={newCommunityName}
+                    onChange={(e) => {
+                      const slug = e.target.value.toLowerCase().replace(/^c\//, '').replace(/[^a-z0-9-]/g, '')
+                      setNewCommunityName(slug)
+                    }}
+                    placeholder="web-dev, cyber-security, cc104-notes"
+                    maxLength={32}
+                    className="w-full bg-surface-subtle border border-black/[0.08] dark:border-white/10 focus:border-gold rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-900 dark:text-white font-mono placeholder:text-slate-400 focus:outline-none"
+                  />
+                </div>
+                <p className="text-[10px] font-mono text-slate-400">
+                  {32 - newCommunityName.length} characters remaining · Lowercase letters, numbers, and hyphens only
+                </p>
+              </div>
+
+              {/* Category / Domain Selection */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-white/80 block">
+                  Focus Domain
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {['Tech & Code', 'Academics', 'Projects', 'Discussions', 'Gaming & Esports', 'Campus Life'].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setNewCommunityCategory(cat)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                        newCommunityCategory === cat
+                          ? 'bg-gold text-slate-950 font-bold shadow-sm'
+                          : 'bg-surface-subtle text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white border border-black/[0.05] dark:border-white/[0.06]'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-white/80 block">
+                  Description & Purpose
+                </label>
+                <textarea
+                  value={newCommunityDesc}
+                  onChange={(e) => setNewCommunityDesc(e.target.value)}
+                  placeholder="Tell fellow BSIT students what this circle is about, rules, and what to share..."
+                  rows={3}
+                  maxLength={180}
+                  className="w-full bg-surface-subtle border border-black/[0.08] dark:border-white/10 focus:border-gold rounded-xl p-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none resize-none leading-relaxed"
+                />
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
+              <button
+                type="button"
+                onClick={() => setIsCreateCommunityOpen(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={newCommunityName.trim().length < 3}
+                onClick={handleCreateCommunity}
+                className="px-6 py-2.5 rounded-xl bg-gold hover:bg-gold-muted disabled:opacity-40 text-slate-950 font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create c/{newCommunityName.trim() || 'community'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Create Post Modal (Maximized Spacing & Theme-Aware) ─── */}
       {isCreateOpen && (
@@ -1063,7 +2107,7 @@ export default function CommunityPage() {
 
             {/* Category Select */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-              {TAGS.filter(t => t !== 'All').map(t => (
+              {allTags.filter(t => t !== 'All').map(t => (
                 <button
                   key={t}
                   type="button"
@@ -1079,11 +2123,42 @@ export default function CommunityPage() {
               ))}
             </div>
 
+            {/* Quick Markdown & Code Formatter Toolbar */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span className="text-[11px] font-mono text-slate-400 dark:text-white/40">Markdown & code blocks supported</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPostContent(prev => prev + '\n```typescript\n// Paste code here\n\n```\n')}
+                  className="px-2.5 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono text-[11px] transition-colors cursor-pointer"
+                  title="Insert code block"
+                >
+                  &lt;/&gt; Code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostContent(prev => prev + ' **bold text** ')}
+                  className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono font-bold text-[11px] transition-colors cursor-pointer"
+                  title="Insert bold text"
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostContent(prev => prev + '\n- Item 1\n- Item 2\n')}
+                  className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono text-[11px] transition-colors cursor-pointer"
+                  title="Insert list"
+                >
+                  • List
+                </button>
+              </div>
+            </div>
+
             {/* Content Input */}
             <textarea
               value={postContent}
               onChange={e => setPostContent(e.target.value)}
-              placeholder="What would you like to discuss with fellow BSIT students?"
+              placeholder="What would you like to discuss with fellow BSIT students? Markdown and code snippets are automatically highlighted."
               className="w-full h-40 bg-surface-subtle border border-black/[0.08] dark:border-white/10 focus:border-gold rounded-2xl p-5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none resize-none leading-relaxed"
             />
 

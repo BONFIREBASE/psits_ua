@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, ShoppingBag } from 'lucide-react'
+import { Menu, X, ShoppingBag, Sun, Moon, User, FileText, Settings, LogOut, ChevronDown } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
+import { useTheme } from '@/components/ThemeProvider'
+import { supabase } from '@/lib/supabase'
 
 const links = [
   { href: '/', label: 'Home' },
@@ -18,10 +20,37 @@ const links = [
 
 export default function Navbar() {
   const pathname = usePathname()
+  const isCommunity = pathname === '/community' || pathname.startsWith('/community')
   const isMerchActive = pathname === '/merch' || pathname.startsWith('/merch/')
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [hoveredPath, setHoveredPath] = useState<string | null>(null)
+  const [communityUser, setCommunityUser] = useState<{ name: string; username?: string; avatar?: string } | null>(null)
+
+  useEffect(() => {
+    if (!isCommunity) return
+
+    const loadUser = () => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          const meta = session.user.user_metadata || {}
+          setCommunityUser({
+            name: meta.full_name || session.user.email?.split('@')[0] || 'Student',
+            username: meta.community_username || '',
+            avatar: meta.community_avatar || meta.avatar_url || '',
+          })
+        } else {
+          setCommunityUser(null)
+        }
+      }).catch(() => setCommunityUser(null))
+    }
+
+    loadUser()
+
+    const handleProfileUpdate = () => loadUser()
+    window.addEventListener('psits:profile-updated', handleProfileUpdate)
+    return () => window.removeEventListener('psits:profile-updated', handleProfileUpdate)
+  }, [isCommunity])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -29,10 +58,33 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Close mobile drawer on route change
+  const { resolvedTheme, toggleTheme } = useTheme()
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const profileMenuRef = useRef<HTMLDivElement>(null)
+  const mobileProfileMenuRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(target) &&
+        mobileProfileMenuRef.current &&
+        !mobileProfileMenuRef.current.contains(target)
+      ) {
+        setProfileMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const [prevPathname, setPrevPathname] = useState(pathname)
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname)
     setOpen(false)
-  }, [pathname])
+    setProfileMenuOpen(false)
+  }
 
   useEffect(() => {
     if (open) {
@@ -159,30 +211,326 @@ export default function Navbar() {
 
             <div className="w-[1px] h-4 bg-black/10 dark:bg-white/15 mx-1" />
 
-            {/* Desktop Merch Store Utility Link */}
-            <Link
-              href="/merch"
-              className={`
-                relative p-2 rounded-full transition-all duration-200
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60
-                ${isMerchActive
-                  ? 'text-gold bg-gold/15 drop-shadow-[0_0_10px_rgba(245,166,35,0.4)]'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-white/75 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/[0.08]'
-                }
-              `}
-              title="Official Merch Store"
-              aria-label="Official Merch Store"
-            >
-              <ShoppingBag size={17} />
-              <span className="sr-only">Official Merch Store</span>
-            </Link>
+            {/* Desktop Merch & Theme OR Community Student Profile */}
+            {isCommunity ? (
+              <div className="relative flex items-center gap-2 pl-0.5" ref={profileMenuRef}>
+                {communityUser ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setProfileMenuOpen(prev => !prev)}
+                      className={`flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface-subtle hover:bg-gold/15 border transition-all text-xs font-mono cursor-pointer group shadow-sm ${
+                        profileMenuOpen ? 'border-gold bg-gold/15 text-gold' : 'border-gold/30 hover:border-gold'
+                      }`}
+                      title="Student Profile & Settings"
+                      aria-expanded={profileMenuOpen}
+                    >
+                      <div className="w-5 h-5 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold font-bold text-[10px] overflow-hidden shrink-0">
+                        {communityUser.avatar && !communityUser.avatar.startsWith('preset:') ? (
+                          <Image
+                            src={communityUser.avatar}
+                            alt="Avatar"
+                            width={20}
+                            height={20}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span>{communityUser.name.charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-gold transition-colors max-w-[90px] truncate text-[11px]">
+                        {communityUser.username
+                          ? (communityUser.username.startsWith('@') ? communityUser.username : `@${communityUser.username}`)
+                          : communityUser.name}
+                      </span>
+                      <ChevronDown size={11} className={`text-slate-400 group-hover:text-gold transition-transform duration-200 ${profileMenuOpen ? 'rotate-180 text-gold' : ''}`} />
+                    </button>
 
-            <ThemeToggle size={17} />
+                    <AnimatePresence>
+                      {profileMenuOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-2.5 space-y-1.5 z-50 backdrop-blur-xl"
+                        >
+                          {/* Student Details Header */}
+                          <div className="p-2.5 rounded-xl bg-surface-subtle border border-black/[0.04] dark:border-white/[0.06] flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold font-bold text-xs shrink-0 overflow-hidden">
+                              {communityUser.avatar && !communityUser.avatar.startsWith('preset:') ? (
+                                <Image
+                                  src={communityUser.avatar}
+                                  alt="Avatar"
+                                  width={32}
+                                  height={32}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span>{communityUser.name.charAt(0).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                                {communityUser.name}
+                              </div>
+                              <div className="text-[10px] font-mono text-gold truncate">
+                                {communityUser.username
+                                  ? (communityUser.username.startsWith('@') ? communityUser.username : `@${communityUser.username}`)
+                                  : '@kasubay'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Quick Dark / Light Mode Switcher */}
+                          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface-subtle border border-black/[0.04] dark:border-white/[0.06]">
+                            <div className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-white/80">
+                              {resolvedTheme === 'dark' ? <Moon size={13} className="text-gold" /> : <Sun size={13} className="text-gold" />}
+                              <span>Appearance</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleTheme()}
+                              className="px-2.5 py-1 rounded-lg bg-surface border border-black/[0.08] dark:border-white/10 hover:border-gold/40 text-[10px] font-mono font-semibold text-slate-800 dark:text-slate-200 hover:text-gold transition-all cursor-pointer shadow-xs capitalize"
+                            >
+                              {resolvedTheme} mode
+                            </button>
+                          </div>
+
+                          <div className="w-full h-[1px] bg-black/[0.06] dark:bg-white/[0.06] my-1" />
+
+                          {/* Action Items */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProfileMenuOpen(false)
+                              window.dispatchEvent(new CustomEvent('psits:open-profile'))
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gold/15 text-slate-700 dark:text-white/80 hover:text-gold transition-colors text-xs font-medium text-left cursor-pointer"
+                          >
+                            <User size={14} className="text-gold" />
+                            <span>Edit Student Profile</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProfileMenuOpen(false)
+                              window.dispatchEvent(new CustomEvent('psits:filter-my-posts'))
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gold/15 text-slate-700 dark:text-white/80 hover:text-gold transition-colors text-xs font-medium text-left cursor-pointer"
+                          >
+                            <FileText size={14} className="text-gold" />
+                            <span>View My Posts</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProfileMenuOpen(false)
+                              window.dispatchEvent(new CustomEvent('psits:open-onboarding'))
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gold/15 text-slate-700 dark:text-white/80 hover:text-gold transition-colors text-xs font-medium text-left cursor-pointer"
+                          >
+                            <Settings size={14} className="text-gold" />
+                            <span>Tour & Community Guide</span>
+                          </button>
+
+                          <div className="w-full h-[1px] bg-black/[0.06] dark:bg-white/[0.06] my-1" />
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setProfileMenuOpen(false)
+                              await supabase.auth.signOut()
+                              setCommunityUser(null)
+                              window.dispatchEvent(new CustomEvent('psits:profile-updated'))
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-rose-500/15 text-rose-500 transition-colors text-xs font-medium text-left cursor-pointer"
+                          >
+                            <LogOut size={14} />
+                            <span>Disconnect Account</span>
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('psits:open-onboarding'))
+                    }}
+                    className="px-3 py-1 rounded-full bg-gold hover:bg-gold-muted text-slate-950 font-bold text-[11px] font-mono uppercase tracking-wider transition-transform active:scale-95 cursor-pointer shadow-sm"
+                  >
+                    Connect
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Desktop Merch Store Utility Link */}
+                <Link
+                  href="/merch"
+                  className={`
+                    relative p-2 rounded-full transition-all duration-200
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60
+                    ${isMerchActive
+                      ? 'text-gold bg-gold/15 drop-shadow-[0_0_10px_rgba(245,166,35,0.4)]'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-white/75 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/[0.08]'
+                    }
+                  `}
+                  title="Official Merch Store"
+                  aria-label="Official Merch Store"
+                >
+                  <ShoppingBag size={17} />
+                  <span className="sr-only">Official Merch Store</span>
+                </Link>
+
+                <ThemeToggle size={17} />
+              </>
+            )}
           </div>
 
-          {/* Mobile Right Controls: Theme Toggle + Menu Toggle */}
-          <div className="flex items-center gap-1 md:hidden">
-            <ThemeToggle size={18} />
+          {/* Mobile Right Controls: Theme Toggle / Profile + Menu Toggle */}
+          <div className="flex items-center gap-1.5 md:hidden">
+            {isCommunity ? (
+              <div className="relative" ref={mobileProfileMenuRef}>
+                {communityUser ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setProfileMenuOpen(prev => !prev)}
+                      className="w-7 h-7 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold font-bold text-xs overflow-hidden cursor-pointer"
+                      title="Student Profile"
+                      aria-expanded={profileMenuOpen}
+                    >
+                      {communityUser.avatar && !communityUser.avatar.startsWith('preset:') ? (
+                        <Image src={communityUser.avatar} alt="Avatar" width={28} height={28} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{communityUser.name.charAt(0).toUpperCase()}</span>
+                      )}
+                    </button>
+
+                    <AnimatePresence>
+                      {profileMenuOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-2.5 space-y-1.5 z-50 backdrop-blur-xl"
+                        >
+                          <div className="p-2.5 rounded-xl bg-surface-subtle border border-black/[0.04] dark:border-white/[0.06] flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold font-bold text-xs shrink-0 overflow-hidden">
+                              {communityUser.avatar && !communityUser.avatar.startsWith('preset:') ? (
+                                <Image
+                                  src={communityUser.avatar}
+                                  alt="Avatar"
+                                  width={32}
+                                  height={32}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span>{communityUser.name.charAt(0).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                                {communityUser.name}
+                              </div>
+                              <div className="text-[10px] font-mono text-gold truncate">
+                                {communityUser.username
+                                  ? (communityUser.username.startsWith('@') ? communityUser.username : `@${communityUser.username}`)
+                                  : '@kasubay'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface-subtle border border-black/[0.04] dark:border-white/[0.06]">
+                            <div className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-white/80">
+                              {resolvedTheme === 'dark' ? <Moon size={13} className="text-gold" /> : <Sun size={13} className="text-gold" />}
+                              <span>Appearance</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleTheme()}
+                              className="px-2.5 py-1 rounded-lg bg-surface border border-black/[0.08] dark:border-white/10 hover:border-gold/40 text-[10px] font-mono font-semibold text-slate-800 dark:text-slate-200 hover:text-gold transition-all cursor-pointer shadow-xs capitalize"
+                            >
+                              {resolvedTheme} mode
+                            </button>
+                          </div>
+
+                          <div className="w-full h-[1px] bg-black/[0.06] dark:bg-white/[0.06] my-1" />
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProfileMenuOpen(false)
+                              window.dispatchEvent(new CustomEvent('psits:open-profile'))
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gold/15 text-slate-700 dark:text-white/80 hover:text-gold transition-colors text-xs font-medium text-left cursor-pointer"
+                          >
+                            <User size={14} className="text-gold" />
+                            <span>Edit Student Profile</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProfileMenuOpen(false)
+                              window.dispatchEvent(new CustomEvent('psits:filter-my-posts'))
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gold/15 text-slate-700 dark:text-white/80 hover:text-gold transition-colors text-xs font-medium text-left cursor-pointer"
+                          >
+                            <FileText size={14} className="text-gold" />
+                            <span>View My Posts</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProfileMenuOpen(false)
+                              window.dispatchEvent(new CustomEvent('psits:open-onboarding'))
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gold/15 text-slate-700 dark:text-white/80 hover:text-gold transition-colors text-xs font-medium text-left cursor-pointer"
+                          >
+                            <Settings size={14} className="text-gold" />
+                            <span>Tour & Community Guide</span>
+                          </button>
+
+                          <div className="w-full h-[1px] bg-black/[0.06] dark:bg-white/[0.06] my-1" />
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setProfileMenuOpen(false)
+                              await supabase.auth.signOut()
+                              setCommunityUser(null)
+                              window.dispatchEvent(new CustomEvent('psits:profile-updated'))
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-rose-500/15 text-rose-500 transition-colors text-xs font-medium text-left cursor-pointer"
+                          >
+                            <LogOut size={14} />
+                            <span>Disconnect Account</span>
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new CustomEvent('psits:open-onboarding'))}
+                    className="px-2.5 py-1 rounded-full bg-gold text-slate-950 font-bold text-[10px] font-mono uppercase"
+                  >
+                    Connect
+                  </button>
+                )}
+              </div>
+            ) : (
+              <ThemeToggle size={18} />
+            )}
             <button
               type="button"
               onClick={() => setOpen(!open)}

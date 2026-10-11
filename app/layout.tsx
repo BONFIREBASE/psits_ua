@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import LayoutShell from "@/components/LayoutShell";
@@ -194,8 +195,9 @@ export default function RootLayout({
       className={`${syne.variable} ${inter.variable} ${architectsDaughter.variable}`}
     >
       <head>
-        <script
-          suppressHydrationWarning
+        <Script
+          id="theme-script"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: themeScript }}
         />
         <script
