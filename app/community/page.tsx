@@ -37,6 +37,8 @@ import {
   CheckCircle2,
   Plus,
   Users,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { appwrite, appwriteStorage, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
@@ -56,7 +58,7 @@ import ScrollReveal from '@/components/ScrollReveal'
 import CommunityOnboardingModal, { type CommunityUserProfile } from '@/components/CommunityOnboardingModal'
 
 const LOCAL_STORAGE_KEY = 'psits_community_cached_posts_v4'
-const TAGS = ['All', 'Academics', 'Tech & Code', 'Projects', 'Discussions', 'Campus Life']
+const TAGS = ['All', 'Announcements', 'Academics', 'Tech & Code', 'Projects', 'Discussions', 'Campus Life'] as const
 
 function formatRelativeTime(dateStr: string): string {
   try {
@@ -210,37 +212,11 @@ function renderAvatarIcon(avatarStr?: string, nameStr?: string, className = 'w-5
 }
 
 export default function CommunityPage() {
-  const [posts, setPosts] = useState<CommunityPostItem[]>(() => {
-    if (typeof window === 'undefined') return []
-    try {
-      const cached = localStorage.getItem(LOCAL_STORAGE_KEY)
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed
-      }
-    } catch {
-      // Local storage unreadable
-    }
-    return []
-  })
-
-  const [loading, setLoading] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true
-    try {
-      const cached = localStorage.getItem(LOCAL_STORAGE_KEY)
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Array.isArray(parsed) && parsed.length > 0) return false
-      }
-    } catch {
-      // ignore
-    }
-    return true
-  })
-
+  const [posts, setPosts] = useState<CommunityPostItem[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
   const [selectedTag, setSelectedTag] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
-  const [isOffline, setIsOffline] = useState(() => (typeof window !== 'undefined' ? !navigator.onLine : false))
+  const [isOffline, setIsOffline] = useState(false)
   const [user, setUser] = useState<{ email: string; name: string; avatar?: string } | null>(null)
   const [userProfile, setUserProfile] = useState<CommunityUserProfile | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -264,169 +240,37 @@ export default function CommunityPage() {
   const [filterOnlyOfficers, setFilterOnlyOfficers] = useState(false)
   const [filterOnlySaved, setFilterOnlySaved] = useState(false)
   const [filterOnlyMyPosts, setFilterOnlyMyPosts] = useState(false)
-  const [notifTab, setNotifTab] = useState<'broadcasts' | 'mentions'>('broadcasts')
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null)
+  const [savedPostIds, setSavedPostIds] = useState<string[]>([])
+  const [userLikedPosts, setUserLikedPosts] = useState<string[]>([])
 
-  // Custom Community Creator State
-  const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false)
-  const [newCommunityName, setNewCommunityName] = useState('')
-  const [newCommunityCategory, setNewCommunityCategory] = useState('Tech & Code')
-  const [newCommunityDesc, setNewCommunityDesc] = useState('')
-  const [newCommunityLogo, setNewCommunityLogo] = useState('')
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
-  const logoFileInputRef = useRef<HTMLInputElement>(null)
-
-  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (!file.type.startsWith('image/')) {
-      alert('Please select a valid image file (PNG, JPG, WebP).')
-      return
-    }
-
-    setIsUploadingLogo(true)
-    try {
-      const compressed = await compressImageToWebP(file, { maxWidth: 256, maxHeight: 256, quality: 0.85 })
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        const previewUrl = event.target?.result as string
-        setNewCommunityLogo(previewUrl)
-      }
-      reader.readAsDataURL(compressed)
-    } catch (err) {
-      console.error('Logo compression error:', err)
-    } finally {
-      setIsUploadingLogo(false)
-      if (logoFileInputRef.current) logoFileInputRef.current.value = ''
+  // Minimalist Topic Slider Ref & Smooth Scroll Helper
+  const sliderRef = useRef<HTMLDivElement>(null)
+  const scrollSlider = (direction: 'left' | 'right') => {
+    if (sliderRef.current) {
+      const scrollAmount = direction === 'left' ? -220 : 220
+      sliderRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
     }
   }
 
-  const [customCommunities, setCustomCommunities] = useState<{ name: string; description?: string; category?: string; logo?: string }[]>(() => {
-    if (typeof window === 'undefined') return []
+  // Hydration-Safe Client Cache Initialization
+  useEffect(() => {
     try {
-      const cached = localStorage.getItem('psits_custom_communities')
-      return cached ? JSON.parse(cached) : []
-    } catch {
-      return []
-    }
-  })
-
-  const [joinedCommunities, setJoinedCommunities] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return ['Academics', 'Tech & Code', 'WebDev']
-    try {
-      const cached = localStorage.getItem('psits_joined_communities')
-      return cached ? JSON.parse(cached) : ['Academics', 'Tech & Code', 'WebDev']
-    } catch {
-      return ['Academics', 'Tech & Code', 'WebDev']
-    }
-  })
-
-  const PRESET_COMMUNITIES = useMemo(() => [
-    { name: 'WebDev', topic: 'Fullstack & APIs', category: 'Tech & Code', isCustom: false, logo: undefined },
-    { name: 'CyberSec', topic: 'Ethical Hacking & CTF', category: 'Tech & Code', isCustom: false, logo: undefined },
-    { name: 'Capstone2026', topic: 'Senior Project Defense', category: 'Projects', isCustom: false, logo: undefined },
-    { name: 'GameDev', topic: 'Unity & Godot Assets', category: 'Projects', isCustom: false, logo: undefined },
-  ], [])
-
-  const displayCommunities = useMemo(() => {
-    const list: { name: string; topic?: string; category?: string; isCustom: boolean; logo?: string }[] = []
-    for (const c of customCommunities) {
-      list.push({
-        name: c.name,
-        topic: c.description || c.category,
-        category: c.category,
-        isCustom: true,
-        logo: c.logo,
-      })
-    }
-    for (const p of PRESET_COMMUNITIES) {
-      if (!list.some(item => item.name.toLowerCase() === p.name.toLowerCase())) {
-        list.push(p)
+      const cached = localStorage.getItem(LOCAL_STORAGE_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPosts(parsed)
+          setLoading(false)
+        }
       }
-    }
-    return list
-  }, [customCommunities, PRESET_COMMUNITIES])
-
-  const allTags = useMemo(() => {
-    const list = [...TAGS]
-    for (const p of PRESET_COMMUNITIES) {
-      if (!list.includes(p.name)) list.push(p.name)
-    }
-    for (const c of customCommunities) {
-      if (!list.includes(c.name)) list.push(c.name)
-    }
-    return list
-  }, [customCommunities, PRESET_COMMUNITIES])
-
-  const toggleJoinCommunity = (communityName: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation()
-    setJoinedCommunities(prev => {
-      const updated = prev.includes(communityName)
-        ? prev.filter(c => c !== communityName)
-        : [...prev, communityName]
-      try {
-        localStorage.setItem('psits_joined_communities', JSON.stringify(updated))
-      } catch {}
-      return updated
-    })
-  }
-
-  const handleCreateCommunity = () => {
-    const cleanName = newCommunityName.trim().toLowerCase().replace(/^c\//, '').replace(/[^a-z0-9-]/g, '')
-    if (cleanName.length < 3) {
-      alert('Community name must be at least 3 characters.')
-      return
-    }
-    if (allTags.map(t => t.toLowerCase()).includes(cleanName)) {
-      alert('A community with this name already exists.')
-      return
-    }
-
-    const updated = [
-      ...customCommunities,
-      {
-        name: cleanName,
-        description: newCommunityDesc.trim(),
-        category: newCommunityCategory,
-        logo: newCommunityLogo || undefined,
-      }
-    ]
-    setCustomCommunities(updated)
-    setJoinedCommunities(prev => {
-      const next = prev.includes(cleanName) ? prev : [...prev, cleanName]
-      try {
-        localStorage.setItem('psits_joined_communities', JSON.stringify(next))
-      } catch {}
-      return next
-    })
-    try {
-      localStorage.setItem('psits_custom_communities', JSON.stringify(updated))
+      const cachedSaved = localStorage.getItem('psits_community_saved_posts')
+      if (cachedSaved) setSavedPostIds(JSON.parse(cachedSaved))
+      const cachedLiked = localStorage.getItem('psits_community_liked_posts')
+      if (cachedLiked) setUserLikedPosts(JSON.parse(cachedLiked))
+      setIsOffline(!navigator.onLine)
     } catch {}
-
-    setSelectedTag(cleanName)
-    setIsCreateCommunityOpen(false)
-    setNewCommunityName('')
-    setNewCommunityDesc('')
-    setNewCommunityLogo('')
-  }
-  const [savedPostIds, setSavedPostIds] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return []
-    try {
-      const cached = localStorage.getItem('psits_community_saved_posts')
-      return cached ? JSON.parse(cached) : []
-    } catch {
-      return []
-    }
-  })
-  const [userLikedPosts, setUserLikedPosts] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return []
-    try {
-      const cached = localStorage.getItem('psits_community_liked_posts')
-      return cached ? JSON.parse(cached) : []
-    } catch {
-      return []
-    }
-  })
+  }, [])
 
   const handleToggleSavePost = (postId: string) => {
     setSavedPostIds(prev => {
@@ -1018,44 +862,55 @@ export default function CommunityPage() {
         </div>
       )}
 
-      {/* ─── Reddit Category Flairs & Search Bar ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-black/[0.06] dark:border-white/[0.08]">
-        {/* Category Flairs */}
-        <nav className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-xs font-mono">
-          {allTags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => setSelectedTag(tag)}
-              className={`px-3 py-1.5 rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                selectedTag === tag
-                  ? 'bg-gold text-slate-950 font-bold shadow-sm'
-                  : 'bg-surface border border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white hover:border-gold/30'
-              }`}
-            >
-              {tag === 'All' ? 'c/All' : `c/${tag}`}
-            </button>
-          ))}
+      {/* ─── Minimalist Topic Slider & Search Bar ─── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-black/[0.06] dark:border-white/[0.08]">
+        {/* Minimalist Topic Slider */}
+        <div className="relative flex items-center min-w-0 max-w-full">
           <button
             type="button"
-            onClick={() => {
-              if (!user) {
-                setOnboardingInitialStep(1)
-                setIsOnboardingOpen(true)
-                return
-              }
-              setIsCreateCommunityOpen(true)
-            }}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-dashed border-gold/40 text-gold hover:bg-gold/10 transition-colors cursor-pointer text-xs font-mono font-medium whitespace-nowrap"
-            title="Create a new student community"
+            onClick={() => scrollSlider('left')}
+            className="hidden sm:flex items-center justify-center w-7 h-7 rounded-full bg-surface hover:bg-surface-subtle text-slate-500 hover:text-slate-900 dark:hover:text-white border border-black/[0.08] dark:border-white/10 shadow-xs mr-1.5 shrink-0 transition-all cursor-pointer opacity-80 hover:opacity-100"
+            aria-label="Scroll topics left"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Community</span>
+            <ChevronLeft className="w-3.5 h-3.5" />
           </button>
-        </nav>
+
+          <div
+            ref={sliderRef}
+            className="flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-smooth py-1 px-0.5"
+          >
+            {TAGS.map((tag) => {
+              const isSelected = selectedTag === tag
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setSelectedTag(tag)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium tracking-tight transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-gold text-slate-950 font-bold shadow-xs'
+                      : 'bg-surface hover:bg-surface-subtle text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-black/[0.06] dark:border-white/[0.08] hover:border-gold/30'
+                  }`}
+                >
+                  {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-slate-950 inline-block animate-pulse" />}
+                  <span>{tag}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => scrollSlider('right')}
+            className="hidden sm:flex items-center justify-center w-7 h-7 rounded-full bg-surface hover:bg-surface-subtle text-slate-500 hover:text-slate-900 dark:hover:text-white border border-black/[0.08] dark:border-white/10 shadow-xs ml-1.5 shrink-0 transition-all cursor-pointer opacity-80 hover:opacity-100"
+            aria-label="Scroll topics right"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
         {/* Search Input */}
-        <div className="relative w-full sm:w-64">
+        <div className="relative w-full md:w-64 shrink-0">
           <Search
             size={13}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/30"
@@ -1071,7 +926,7 @@ export default function CommunityPage() {
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
             >
               <X size={12} />
             </button>
@@ -1572,17 +1427,38 @@ export default function CommunityPage() {
 
         {/* ─── Reddit-Style Right Sidebar (4 cols, Sticky) ─── */}
         <aside className="hidden lg:flex flex-col gap-5 lg:col-span-4 sticky top-20">
-          {/* About Community Card */}
+          {/* About PSITS Community Card */}
           <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-5 space-y-4 shadow-sm dark:shadow-none">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-black/[0.06] dark:border-white/[0.08]">
-              <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/30 flex items-center justify-center text-gold font-bold text-xs">
+            <div className="flex items-center gap-3 pb-3 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="w-9 h-9 rounded-xl bg-gold/15 border border-gold/30 flex items-center justify-center text-gold font-bold text-xs shrink-0 shadow-xs">
                 UA
               </div>
-              <div>
-                <h3 className="font-display font-black text-sm text-slate-900 dark:text-white uppercase tracking-tight">
-                  c/BSIT-Community
+              <div className="min-w-0">
+                <h3 className="font-display font-black text-sm text-slate-900 dark:text-white uppercase tracking-tight truncate">
+                  PSITS Community
                 </h3>
-                <p className="text-[10px] font-mono text-slate-400 dark:text-white/40">University of Antique</p>
+                <p className="text-[11px] font-mono text-slate-400 dark:text-white/40 truncate">
+                  University of Antique · CCS
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              The official hub for BS Information Technology students at UA. Connect, collaborate on code, exchange academic resources, and participate in peer discussions.
+            </p>
+
+            <div className="space-y-2 py-1 text-xs">
+              <div className="flex items-center justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                <span className="text-slate-500 dark:text-slate-400">Active Topic</span>
+                <span className="font-semibold text-gold font-mono">{selectedTag}</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                <span className="text-slate-500 dark:text-slate-400">Total Discussions</span>
+                <span className="font-mono text-slate-900 dark:text-white font-semibold">{posts.length}</span>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-slate-500 dark:text-slate-400">Moderation</span>
+                <span className="text-emerald-500 font-mono text-[11px] font-semibold">Active · Student Run</span>
               </div>
             </div>
 
@@ -1594,79 +1470,13 @@ export default function CommunityPage() {
                   setIsOnboardingOpen(true)
                   return
                 }
-                setIsCreateCommunityOpen(true)
+                setIsCreateOpen(true)
               }}
               className="w-full py-2.5 rounded-xl bg-gold hover:bg-gold-muted text-slate-950 font-bold text-xs uppercase tracking-wider transition-colors shadow-sm cursor-pointer flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" />
-              <span>Create Community</span>
+              <span>Start Discussion</span>
             </button>
-
-            {/* Created & Joined Community Tiles */}
-            <div className="space-y-2 pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
-              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                <span className="uppercase tracking-wider font-bold">Communities & Guilds</span>
-                <span>{joinedCommunities.length} Joined</span>
-              </div>
-
-              <div className="space-y-1.5 max-h-60 overflow-y-auto pr-0.5 scrollbar-thin">
-                {displayCommunities.map((comm) => {
-                  const isJoined = joinedCommunities.includes(comm.name)
-                  const isSelected = selectedTag === comm.name
-                  return (
-                    <div
-                      key={comm.name}
-                      onClick={() => setSelectedTag(comm.name)}
-                      className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer group ${
-                        isSelected
-                          ? 'bg-gold/15 border-gold shadow-xs text-gold'
-                          : 'bg-surface-subtle hover:bg-gold/10 border-black/[0.05] dark:border-white/[0.06] hover:border-gold/30'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 overflow-hidden ${
-                          isSelected
-                            ? 'bg-gold text-slate-950 shadow-xs'
-                            : 'bg-gold/15 text-gold border border-gold/30'
-                        }`}>
-                          {comm.logo ? (
-                            <Image
-                              src={comm.logo}
-                              alt={comm.name}
-                              width={28}
-                              height={28}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span>{comm.name.charAt(0).toUpperCase()}</span>
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-bold text-xs truncate text-slate-900 dark:text-white group-hover:text-gold transition-colors">
-                            c/{comm.name}
-                          </div>
-                          <div className="text-[10px] font-mono text-slate-400 truncate">
-                            {comm.isCustom ? (comm.category || 'Student Created') : (comm.topic || 'Guild')}
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={(e) => toggleJoinCommunity(comm.name, e)}
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold transition-all cursor-pointer shrink-0 ${
-                          isJoined
-                            ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 hover:bg-rose-500/15 hover:text-rose-500 hover:border-rose-500/30'
-                            : 'bg-surface hover:bg-gold hover:text-slate-950 text-slate-600 dark:text-white/60 border border-black/[0.08] dark:border-white/10'
-                        }`}
-                      >
-                        {isJoined ? 'Joined' : '+ Join'}
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
 
             <button
               type="button"
@@ -1676,134 +1486,92 @@ export default function CommunityPage() {
               }}
               className="w-full text-center text-[11px] font-mono text-slate-400 hover:text-gold transition-colors cursor-pointer pt-1"
             >
-              View Onboarding Tour →
+              View Community Guidelines &amp; Tour →
             </button>
           </div>
 
-          {/* Community Notifications & Live Activity Card (Option C Hybrid) */}
+          {/* Unified Community Notifications Card (No Double Tabs) */}
           <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-5 space-y-3.5 shadow-sm dark:shadow-none text-xs">
             <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
               <div className="flex items-center gap-2 font-display font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-white">
                 <Bell className="w-4 h-4 text-gold" />
-                <span>Notices & Activity</span>
+                <span>Notifications</span>
               </div>
-              <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full ${
-                isOffline
-                  ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
-                  : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-rose-500' : 'bg-emerald-500 animate-pulse'}`} />
-                {isOffline ? 'OFFLINE' : 'LIVE'}
-              </span>
             </div>
 
-            {/* Sub-tabs: Broadcasts vs Mentions */}
-            <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl border border-black/[0.04] dark:border-white/[0.04] text-[11px] font-medium">
-              <button
-                type="button"
-                onClick={() => setNotifTab('broadcasts')}
-                className={`flex-1 py-1 px-2 rounded-lg text-center transition-all cursor-pointer ${
-                  notifTab === 'broadcasts'
-                    ? 'bg-surface shadow-xs text-slate-900 dark:text-white font-bold'
-                    : 'text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                Broadcasts
-              </button>
-              <button
-                type="button"
-                onClick={() => setNotifTab('mentions')}
-                className={`flex-1 py-1 px-2 rounded-lg text-center transition-all cursor-pointer ${
-                  notifTab === 'mentions'
-                    ? 'bg-surface shadow-xs text-slate-900 dark:text-white font-bold'
-                    : 'text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                Mentions
-              </button>
-            </div>
+            {/* Unified Notification Stream */}
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5 scrollbar-thin">
+              {/* User personal reply & activity alerts */}
+              {user && userActivityItems.length > 0 && userActivityItems.map(post => (
+                <div
+                  key={`activity-${post.$id}`}
+                  onClick={() => openComments(post)}
+                  className="group p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.04] hover:border-gold/30 transition-all cursor-pointer space-y-1"
+                >
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="font-semibold text-emerald-500 font-mono flex items-center gap-1">
+                      <MessageSquare className="w-3 h-3" />
+                      {post.comments_count} {post.comments_count === 1 ? 'reply' : 'replies'}
+                    </span>
+                    <span className="text-gold font-mono text-[9px]">{post.likes_count} upvotes</span>
+                  </div>
+                  <p className="text-[11px] text-slate-700 dark:text-white/70 line-clamp-2 leading-relaxed">
+                    {post.content}
+                  </p>
+                </div>
+              ))}
 
-            {/* Content Area */}
-            {notifTab === 'broadcasts' ? (
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5 scrollbar-thin">
-                {broadcastItems.length > 0 ? (
-                  broadcastItems.map(post => (
-                    <div
-                      key={post.$id}
-                      onClick={() => openComments(post)}
-                      className="group p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.04] hover:border-gold/30 transition-all cursor-pointer space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="font-semibold text-gold truncate max-w-[130px]">
-                          {post.is_officer ? `PSITS ${post.officer_title || 'Officer'}` : (post.tags?.[0] ? `c/${post.tags[0]}` : 'c/Community')}
-                        </span>
-                        <span className="text-slate-400 font-mono text-[9px]">
-                          {new Date(post.$createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-700 dark:text-white/70 line-clamp-2 leading-relaxed group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
-                        {post.content}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-4 text-center text-slate-400 text-[11px]">
-                    No active dispatches right now.
+              {/* Official broadcasts / dispatches */}
+              {broadcastItems.length > 0 && broadcastItems.map(post => (
+                <div
+                  key={`broadcast-${post.$id}`}
+                  onClick={() => openComments(post)}
+                  className="group p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.04] hover:border-gold/30 transition-all cursor-pointer space-y-1.5"
+                >
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="font-semibold text-gold truncate max-w-[130px]">
+                      {post.is_officer ? `PSITS ${post.officer_title || 'Officer'}` : (post.tags?.[0] ? `c/${post.tags[0]}` : 'c/Community')}
+                    </span>
+                    <span className="text-slate-400 font-mono text-[9px]">
+                      {new Date(post.$createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                    </span>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {user ? (
-                  userActivityItems.length > 0 ? (
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5 scrollbar-thin">
-                      {userActivityItems.map(post => (
-                        <div
-                          key={post.$id}
-                          onClick={() => openComments(post)}
-                          className="group p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.04] hover:border-gold/30 transition-all cursor-pointer space-y-1"
-                        >
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="font-medium text-emerald-500 font-mono flex items-center gap-1">
-                              <MessageSquare className="w-3 h-3" />
-                              {post.comments_count} {post.comments_count === 1 ? 'reply' : 'replies'}
-                            </span>
-                            <span className="text-gold font-mono text-[9px]">{post.likes_count} upvotes</span>
-                          </div>
-                          <p className="text-[11px] text-slate-700 dark:text-white/70 line-clamp-2 leading-relaxed">
-                            {post.content}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="py-5 text-center space-y-1">
-                      <div className="w-8 h-8 rounded-full bg-surface-subtle mx-auto flex items-center justify-center text-slate-400">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      </div>
-                      <div className="text-[11px] font-semibold text-slate-700 dark:text-white/80">All caught up!</div>
-                      <p className="text-[10px] text-slate-400 leading-tight">No unread mentions or replies on your posts.</p>
-                    </div>
-                  )
-                ) : (
-                  <div className="p-3.5 rounded-xl bg-surface-subtle border border-dashed border-gold/30 text-center space-y-2">
-                    <p className="text-[11px] text-slate-600 dark:text-white/60 leading-relaxed">
-                      Connect your student ID to receive mention alerts and reply notifications.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOnboardingInitialStep(1)
-                        setIsOnboardingOpen(true)
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-gold hover:bg-gold-muted text-slate-950 font-bold text-[10px] tracking-wide transition-colors cursor-pointer w-full"
-                    >
-                      Connect Student ID
-                    </button>
+                  <p className="text-[11px] text-slate-700 dark:text-white/70 line-clamp-2 leading-relaxed group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                    {post.content}
+                  </p>
+                </div>
+              ))}
+
+              {/* Empty / Clean fallback */}
+              {(!user || userActivityItems.length === 0) && broadcastItems.length === 0 && (
+                <div className="py-5 text-center space-y-1">
+                  <div className="w-8 h-8 rounded-full bg-surface-subtle mx-auto flex items-center justify-center text-slate-400">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   </div>
-                )}
-              </div>
-            )}
+                  <div className="text-[11px] font-semibold text-slate-700 dark:text-white/80">All caught up!</div>
+                  <p className="text-[10px] text-slate-400 leading-tight">No unread notifications.</p>
+                </div>
+              )}
+
+              {/* Connect student ID callout if not logged in */}
+              {!user && (
+                <div className="p-3 rounded-xl bg-surface-subtle border border-dashed border-gold/30 text-center space-y-1.5 mt-2">
+                  <p className="text-[10px] text-slate-500 dark:text-white/50 leading-relaxed">
+                    Connect your student ID to receive mention alerts.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnboardingInitialStep(1)
+                      setIsOnboardingOpen(true)
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-gold hover:bg-gold-muted text-slate-950 font-bold text-[10px] tracking-wide transition-colors cursor-pointer w-full"
+                  >
+                    Connect Student ID
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Quick Resource Shortcuts Card */}
@@ -1883,302 +1651,134 @@ export default function CommunityPage() {
         initialStep={onboardingInitialStep}
       />
 
-      {/* ─── Create Community Modal ─── */}
-      {isCreateCommunityOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6">
-          <div className="w-full max-w-lg rounded-[28px] sm:rounded-[36px] bg-surface border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-7 sm:p-9 space-y-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.08] pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-display font-black text-lg text-slate-900 dark:text-white uppercase tracking-tight">
-                    Create a Community
-                  </h3>
-                  <p className="text-[11px] font-mono text-slate-400">Launch a specialized student guild or topic circle</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCreateCommunityOpen(false)}
-                className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-2 rounded-full hover:bg-surface-subtle transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            {/* Form Fields */}
-            <div className="space-y-4">
-              {/* Community Avatar / Logo Picker */}
-              <div className="flex items-center gap-4 p-3.5 rounded-2xl bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08]">
-                <div className="relative group shrink-0">
-                  <div className="w-16 h-16 rounded-2xl bg-gold/15 border border-gold/40 flex items-center justify-center overflow-hidden shadow-xs">
-                    {newCommunityLogo ? (
-                      <Image
-                        src={newCommunityLogo}
-                        alt="Community Logo"
-                        width={64}
-                        height={64}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="font-mono font-black text-2xl text-gold select-none">
-                        {(newCommunityName.trim().charAt(0) || 'C').toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  {newCommunityLogo && (
-                    <button
-                      type="button"
-                      onClick={() => setNewCommunityLogo('')}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs shadow-md cursor-pointer hover:bg-rose-600 transition-colors"
-                      title="Remove custom logo (use default letter)"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
 
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="text-xs font-bold text-slate-900 dark:text-white">
-                    Community Avatar
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-white/50 leading-tight">
-                    {newCommunityLogo
-                      ? 'Custom logo uploaded. Click X to revert to default letter avatar.'
-                      : `Upload a custom logo or auto-use "${(newCommunityName.trim().charAt(0) || 'C').toUpperCase()}" as the default avatar.`}
-                  </p>
-                  <div className="pt-1">
-                    <input
-                      ref={logoFileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                      onChange={handleLogoFileChange}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      disabled={isUploadingLogo}
-                      onClick={() => logoFileInputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/[0.08] dark:border-white/10 hover:border-gold/40 bg-surface hover:bg-gold/10 text-[11px] font-mono text-slate-700 dark:text-white/80 hover:text-gold transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-                    >
-                      <UploadCloud className="w-3.5 h-3.5 text-gold" />
-                      <span>{isUploadingLogo ? 'Processing...' : (newCommunityLogo ? 'Change Custom Logo' : 'Upload Community Logo')}</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Community Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-white/80 block">
-                  Community Name
-                </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-4 font-mono font-bold text-gold text-sm select-none">
-                    c/
-                  </span>
-                  <input
-                    type="text"
-                    value={newCommunityName}
-                    onChange={(e) => {
-                      const slug = e.target.value.toLowerCase().replace(/^c\//, '').replace(/[^a-z0-9-]/g, '')
-                      setNewCommunityName(slug)
-                    }}
-                    placeholder="web-dev, cyber-security, cc104-notes"
-                    maxLength={32}
-                    className="w-full bg-surface-subtle border border-black/[0.08] dark:border-white/10 focus:border-gold rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-900 dark:text-white font-mono placeholder:text-slate-400 focus:outline-none"
-                  />
-                </div>
-                <p className="text-[10px] font-mono text-slate-400">
-                  {32 - newCommunityName.length} characters remaining · Lowercase letters, numbers, and hyphens only
-                </p>
-              </div>
-
-              {/* Category / Domain Selection */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-white/80 block">
-                  Focus Domain
-                </label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {['Tech & Code', 'Academics', 'Projects', 'Discussions', 'Gaming & Esports', 'Campus Life'].map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setNewCommunityCategory(cat)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                        newCommunityCategory === cat
-                          ? 'bg-gold text-slate-950 font-bold shadow-sm'
-                          : 'bg-surface-subtle text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white border border-black/[0.05] dark:border-white/[0.06]'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-white/80 block">
-                  Description & Purpose
-                </label>
-                <textarea
-                  value={newCommunityDesc}
-                  onChange={(e) => setNewCommunityDesc(e.target.value)}
-                  placeholder="Tell fellow BSIT students what this circle is about, rules, and what to share..."
-                  rows={3}
-                  maxLength={180}
-                  className="w-full bg-surface-subtle border border-black/[0.08] dark:border-white/10 focus:border-gold rounded-xl p-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none resize-none leading-relaxed"
-                />
-              </div>
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
-              <button
-                type="button"
-                onClick={() => setIsCreateCommunityOpen(false)}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={newCommunityName.trim().length < 3}
-                onClick={handleCreateCommunity}
-                className="px-6 py-2.5 rounded-xl bg-gold hover:bg-gold-muted disabled:opacity-40 text-slate-950 font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Create c/{newCommunityName.trim() || 'community'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Create Post Modal (Maximized Spacing & Theme-Aware) ─── */}
+      {/* ─── Create Post Modal (Responsive & Theme-Aware) ─── */}
       {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6">
-          <div className="w-full max-w-xl rounded-[28px] sm:rounded-[36px] bg-surface border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-7 sm:p-9 space-y-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.08] pb-4">
-              <h3 className="font-display font-black text-lg text-slate-900 dark:text-white uppercase tracking-tight">
+        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 md:p-6">
+          <div className="w-full max-w-xl max-h-[92dvh] flex flex-col rounded-3xl sm:rounded-[32px] bg-surface border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-4 sm:p-6 md:p-8 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.08] pb-3 shrink-0">
+              <h3 className="font-display font-black text-base sm:text-lg text-slate-900 dark:text-white uppercase tracking-tight">
                 Publish Discussion
               </h3>
               <button
+                type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-2 rounded-full hover:bg-surface-subtle transition-colors cursor-pointer"
+                className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-1.5 rounded-full hover:bg-surface-subtle transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Student Author Indicator */}
-            <div className="flex items-center gap-3.5 p-4 sm:p-5 rounded-2xl bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08]">
-              <div className="w-10 h-10 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center shrink-0 text-gold overflow-hidden">
-                {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
-                  <Image
-                    src={userProfile.avatar}
-                    alt="Student"
-                    width={40}
-                    height={40}
-                    className="rounded-full object-cover w-full h-full"
-                  />
-                ) : (
-                  renderAvatarIcon(userProfile?.avatar, userProfile?.name || user?.name)
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold font-mono text-gold truncate">
-                  {userProfile?.username
-                    ? (userProfile.username.startsWith('@') ? userProfile.username : `@${userProfile.username}`)
-                    : `@${(userProfile?.name || user?.name || 'kasubay').toLowerCase().replace(/[^a-z0-9_.]/g, '')}`}
+            {/* Scrollable Content Body */}
+            <div className="overflow-y-auto pr-1 space-y-4 flex-1 scrollbar-thin">
+              {/* Student Author Indicator */}
+              <div className="flex items-center gap-3 p-3 sm:p-4 rounded-2xl bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08]">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center shrink-0 text-gold overflow-hidden">
+                  {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
+                    <Image
+                      src={userProfile.avatar}
+                      alt="Student"
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover w-full h-full"
+                    />
+                  ) : (
+                    renderAvatarIcon(userProfile?.avatar, userProfile?.name || user?.name)
+                  )}
                 </div>
-                <div className="text-[11px] font-mono text-slate-500 dark:text-white/40">
-                  {userProfile?.yearSection || 'BSIT'} · Public Discussion
-                </div>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono">
-                <UserCheck className="w-3 h-3" />
-                <span>Verified</span>
-              </div>
-            </div>
-
-            {/* Category Select */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-              {allTags.filter(t => t !== 'All').map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setSelectedPostTag(t)}
-                  className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors cursor-pointer ${
-                    selectedPostTag === t
-                      ? 'bg-gold text-slate-950 font-bold'
-                      : 'bg-surface-subtle text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {/* Quick Markdown & Code Formatter Toolbar */}
-            <div className="flex items-center justify-between text-xs pt-1">
-              <span className="text-[11px] font-mono text-slate-400 dark:text-white/40">Markdown & code blocks supported</span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setPostContent(prev => prev + '\n```typescript\n// Paste code here\n\n```\n')}
-                  className="px-2.5 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono text-[11px] transition-colors cursor-pointer"
-                  title="Insert code block"
-                >
-                  &lt;/&gt; Code
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPostContent(prev => prev + ' **bold text** ')}
-                  className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono font-bold text-[11px] transition-colors cursor-pointer"
-                  title="Insert bold text"
-                >
-                  B
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPostContent(prev => prev + '\n- Item 1\n- Item 2\n')}
-                  className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono text-[11px] transition-colors cursor-pointer"
-                  title="Insert list"
-                >
-                  • List
-                </button>
-              </div>
-            </div>
-
-            {/* Content Input */}
-            <textarea
-              value={postContent}
-              onChange={e => setPostContent(e.target.value)}
-              placeholder="What would you like to discuss with fellow BSIT students? Markdown and code snippets are automatically highlighted."
-              className="w-full h-40 bg-surface-subtle border border-black/[0.08] dark:border-white/10 focus:border-gold rounded-2xl p-5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none resize-none leading-relaxed"
-            />
-
-            {/* Attached Files List */}
-            {attachments.length > 0 && (
-              <div className="space-y-2">
-                {attachments.map((file, idx) => (
-                  <div key={file.id} className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-surface-subtle text-xs border border-black/[0.06] dark:border-white/[0.08]">
-                    <span className="truncate max-w-[320px] text-slate-900 dark:text-white font-medium">{file.name} ({file.size})</span>
-                    <button
-                      type="button"
-                      onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
-                      className="text-slate-400 hover:text-rose-500 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold font-mono text-gold truncate">
+                    {userProfile?.username
+                      ? (userProfile.username.startsWith('@') ? userProfile.username : `@${userProfile.username}`)
+                      : `@${(userProfile?.name || user?.name || 'kasubay').toLowerCase().replace(/[^a-z0-9_.]/g, '')}`}
                   </div>
+                  <div className="text-[10px] sm:text-[11px] font-mono text-slate-500 dark:text-white/40">
+                    {userProfile?.yearSection || 'BSIT'} · Public Discussion
+                  </div>
+                </div>
+                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-[9px] sm:text-[10px] font-mono shrink-0">
+                  <UserCheck className="w-3 h-3" />
+                  <span>Verified</span>
+                </div>
+              </div>
+
+              {/* Category Select */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
+                {TAGS.filter(t => t !== 'All').map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setSelectedPostTag(t)}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                      selectedPostTag === t
+                        ? 'bg-gold text-slate-950 font-bold'
+                        : 'bg-surface-subtle text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {t}
+                  </button>
                 ))}
               </div>
-            )}
+
+              {/* Quick Markdown & Code Formatter Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-0.5">
+                <span className="text-[10px] sm:text-[11px] font-mono text-slate-400 dark:text-white/40">Markdown &amp; code supported</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setPostContent(prev => prev + '\n```typescript\n// Paste code here\n\n```\n')}
+                    className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono text-[10px] sm:text-[11px] transition-colors cursor-pointer"
+                    title="Insert code block"
+                  >
+                    &lt;/&gt; Code
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPostContent(prev => prev + ' **bold text** ')}
+                    className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono font-bold text-[10px] sm:text-[11px] transition-colors cursor-pointer"
+                    title="Insert bold text"
+                  >
+                    B
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPostContent(prev => prev + '\n- Item 1\n- Item 2\n')}
+                    className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono text-[10px] sm:text-[11px] transition-colors cursor-pointer"
+                    title="Insert list"
+                  >
+                    • List
+                  </button>
+                </div>
+              </div>
+
+              {/* Content Input */}
+              <textarea
+                value={postContent}
+                onChange={e => setPostContent(e.target.value)}
+                placeholder="What would you like to discuss with fellow BSIT students? Markdown and code snippets are automatically highlighted."
+                className="w-full h-32 sm:h-36 bg-surface-subtle border border-black/[0.08] dark:border-white/10 focus:border-gold rounded-2xl p-4 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none resize-none leading-relaxed"
+              />
+
+              {/* Attached Files List */}
+              {attachments.length > 0 && (
+                <div className="space-y-1.5">
+                  {attachments.map((file, idx) => (
+                    <div key={file.id} className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface-subtle text-xs border border-black/[0.06] dark:border-white/[0.08]">
+                      <span className="truncate max-w-[200px] sm:max-w-[320px] text-slate-900 dark:text-white font-medium text-[11px]">{file.name} ({file.size})</span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
+                        className="text-slate-400 hover:text-rose-500 cursor-pointer p-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Hidden File Input */}
             <input
@@ -2189,13 +1789,13 @@ export default function CommunityPage() {
               className="hidden"
             />
 
-            {/* Actions Footer */}
-            <div className="flex items-center justify-between pt-2">
+            {/* Actions Footer - Fully Responsive Stack on Mobile */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.08] shrink-0">
               <button
                 type="button"
                 disabled={isUploadingFile}
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 text-slate-500 dark:text-white/50 hover:text-gold text-xs font-semibold px-4 py-2.5 rounded-xl border border-black/[0.08] dark:border-white/10 hover:bg-surface-subtle transition-colors cursor-pointer"
+                className="flex items-center justify-center gap-2 text-slate-500 dark:text-white/50 hover:text-gold text-xs font-semibold px-3 py-2 rounded-xl border border-black/[0.08] dark:border-white/10 hover:bg-surface-subtle transition-colors cursor-pointer"
               >
                 <UploadCloud className="w-4 h-4 text-gold" />
                 <span>{isUploadingFile ? 'Uploading...' : 'Attach Document / PDF'}</span>
@@ -2205,7 +1805,7 @@ export default function CommunityPage() {
                 type="button"
                 disabled={isSubmittingPost || !postContent.trim()}
                 onClick={handleCreatePost}
-                className="px-6 py-2.5 rounded-xl bg-gold hover:bg-gold-muted disabled:opacity-50 text-slate-950 font-bold text-xs shadow-md transition-colors flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-muted disabled:opacity-50 text-slate-950 font-bold text-xs shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isSubmittingPost ? 'Publishing...' : 'Publish Post'}
               </button>

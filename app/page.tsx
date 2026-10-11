@@ -7,6 +7,7 @@ import { Quote } from 'lucide-react'
 import SectionHeader from '@/components/SectionHeader'
 import DispatchCarousel from '@/components/DispatchCarousel'
 import BannerStack from '@/components/BannerStack'
+import { NumberTicker } from '@/components/motion/number-ticker'
 import ScrollReveal from '@/components/ScrollReveal'
 import KasubayPatrol from '@/components/KasubayPatrol'
 import KasubayHeroNest from '@/components/KasubayHeroNest'
@@ -295,7 +296,12 @@ export default function HomePage() {
             <div className="grid grid-cols-3 divide-x divide-border-theme items-center">
               <div className="text-center px-1 sm:px-4 md:px-8">
                 <p className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-foreground-theme tracking-tight mb-1 whitespace-nowrap pt-1">
-                  {studentStats.totalStudents > 0 ? `${studentStats.totalStudents}+` : '600+'}
+                  <NumberTicker
+                    value={studentStats.totalStudents > 0 ? studentStats.totalStudents : 600}
+                    suffix="+"
+                    duration={0.8}
+                    locale
+                  />
                 </p>
                 <p className="text-[8.5px] xs:text-[9.5px] sm:text-[11px] font-mono uppercase tracking-tight xs:tracking-normal sm:tracking-[0.2em] text-amber-600 dark:text-gold/80 font-bold">
                   Active Members
@@ -311,7 +317,11 @@ export default function HomePage() {
                     <span className="inline-block w-20 sm:w-28 h-6 sm:h-8 rounded bg-muted-foreground-theme/20 dark:bg-white/10 animate-pulse my-auto" />
                   ) : (
                     <>
-                      <AnimatedCounter value={viewsData.totalViews} />
+                      <NumberTicker
+                        value={viewsData.totalViews}
+                        duration={0.8}
+                        locale
+                      />
                       <span className="inline-flex items-center ml-0.5">
                         {viewsData.totalViews >= 10000 && <span>+</span>}
                         <sup
@@ -432,45 +442,4 @@ export default function HomePage() {
       <BannerStack banners={activeBanners} isLoading={bannersLoading} />
     </>
   )
-}
-
-function AnimatedCounter({ value }: { value: number }) {
-  const baseHundred = Math.max(0, Math.floor(value / 100) * 100)
-  const [displayValue, setDisplayValue] = useState<number>(baseHundred)
-  const prevValueRef = useRef<number>(baseHundred)
-  const isFirstRender = useRef(true)
-
-  useEffect(() => {
-    if (!value) return
-
-    const from = isFirstRender.current ? baseHundred : prevValueRef.current
-    const duration = isFirstRender.current ? 800 : 350
-    isFirstRender.current = false
-    prevValueRef.current = value
-
-    const startTime = performance.now()
-    let frameId: number
-
-    const tick = (currentTime: number) => {
-      const elapsed = currentTime - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      // Ease out cubic: fast rise with smooth deceleration
-      const ease = 1 - Math.pow(1 - progress, 3)
-      const current = Math.round(from + (value - from) * ease)
-      setDisplayValue(current)
-
-      if (progress < 1) {
-        frameId = requestAnimationFrame(tick)
-      }
-    }
-
-    frameId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frameId)
-  }, [value, baseHundred])
-
-  if (displayValue >= 1000000) {
-    return <span>{(displayValue / 1000000).toFixed(1)}M</span>
-  }
-
-  return <span>{displayValue.toLocaleString()}</span>
 }

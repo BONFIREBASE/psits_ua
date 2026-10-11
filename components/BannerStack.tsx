@@ -8,13 +8,14 @@ import type { BannerRow } from '@/lib/supabase'
 interface BannerStackProps {
   banners: BannerRow[]
   isLoading?: boolean
+  className?: string
 }
 
 const AUTO_INTERVAL = 6000
 
-export function BannerStackSkeleton() {
+export function BannerStackSkeleton({ className }: { className?: string }) {
   return (
-    <section className="relative max-w-6xl xl:max-w-7xl mx-auto px-6 pb-20 lg:pb-24">
+    <section className={className || "relative max-w-6xl xl:max-w-7xl mx-auto px-6 pb-20 lg:pb-24"}>
       <div className="relative pt-10 sm:pt-14">
         <div className="relative w-full h-[400px] sm:h-[420px] md:h-[440px] lg:h-[450px]">
           {/* Back Card 2 Skeleton */}
@@ -54,7 +55,7 @@ export function BannerStackSkeleton() {
   )
 }
 
-export default function BannerStack({ banners, isLoading = false }: BannerStackProps) {
+export default function BannerStack({ banners, isLoading = false, className }: BannerStackProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
   const count = banners.length
@@ -102,15 +103,17 @@ export default function BannerStack({ banners, isLoading = false }: BannerStackP
   }, [startAutoPlay, clearAutoPlay])
 
   if (isLoading) {
-    return <BannerStackSkeleton />
+    return <BannerStackSkeleton className={className} />
   }
 
   if (count === 0) return null
 
+  const containerClass = className || "relative max-w-6xl xl:max-w-7xl mx-auto px-6 pb-20 lg:pb-24"
+
   /* ── Single banner ── */
   if (count === 1) {
     return (
-      <section className="relative max-w-6xl xl:max-w-7xl mx-auto px-6 pb-20 lg:pb-24">
+      <section className={containerClass}>
         <BannerCard banner={banners[0]} isActive={true} />
       </section>
     )
@@ -119,7 +122,7 @@ export default function BannerStack({ banners, isLoading = false }: BannerStackP
   /* ── Multi-banner stacked carousel ── */
   return (
     <section
-      className="relative max-w-6xl xl:max-w-7xl mx-auto px-6 pb-20 lg:pb-24"
+      className={containerClass}
       onMouseEnter={() => {
         setIsHovered(true)
         clearAutoPlay()
