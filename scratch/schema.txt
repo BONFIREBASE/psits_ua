@@ -1,0 +1,52 @@
+=== posts ===
+  content | type=string | size=5000 | required=true | array=false
+  author_student_no | type=string | size=255 | required=true | array=false
+  author_display_name | type=string | size=100 | required=true | array=false
+  is_anonymous | type=boolean | size=- | required=false | array=false
+  is_verified | type=boolean | size=- | required=false | array=false
+  is_locked | type=boolean | size=- | required=false | array=false
+  is_flagged | type=boolean | size=- | required=false | array=false
+  author_avatar | type=string | size=500 | required=false | array=false
+  author_year_section | type=string | size=20 | required=false | array=false
+  attachments | type=string | size=500 | required=false | array=true
+  attachment_names | type=string | size=255 | required=false | array=true
+  attachment_types | type=string | size=50 | required=false | array=true
+  attachment_sizes | type=string | size=50 | required=false | array=true
+  likes_count | type=integer | size=- | required=false | array=false
+  comments_count | type=integer | size=- | required=false | array=false
+  tags | type=string | size=50 | required=false | array=true
+  flag_count | type=integer | size=- | required=false | array=false
+  status | type=string | size=20 | required=false | array=false
+  is_officer | type=boolean | size=- | required=false | array=false
+  officer_title | type=string | size=100 | required=false | array=false
+  IDX idx_posts_author key [author_student_no]
+  IDX idx_posts_status key [status]
+=== comments ===
+  post_id | type=string | size=50 | required=true | array=false
+  content | type=string | size=1000 | required=true | array=false
+  author_student_no | type=string | size=255 | required=true | array=false
+  author_display_name | type=string | size=100 | required=true | array=false
+  author_avatar | type=string | size=500 | required=false | array=false
+  is_anonymous | type=boolean | size=- | required=false | array=false
+  is_verified | type=boolean | size=- | required=false | array=false
+  is_flagged | type=boolean | size=- | required=false | array=false
+  flag_count | type=integer | size=- | required=false | array=false
+  status | type=string | size=20 | required=false | array=false
+  is_officer | type=boolean | size=- | required=false | array=false
+  officer_title | type=string | size=100 | required=false | array=false
+  IDX idx_comments_post key [post_id]
+=== reactions ===
+  post_id | type=string | size=50 | required=true | array=false
+  student_no | type=string | size=20 | required=true | array=false
+  reaction_type | type=string | size=20 | required=false | array=false
+  IDX idx_reactions_post_user key [post_id,student_no]
+=== reports ===
+  target_type | type=string | size=20 | required=true | array=false
+  target_id | type=string | size=50 | required=true | array=false
+  reporter_student_no | type=string | size=20 | required=true | array=false
+  reason | type=string | size=255 | required=true | array=false
+  status | type=string | size=20 | required=false | array=false
+=== follows ===
+  follower_student_no | type=string | size=20 | required=true | array=false
+  following_student_no | type=string | size=20 | required=true | array=false
+  IDX idx_follows_pair key [follower_student_no,following_student_no]

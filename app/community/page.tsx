@@ -39,6 +39,8 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  Paperclip,
+  CornerDownLeft,
 } from 'lucide-react'
 import { appwrite, appwriteStorage, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
@@ -56,6 +58,9 @@ import { compressImageToWebP } from '@/lib/image-compress'
 import { ID } from 'appwrite'
 import ScrollReveal from '@/components/ScrollReveal'
 import CommunityOnboardingModal, { type CommunityUserProfile } from '@/components/CommunityOnboardingModal'
+import { motion } from 'framer-motion'
+import { Tabs, TabsList, TabsTrigger } from '@/components/motion/tabs'
+import { NumberTicker } from '@/components/motion/number-ticker'
 
 const LOCAL_STORAGE_KEY = 'psits_community_cached_posts_v4'
 const TAGS = ['All', 'Announcements', 'Academics', 'Tech & Code', 'Projects', 'Discussions', 'Campus Life'] as const
@@ -304,10 +309,16 @@ export default function CommunityPage() {
 
   // Active Comment Thread Modal
   const [activeCommentPost, setActiveCommentPost] = useState<CommunityPostItem | null>(null)
+  const activeCommentPostRef = useRef<CommunityPostItem | null>(null)
   const [comments, setComments] = useState<CommunityCommentItem[]>([])
   const [newCommentText, setNewCommentText] = useState('')
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [commentsLoading, setCommentsLoading] = useState(false)
+
+  // Keep ref in sync with state so the realtime callback always reads the latest value
+  useEffect(() => {
+    activeCommentPostRef.current = activeCommentPost
+  }, [activeCommentPost])
 
   // Moderator Takedown State
   const [takedownTarget, setTakedownTarget] = useState<CommunityPostItem | null>(null)
@@ -480,7 +491,33 @@ export default function CommunityPage() {
     }
   }, [selectedTag])
 
+  /* ─── 4.5 Suppress Appwrite SDK non-fatal WebSocket reconnect logs (dev only) ─── */
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return
+
+    const originalConsoleError = console.error
+    console.error = (...args: unknown[]) => {
+      // The Appwrite SDK logs "Realtime got disconnected. Reconnect will be attempted in X seconds."
+      // This is a non-fatal informational message — the SDK handles reconnection automatically.
+      // Next.js Turbopack intercepts ALL console.error calls and renders a full-screen overlay,
+      // which is disruptive. Downgrade to console.warn instead.
+      if (
+        typeof args[0] === 'string' &&
+        args[0].includes('Realtime got disconnected')
+      ) {
+        console.warn('[Appwrite SDK]', ...args)
+        return
+      }
+      originalConsoleError.apply(console, args)
+    }
+
+    return () => {
+      console.error = originalConsoleError
+    }
+  }, [])
+
   /* ─── 5. Appwrite Realtime Subscriptions (Live Feed & Instant Moderator Takedown) ─── */
+  /* Subscribe ONCE on mount. Uses activeCommentPostRef to avoid re-subscribing on every comment toggle. */
   useEffect(() => {
     const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_COLLECTIONS.POSTS}.documents`
 
@@ -503,7 +540,8 @@ export default function CommunityPage() {
           } catch {}
           return filtered
         })
-        if (activeCommentPost?.$id === docId) {
+        // Read from ref instead of state to avoid re-mounting the subscription
+        if (activeCommentPostRef.current?.$id === docId) {
           setActiveCommentPost(null)
         }
         return
@@ -539,7 +577,8 @@ export default function CommunityPage() {
         unsubscribe()
       } catch {}
     }
-  }, [activeCommentPost])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* ─── 6. Handle File Upload (Compressed WebP / Direct to Appwrite Storage) ─── */
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -886,12 +925,19 @@ export default function CommunityPage() {
                   key={tag}
                   type="button"
                   onClick={() => setSelectedTag(tag)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium tracking-tight transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+                  className={`relative isolate px-3.5 py-1.5 rounded-full text-xs font-medium tracking-tight transition-colors cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 active:scale-[0.98] ${
                     isSelected
-                      ? 'bg-gold text-slate-950 font-bold shadow-xs'
+                      ? 'text-slate-950 font-bold'
                       : 'bg-surface hover:bg-surface-subtle text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-black/[0.06] dark:border-white/[0.08] hover:border-gold/30'
                   }`}
                 >
+                  {isSelected && (
+                    <motion.span
+                      layoutId="active-category-pill"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      className="absolute inset-0 bg-gold rounded-full shadow-xs -z-10"
+                    />
+                  )}
                   {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-slate-950 inline-block animate-pulse" />}
                   <span>{tag}</span>
                 </button>
@@ -1013,98 +1059,90 @@ export default function CommunityPage() {
           </div>
 
           {/* Feed Sort & Quick Filters Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs py-1">
-            {/* Sort Modes */}
-            <div className="flex items-center gap-1 bg-surface-subtle p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08]">
-              <button
-                type="button"
-                onClick={() => setSortBy('latest')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
-                  sortBy === 'latest'
-                    ? 'bg-surface text-gold font-bold shadow-sm border border-gold/30'
-                    : 'text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Clock className="w-3 h-3" />
-                <span>Latest</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSortBy('popular')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
-                  sortBy === 'popular'
-                    ? 'bg-surface text-gold font-bold shadow-sm border border-gold/30'
-                    : 'text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Flame className="w-3 h-3" />
-                <span>Trending</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSortBy('discussed')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
-                  sortBy === 'discussed'
-                    ? 'bg-surface text-gold font-bold shadow-sm border border-gold/30'
-                    : 'text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <MessageSquare className="w-3 h-3" />
-                <span>Active</span>
-              </button>
-            </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 text-xs py-1">
+            {/* Sort Modes (beUI animated spring tabs) */}
+            <Tabs
+              value={sortBy}
+              onValueChange={(v) => setSortBy(v as 'latest' | 'popular' | 'discussed')}
+              variant="pill"
+              className="w-full sm:w-auto"
+            >
+              <TabsList className="w-full sm:w-auto flex items-center justify-between p-1 bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08] rounded-xl shrink-0">
+                <TabsTrigger
+                  value="latest"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 sm:py-1 text-[10px] sm:text-[11px]"
+                >
+                  <Clock className="w-3 h-3 shrink-0" />
+                  <span>Latest</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="popular"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 sm:py-1 text-[10px] sm:text-[11px]"
+                >
+                  <Flame className="w-3 h-3 shrink-0" />
+                  <span>Trending</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="discussed"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 sm:py-1 text-[10px] sm:text-[11px]"
+                >
+                  <MessageSquare className="w-3 h-3 shrink-0" />
+                  <span>Active</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-            {/* Quick Filter Toggles */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Quick Filter Toggles (Smooth horizontal scroll on mobile) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 w-full sm:w-auto -mx-1 px-1 sm:mx-0 sm:px-0">
               <button
                 type="button"
                 onClick={() => setFilterOnlyWithFiles(!filterOnlyWithFiles)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer ${
+                className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   filterOnlyWithFiles
                     ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
                     : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <FileText className="w-3 h-3" />
+                <FileText className="w-3 h-3 shrink-0" />
                 <span>Modules Only</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setFilterOnlyOfficers(!filterOnlyOfficers)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer ${
+                className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   filterOnlyOfficers
                     ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
                     : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <Sparkles className="w-3 h-3" />
+                <Sparkles className="w-3 h-3 shrink-0" />
                 <span>Officers</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setFilterOnlySaved(!filterOnlySaved)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer ${
+                className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   filterOnlySaved
                     ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
                     : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <Bookmark className="w-3 h-3" />
+                <Bookmark className="w-3 h-3 shrink-0" />
                 <span>Saved ({savedPostIds.length})</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setFilterOnlyMyPosts(!filterOnlyMyPosts)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer ${
+                className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   filterOnlyMyPosts
                     ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
                     : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <User className="w-3 h-3" />
+                <User className="w-3 h-3 shrink-0" />
                 <span>My Posts</span>
               </button>
             </div>
@@ -1359,28 +1397,31 @@ export default function CommunityPage() {
 
                       {/* Reddit-Style Bottom Action Strip */}
                       <div className="flex items-center gap-2 pt-3 border-t border-black/[0.05] dark:border-white/[0.06] text-xs text-slate-500 dark:text-white/40 flex-wrap">
-                        {/* Reaction / Upvote Pill */}
+                        {/* Reaction / Upvote Pill with beUI Number Ticker */}
                         <button
                           type="button"
                           onClick={() => handleReaction(post)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors font-mono text-[11px] cursor-pointer ${
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors font-mono text-[11px] cursor-pointer active:scale-95 ${
                             isLiked
                               ? 'bg-gold/15 text-gold font-bold border border-gold/40'
                               : 'bg-surface-subtle hover:bg-gold/10 hover:text-gold border border-black/[0.06] dark:border-white/[0.08]'
                           }`}
                         >
                           <ThumbsUp className={`w-3.5 h-3.5 ${isLiked ? 'fill-gold text-gold' : ''}`} />
-                          <span>{post.likes_count}</span>
+                          <NumberTicker value={post.likes_count} duration={0.4} />
                         </button>
 
-                        {/* Comments Pill */}
+                        {/* Comments Pill with beUI Number Ticker */}
                         <button
                           type="button"
                           onClick={() => openComments(post)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-subtle hover:bg-gold/10 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] transition-colors font-mono text-[11px] cursor-pointer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-subtle hover:bg-gold/10 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] transition-colors font-mono text-[11px] cursor-pointer active:scale-95"
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
-                          <span>{post.comments_count} Replies</span>
+                          <span className="flex items-center gap-1">
+                            <NumberTicker value={post.comments_count} duration={0.4} />
+                            <span>Replies</span>
+                          </span>
                         </button>
 
                         {/* Share Pill */}
@@ -1653,126 +1694,158 @@ export default function CommunityPage() {
 
 
 
-      {/* ─── Create Post Modal (Responsive & Theme-Aware) ─── */}
+      {/* ─── Create Post Modal (Minimalist Command / Spotlight Palette) ─── */}
       {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 md:p-6">
-          <div className="w-full max-w-xl max-h-[92dvh] flex flex-col rounded-3xl sm:rounded-[32px] bg-surface border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-4 sm:p-6 md:p-8 space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.08] pb-3 shrink-0">
-              <h3 className="font-display font-black text-base sm:text-lg text-slate-900 dark:text-white uppercase tracking-tight">
-                Publish Discussion
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-                className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-1.5 rounded-full hover:bg-surface-subtle transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsCreateOpen(false)
+          }}
+        >
+          <div
+            className="w-full max-w-lg max-h-[90dvh] flex flex-col rounded-2xl bg-[#0c0e12]/95 border border-white/[0.08] shadow-[0_24px_64px_-12px_rgba(0,0,0,0.85)] backdrop-blur-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault()
+                if (!isSubmittingPost && postContent.trim()) handleCreatePost()
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                setIsCreateOpen(false)
+              }
+            }}
+          >
+            {/* Command-Bar Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-white/[0.02] shrink-0">
+              <div className="text-xs font-semibold text-white/90 tracking-wide font-mono">
+                Create Discussion
+              </div>
+              <div className="flex items-center gap-2">
+                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-white/40 bg-white/[0.04] border border-white/[0.08] rounded shadow-xs">
+                  ESC
+                </kbd>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(false)}
+                  className="text-white/40 hover:text-white p-1 rounded-md hover:bg-white/[0.06] transition-colors cursor-pointer"
+                  title="Close modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            {/* Scrollable Content Body */}
-            <div className="overflow-y-auto pr-1 space-y-4 flex-1 scrollbar-thin">
-              {/* Student Author Indicator */}
-              <div className="flex items-center gap-3 p-3 sm:p-4 rounded-2xl bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08]">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center shrink-0 text-gold overflow-hidden">
+            {/* Author / Identity Strip */}
+            <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.04] bg-white/[0.01] text-xs shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-5 h-5 rounded-full bg-amber-400/10 border border-amber-400/25 flex items-center justify-center shrink-0 text-amber-400 overflow-hidden text-[10px]">
                   {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
                     <Image
                       src={userProfile.avatar}
                       alt="Student"
-                      width={40}
-                      height={40}
+                      width={20}
+                      height={20}
                       className="rounded-full object-cover w-full h-full"
                     />
                   ) : (
                     renderAvatarIcon(userProfile?.avatar, userProfile?.name || user?.name)
                   )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-bold font-mono text-gold truncate">
-                    {userProfile?.username
-                      ? (userProfile.username.startsWith('@') ? userProfile.username : `@${userProfile.username}`)
-                      : `@${(userProfile?.name || user?.name || 'kasubay').toLowerCase().replace(/[^a-z0-9_.]/g, '')}`}
-                  </div>
-                  <div className="text-[10px] sm:text-[11px] font-mono text-slate-500 dark:text-white/40">
-                    {userProfile?.yearSection || 'BSIT'} · Public Discussion
-                  </div>
-                </div>
-                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-[9px] sm:text-[10px] font-mono shrink-0">
-                  <UserCheck className="w-3 h-3" />
-                  <span>Verified</span>
-                </div>
+                <span className="font-mono text-xs font-semibold text-amber-400/90 truncate">
+                  {userProfile?.username
+                    ? (userProfile.username.startsWith('@') ? userProfile.username : `@${userProfile.username}`)
+                    : `@${(userProfile?.name || user?.name || 'kasubay').toLowerCase().replace(/[^a-z0-9_.]/g, '')}`}
+                </span>
               </div>
+              <div className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400/90 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Verified</span>
+              </div>
+            </div>
 
-              {/* Category Select */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
+            {/* Category / Tags Selector */}
+            <div className="px-4 pt-3 pb-1 shrink-0">
+              <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-white/35 mb-1.5">
+                Topic
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
                 {TAGS.filter(t => t !== 'All').map(t => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setSelectedPostTag(t)}
-                    className={`px-3 py-1.5 rounded-xl text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       selectedPostTag === t
-                        ? 'bg-gold text-slate-950 font-bold'
-                        : 'bg-surface-subtle text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'
+                        ? 'bg-amber-400/15 text-amber-300 border border-amber-400/30 font-semibold'
+                        : 'bg-white/[0.03] text-white/50 border border-white/[0.05] hover:text-white/80 hover:bg-white/[0.06]'
                     }`}
                   >
-                    {t}
+                    #{t}
                   </button>
                 ))}
               </div>
+            </div>
 
-              {/* Quick Markdown & Code Formatter Toolbar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-0.5">
-                <span className="text-[10px] sm:text-[11px] font-mono text-slate-400 dark:text-white/40">Markdown &amp; code supported</span>
-                <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Editor Canvas */}
+            <div className="flex-1 flex flex-col px-4 py-2 overflow-y-auto scrollbar-thin space-y-2">
+              <textarea
+                value={postContent}
+                onChange={e => setPostContent(e.target.value)}
+                autoFocus
+                className="w-full flex-1 min-h-[140px] bg-transparent text-xs sm:text-sm text-white/90 placeholder:text-white/25 focus:outline-none resize-none leading-relaxed font-sans"
+              />
+
+              {/* Formatting Toolbar */}
+              <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] text-xs">
+                <span className="text-[10px] font-mono text-white/30">Markdown &amp; code syntax</span>
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setPostContent(prev => prev + '\n```typescript\n// Paste code here\n\n```\n')}
-                    className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono text-[10px] sm:text-[11px] transition-colors cursor-pointer"
-                    title="Insert code block"
+                    className="px-1.5 py-0.5 rounded text-[10px] font-mono text-white/40 hover:text-amber-300 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                    title="Insert code snippet"
                   >
-                    &lt;/&gt; Code
+                    &lt;/&gt; code
                   </button>
                   <button
                     type="button"
                     onClick={() => setPostContent(prev => prev + ' **bold text** ')}
-                    className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono font-bold text-[10px] sm:text-[11px] transition-colors cursor-pointer"
-                    title="Insert bold text"
+                    className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-white/40 hover:text-amber-300 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                    title="Insert bold"
                   >
                     B
                   </button>
                   <button
                     type="button"
                     onClick={() => setPostContent(prev => prev + '\n- Item 1\n- Item 2\n')}
-                    className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-gold/15 text-slate-600 dark:text-white/60 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] font-mono text-[10px] sm:text-[11px] transition-colors cursor-pointer"
-                    title="Insert list"
+                    className="px-1.5 py-0.5 rounded text-[10px] font-mono text-white/40 hover:text-amber-300 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                    title="Insert bullet list"
                   >
-                    • List
+                    • list
                   </button>
                 </div>
               </div>
 
-              {/* Content Input */}
-              <textarea
-                value={postContent}
-                onChange={e => setPostContent(e.target.value)}
-                placeholder="What would you like to discuss with fellow BSIT students? Markdown and code snippets are automatically highlighted."
-                className="w-full h-32 sm:h-36 bg-surface-subtle border border-black/[0.08] dark:border-white/10 focus:border-gold rounded-2xl p-4 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none resize-none leading-relaxed"
-              />
-
               {/* Attached Files List */}
               {attachments.length > 0 && (
-                <div className="space-y-1.5">
+                <div className="space-y-1 pt-1">
                   {attachments.map((file, idx) => (
-                    <div key={file.id} className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface-subtle text-xs border border-black/[0.06] dark:border-white/[0.08]">
-                      <span className="truncate max-w-[200px] sm:max-w-[320px] text-slate-900 dark:text-white font-medium text-[11px]">{file.name} ({file.size})</span>
+                    <div
+                      key={file.id}
+                      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/[0.03] text-xs border border-white/[0.06]"
+                    >
+                      <div className="flex items-center gap-1.5 truncate max-w-[280px] sm:max-w-[360px]">
+                        <Paperclip className="w-3 h-3 text-white/40 shrink-0" />
+                        <span className="truncate text-white/80 font-mono text-[11px]">{file.name}</span>
+                        <span className="text-white/30 text-[10px] font-mono shrink-0">({file.size})</span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
-                        className="text-slate-400 hover:text-rose-500 cursor-pointer p-1"
+                        className="text-white/40 hover:text-rose-400 cursor-pointer p-0.5"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="w-3 h-3" />
                       </button>
                     </div>
                   ))}
@@ -1789,26 +1862,32 @@ export default function CommunityPage() {
               className="hidden"
             />
 
-            {/* Actions Footer - Fully Responsive Stack on Mobile */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.08] shrink-0">
+            {/* Command-Palette Style Footer */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-t border-white/[0.06] bg-white/[0.02] shrink-0">
               <button
                 type="button"
                 disabled={isUploadingFile}
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 text-slate-500 dark:text-white/50 hover:text-gold text-xs font-semibold px-3 py-2 rounded-xl border border-black/[0.08] dark:border-white/10 hover:bg-surface-subtle transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-white/50 hover:text-amber-300 text-xs font-mono px-2 py-1 rounded-md hover:bg-white/[0.04] transition-colors cursor-pointer disabled:opacity-50"
               >
-                <UploadCloud className="w-4 h-4 text-gold" />
-                <span>{isUploadingFile ? 'Uploading...' : 'Attach Document / PDF'}</span>
+                <Paperclip className="w-3.5 h-3.5" />
+                <span className="text-[11px]">{isUploadingFile ? 'Uploading...' : 'Attach'}</span>
               </button>
 
-              <button
-                type="button"
-                disabled={isSubmittingPost || !postContent.trim()}
-                onClick={handleCreatePost}
-                className="px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-muted disabled:opacity-50 text-slate-950 font-bold text-xs shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {isSubmittingPost ? 'Publishing...' : 'Publish Post'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isSubmittingPost || !postContent.trim()}
+                  onClick={handleCreatePost}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all shadow-sm cursor-pointer"
+                >
+                  <span>{isSubmittingPost ? 'Publishing...' : 'Publish'}</span>
+                  <span className="hidden sm:inline-flex items-center gap-0.5 px-1 py-0.2 rounded bg-black/15 text-[10px] font-mono text-slate-900 font-semibold">
+                    <span>⌘</span>
+                    <CornerDownLeft className="w-2.5 h-2.5" />
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
