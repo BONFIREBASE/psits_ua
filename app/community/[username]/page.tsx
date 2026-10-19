@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import {
   ChevronLeft,
   Heart,
@@ -120,7 +120,6 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 export default function StudentProfilePage() {
-  const router = useRouter()
   const params = useParams()
   const rawParam = params?.username as string | undefined
   const targetUsername = useMemo(() => {
@@ -181,6 +180,7 @@ export default function StudentProfilePage() {
 
   // Load auth state
   useEffect(() => {
+    // 1. Resolve auth session (guest or authenticated)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const email = session.user.email || ''
@@ -196,37 +196,40 @@ export default function StudentProfilePage() {
         if (email.toLowerCase() === 'psits-ua@antiquespride.edu.ph' || email.toLowerCase().includes('admin')) {
           setIsAdmin(true)
         }
-
-        try {
-          const cached = localStorage.getItem('psits_community_cached_posts_v4')
-          if (cached) {
-            const parsed = JSON.parse(cached)
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setPosts(parsed)
-              setLoading(false)
-            }
-          }
-        } catch {}
       } else {
-        router.replace('/community')
+        setUser(null)
       }
     }).catch(() => {
-      router.replace('/community')
+      setUser(null)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session?.user) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const email = session.user.email || ''
+        const metadata = session.user.user_metadata || {}
+        const name = metadata.full_name || email.split('@')[0]
+        const avatar = metadata.community_avatar || metadata.avatar_url || ''
+        const username = metadata.community_username || ''
+        const isOfficer = Boolean(metadata.role === 'officer' || metadata.role === 'admin' || email.toLowerCase() === 'psits-ua@antiquespride.edu.ph')
+        const isVerified = Boolean(isOfficer || metadata.is_verified || metadata.community_tos_accepted)
+        const yearSection = metadata.year_section || 'BSIT'
+        setUser({ email, name, avatar, username, isOfficer, isVerified, yearSection })
+      } else {
         setUser(null)
-        setPosts([])
-        try {
-          localStorage.removeItem('psits_community_cached_posts_v4')
-        } catch {}
-        router.replace('/community')
       }
     })
 
+    // 2. Hydrate cached state asynchronously without blocking initial render
     queueMicrotask(() => {
       try {
+        const cached = localStorage.getItem('psits_community_cached_posts_v4')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPosts(parsed)
+            setLoading(false)
+          }
+        }
         const cachedSaved = localStorage.getItem('psits_community_saved_posts')
         if (cachedSaved) setSavedPostIds(JSON.parse(cachedSaved))
         const cachedLiked = localStorage.getItem('psits_community_liked_posts')
@@ -237,7 +240,7 @@ export default function StudentProfilePage() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [router])
+  }, [])
 
   // Fetch persistent student profile metadata by handle
   useEffect(() => {
@@ -278,12 +281,12 @@ export default function StudentProfilePage() {
 
   // Filter posts by this username
   const authorPosts = useMemo(() => {
-    if (!user || !targetUsername) return []
+    if (!targetUsername) return []
     return posts.filter(p => {
       const pHandle = (p.author_display_name || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
       return pHandle === targetUsername
     })
-  }, [posts, targetUsername, user])
+  }, [posts, targetUsername])
 
   // Filter saved posts from all loaded feed posts
   const savedPosts = useMemo(() => {
@@ -350,6 +353,10 @@ export default function StudentProfilePage() {
   }, [fetchedProfile, isOwnProfile, user, authorPosts, targetUsername])
 
   const handleToggleSavePost = (postId: string) => {
+    if (!user) {
+      alert('Please connect your student account to save posts.')
+      return
+    }
     setSavedPostIds(prev => {
       const updated = prev.includes(postId) ? prev.filter(id => id !== postId) : [...prev, postId]
       try {
@@ -684,7 +691,16 @@ export default function StudentProfilePage() {
           <div className="font-mono text-xs font-bold text-slate-900 dark:text-white truncate max-w-[180px]">
             {profileInfo.handle}
           </div>
-          <div className="w-16" />
+          {!user ? (
+            <Link
+              href="/community"
+              className="text-xs font-semibold text-gold hover:text-gold-muted transition-colors py-1 px-2.5 rounded-lg border border-gold/30 hover:border-gold/50 bg-gold/5"
+            >
+              Sign in
+            </Link>
+          ) : (
+            <div className="w-16" />
+          )}
         </div>
 
         {/* Instagram Profile Hero (Seamless & Natural) */}
@@ -836,19 +852,21 @@ export default function StudentProfilePage() {
             <span className="text-[11px] font-mono opacity-80">({authorPosts.length})</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('saved')}
-            className={`flex items-center gap-2 py-2 px-5 rounded-full text-xs font-semibold tracking-wide uppercase transition-all cursor-pointer ${
-              activeTab === 'saved'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-bold shadow-xs'
-                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-            }`}
-          >
-            <Bookmark className="w-3.5 h-3.5" />
-            <span>Saved</span>
-            <span className="text-[11px] font-mono opacity-80">({savedPosts.length})</span>
-          </button>
+          {isOwnProfile && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('saved')}
+              className={`flex items-center gap-2 py-2 px-5 rounded-full text-xs font-semibold tracking-wide uppercase transition-all cursor-pointer ${
+                activeTab === 'saved'
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-bold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+              }`}
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+              <span>Saved</span>
+              <span className="text-[11px] font-mono opacity-80">({savedPosts.length})</span>
+            </button>
+          )}
         </div>
 
         {/* Tab Content */}
