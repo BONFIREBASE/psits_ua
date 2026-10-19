@@ -2609,25 +2609,29 @@ export default function CommunityPage() {
 
           {/* ─── Community Feed ─── */}
           {isCurrentThreadPrivateLocked && currentActiveThread ? (
-            <div className="py-16 text-center border border-dashed border-amber-500/30 rounded-2xl p-8 bg-surface/50 space-y-4">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 shadow-inner">
-                <Lock className="w-7 h-7" />
+            <div className="py-16 sm:py-20 px-4 text-center space-y-6 max-w-md mx-auto animate-in fade-in duration-300">
+              <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/20 via-amber-400/25 to-yellow-500/10 blur-xl pointer-events-none" />
+                <div className="w-full h-full rounded-full border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.04] backdrop-blur-sm flex items-center justify-center text-amber-500 shadow-xs">
+                  <Lock className="w-7 h-7 sm:w-8 sm:h-8 stroke-[1.6]" />
+                </div>
               </div>
-              <div className="space-y-1.5 max-w-md mx-auto">
-                <h3 className="font-display font-black text-lg text-slate-900 dark:text-white uppercase tracking-wider">
-                  #{currentActiveThread.title} is Private
+
+              <div className="space-y-2">
+                <h3 className="font-display font-bold text-lg sm:text-xl text-slate-900 dark:text-white tracking-tight">
+                  #{currentActiveThread.title} is private
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-white/60 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-white/60 leading-relaxed max-w-xs mx-auto">
                   {currentActiveThread.description || 'This channel is restricted to invited members only.'}
                 </p>
-                <div className="text-[11px] font-mono text-slate-400 pt-1">
+                <div className="text-[11px] font-mono text-slate-400 pt-0.5">
                   👥 {getThreadMemberCount(currentActiveThread)} joined · Hosted by {currentActiveThread.creator_display_name}
                 </div>
               </div>
 
               <div className="pt-2">
                 {isPendingJoinRequest(currentActiveThread, user?.email, userProfile?.username) ? (
-                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-medium bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                  <span className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-xs font-mono font-medium bg-amber-500/15 text-amber-500 border border-amber-500/30">
                     <Clock className="w-3.5 h-3.5 animate-spin" />
                     <span>Request Pending Host Approval</span>
                   </span>
@@ -2636,10 +2640,10 @@ export default function CommunityPage() {
                     type="button"
                     disabled={requestingThreadId === currentActiveThread.$id}
                     onClick={() => handleRequestJoinThread(currentActiveThread)}
-                    className="px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-muted text-slate-950 font-bold text-xs uppercase tracking-wider transition-colors shadow-sm cursor-pointer inline-flex items-center gap-2"
+                    className="px-6 py-2.5 rounded-full bg-gold hover:bg-gold-muted text-slate-950 font-bold text-xs tracking-wide transition-all shadow-sm hover:shadow active:scale-95 cursor-pointer inline-flex items-center gap-2"
                   >
                     <UserPlus className="w-4 h-4" />
-                    <span>Request to Join #{currentActiveThread.title}</span>
+                    <span>Request to join circle</span>
                   </button>
                 )}
               </div>
@@ -2663,37 +2667,44 @@ export default function CommunityPage() {
               ))}
             </div>
           ) : filteredPosts.length === 0 ? (
-            <div className="py-14 text-center border border-dashed border-black/10 dark:border-white/10 rounded-2xl p-8 bg-surface/50 space-y-5">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-gold/10 border border-gold/20 flex items-center justify-center text-gold shadow-inner">
-                <MessageSquare className="w-7 h-7" />
+            <div className="py-16 sm:py-20 px-4 text-center space-y-6 max-w-md mx-auto animate-in fade-in duration-300">
+              {/* Instagram / Threads Style Circular Icon with Ambient Glow */}
+              <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/20 via-gold/25 to-yellow-400/10 blur-xl pointer-events-none" />
+                <div className="w-full h-full rounded-full border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.04] backdrop-blur-sm flex items-center justify-center text-slate-800 dark:text-white shadow-xs">
+                  <MessageSquare className="w-7 h-7 sm:w-8 sm:h-8 stroke-[1.6] text-gold" />
+                </div>
               </div>
 
-              <div className="space-y-1.5 max-w-md mx-auto">
-                <h3 className="font-display font-black text-base text-slate-900 dark:text-white uppercase tracking-wider">
+              {/* Natural Typography (No All-Caps Blocky Text) */}
+              <div className="space-y-2">
+                <h3 className="font-display font-bold text-lg sm:text-xl text-slate-900 dark:text-white tracking-tight">
                   {searchQuery
                     ? `No results for "${searchQuery}"`
                     : filterOnlySaved
-                    ? 'No bookmarked posts yet'
+                    ? 'No saved posts yet'
                     : filterOnlyWithFiles
-                    ? 'No posts with modules attached'
-                    : `No posts in ${selectedTag}`}
+                    ? 'No modules shared yet'
+                    : selectedTag === 'All'
+                    ? 'No discussions yet'
+                    : `No posts in #${selectedTag}`}
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-white/50 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-white/50 leading-relaxed max-w-xs mx-auto">
                   {searchQuery
                     ? 'Try different keywords or clearing active filters.'
                     : filterOnlySaved
                     ? 'Save posts with the bookmark icon to review them here.'
-                    : 'Be the first student to publish notes or ask an engineering question.'}
+                    : 'Be the first student to publish notes, ask a question, or spark a conversation.'}
                 </p>
               </div>
 
-              {/* Quick Discussion Starter Chips */}
+              {/* Instagram-Style Minimalist Suggestion Chips */}
               {!searchQuery && !filterOnlySaved && (
-                <div className="pt-1 space-y-2 max-w-md mx-auto">
-                  <span className="text-[10px] font-mono text-slate-400 dark:text-white/40 uppercase tracking-widest block font-semibold">
-                    Starter Topics:
+                <div className="pt-1 space-y-2.5">
+                  <span className="text-[10px] font-mono text-slate-400 dark:text-white/40 uppercase tracking-wider block font-semibold">
+                    Starter Topics
                   </span>
-                  <div className="flex flex-col gap-1.5 text-xs">
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
                     <button
                       type="button"
                       onClick={() =>
@@ -2702,9 +2713,9 @@ export default function CommunityPage() {
                           'Feed'
                         )
                       }
-                      className="px-3 py-2 rounded-xl bg-surface hover:bg-gold/15 text-slate-700 dark:text-slate-300 hover:text-gold border border-black/[0.08] dark:border-white/[0.08] text-xs font-mono transition-all text-left cursor-pointer"
+                      className="px-3.5 py-1.5 rounded-full bg-black/[0.03] dark:bg-white/[0.05] hover:bg-gold/15 text-slate-700 dark:text-white/70 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] text-xs font-medium transition-all cursor-pointer active:scale-95"
                     >
-                      📚 CC104 Reviewer Notes
+                      📚 CC104 Reviewer
                     </button>
                     <button
                       type="button"
@@ -2714,9 +2725,9 @@ export default function CommunityPage() {
                           'Feed'
                         )
                       }
-                      className="px-3 py-2 rounded-xl bg-surface hover:bg-gold/15 text-slate-700 dark:text-slate-300 hover:text-gold border border-black/[0.08] dark:border-white/[0.08] text-xs font-mono transition-all text-left cursor-pointer"
+                      className="px-3.5 py-1.5 rounded-full bg-black/[0.03] dark:bg-white/[0.05] hover:bg-gold/15 text-slate-700 dark:text-white/70 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] text-xs font-medium transition-all cursor-pointer active:scale-95"
                     >
-                      ⚡ Next.js Architecture Question
+                      ⚡ Next.js Architecture
                     </button>
                     <button
                       type="button"
@@ -2726,29 +2737,16 @@ export default function CommunityPage() {
                           'Feed'
                         )
                       }
-                      className="px-3 py-2 rounded-xl bg-surface hover:bg-gold/15 text-slate-700 dark:text-slate-300 hover:text-gold border border-black/[0.08] dark:border-white/[0.08] text-xs font-mono transition-all text-left cursor-pointer"
+                      className="px-3.5 py-1.5 rounded-full bg-black/[0.03] dark:bg-white/[0.05] hover:bg-gold/15 text-slate-700 dark:text-white/70 hover:text-gold border border-black/[0.06] dark:border-white/[0.08] text-xs font-medium transition-all cursor-pointer active:scale-95"
                     >
-                      🛠️ Capstone Team Callout
+                      🛠️ Capstone Team
                     </button>
                   </div>
                 </div>
               )}
 
-              <div className="flex items-center justify-center gap-3 pt-2">
-                {(searchQuery || filterOnlyWithFiles || filterOnlyOfficers || filterOnlySaved) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery('')
-                      setFilterOnlyWithFiles(false)
-                      setFilterOnlyOfficers(false)
-                      setFilterOnlySaved(false)
-                    }}
-                    className="px-4 py-2 rounded-xl text-xs font-mono text-slate-500 hover:text-slate-900 dark:hover:text-white border border-black/[0.08] dark:border-white/[0.1] cursor-pointer transition-colors"
-                  >
-                    Reset Filters
-                  </button>
-                )}
+              {/* Actions Row */}
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -2760,10 +2758,27 @@ export default function CommunityPage() {
                     setSelectedPostTag(selectedTag === 'All' ? 'general' : selectedTag)
                     setIsCreateOpen(true)
                   }}
-                  className="px-5 py-2 rounded-xl bg-gold hover:bg-gold-muted text-slate-950 font-bold text-xs uppercase tracking-wider transition-colors shadow-sm cursor-pointer"
+                  className="px-6 py-2.5 rounded-full bg-gold hover:bg-gold-muted text-slate-950 font-bold text-xs tracking-wide transition-all shadow-sm hover:shadow active:scale-95 cursor-pointer inline-flex items-center gap-2"
                 >
-                  Create Post
+                  <Plus className="w-4 h-4" />
+                  <span>Share your thoughts</span>
                 </button>
+
+                {(searchQuery || filterOnlyWithFiles || filterOnlyOfficers || filterOnlySaved || filterOnlyMyPosts) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('')
+                      setFilterOnlyWithFiles(false)
+                      setFilterOnlyOfficers(false)
+                      setFilterOnlySaved(false)
+                      setFilterOnlyMyPosts(false)
+                    }}
+                    className="text-xs font-semibold text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer underline-offset-4 hover:underline"
+                  >
+                    Clear active filters
+                  </button>
+                )}
               </div>
             </div>
           ) : (
