@@ -2092,11 +2092,19 @@ export default function CommunityPage() {
       return true
     })
 
-    // 6. Sorting
+    // 6. Sorting with deterministic recency tie-breaking
     if (sortBy === 'popular') {
-      list = [...list].sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0))
+      list = [...list].sort((a, b) => {
+        const diff = (b.likes_count || 0) - (a.likes_count || 0)
+        if (diff !== 0) return diff
+        return new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime()
+      })
     } else if (sortBy === 'discussed') {
-      list = [...list].sort((a, b) => (b.comments_count || 0) - (a.comments_count || 0))
+      list = [...list].sort((a, b) => {
+        const diff = (b.comments_count || 0) - (a.comments_count || 0)
+        if (diff !== 0) return diff
+        return new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime()
+      })
     } else {
       // Latest first
       list = [...list].sort((a, b) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime())
