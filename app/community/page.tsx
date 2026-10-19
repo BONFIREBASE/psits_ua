@@ -52,6 +52,7 @@ import {
   AlertCircle,
   Bold,
   List,
+  AtSign,
   Flag,
 } from 'lucide-react'
 import { appwrite, appwriteStorage, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
@@ -2003,20 +2004,50 @@ export default function CommunityPage() {
     }
   }
 
-  // Notification sidebar memoized items (Option C Hybrid)
-  const broadcastItems = useMemo(() => {
-    return posts.filter(p => p.is_officer || p.tags?.includes('Announcements')).slice(0, 5)
-  }, [posts])
-
-  const userActivityItems = useMemo(() => {
+  // Notification sidebar items strictly scoped to the authenticated student (never shared)
+  const userNotifications = useMemo(() => {
     if (!user) return []
-    const myName = (userProfile?.name || user.name || '').toLowerCase()
-    const myUsername = (userProfile?.username || '').replace(/^@/, '').toLowerCase()
-    return posts.filter(p => {
-      const author = p.author_display_name.toLowerCase()
-      const isMine = (myName && author === myName) || (myUsername && author.includes(myUsername))
-      return isMine && (p.comments_count > 0 || p.likes_count > 0)
-    }).slice(0, 5)
+    const myEmail = (user.email || '').toLowerCase().trim()
+    const myName = (userProfile?.name || user.name || '').toLowerCase().trim()
+    const myUsername = (userProfile?.username || '').replace(/^@/, '').toLowerCase().trim()
+
+    return posts
+      .map(p => {
+        const authorDisplay = (p.author_display_name || '').toLowerCase().trim()
+        const authorEmail = (p.author_student_no || '').toLowerCase().trim()
+        const isAuthor =
+          (myEmail && authorEmail === myEmail) ||
+          (myUsername && authorDisplay.includes(myUsername)) ||
+          (myName && authorDisplay === myName)
+
+        // 1. Mention alert: someone else tagged this user's handle
+        if (!isAuthor && myUsername && p.content.toLowerCase().includes(`@${myUsername}`)) {
+          return {
+            post: p,
+            type: 'mention' as const,
+            title: `${p.author_display_name} mentioned you`,
+            time: p.$createdAt,
+          }
+        }
+
+        // 2. Activity / engagement alert on user's own post
+        if (isAuthor && (p.comments_count > 0 || p.likes_count > 0)) {
+          const summary =
+            p.comments_count > 0
+              ? `${p.comments_count} ${p.comments_count === 1 ? 'reply' : 'replies'} on your discussion`
+              : `${p.likes_count} upvotes on your discussion`
+          return {
+            post: p,
+            type: 'activity' as const,
+            title: summary,
+            time: p.$createdAt,
+          }
+        }
+
+        return null
+      })
+      .filter((n): n is NonNullable<typeof n> => n !== null)
+      .slice(0, 5)
   }, [posts, user, userProfile])
 
   // Filtered & Sorted post results based on search input, category, tags, and quick-filters
@@ -3270,141 +3301,112 @@ export default function CommunityPage() {
 
           </div>
 
-          {/* Unified Community Notifications Card (No Double Tabs) */}
-          <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-5 space-y-3.5 shadow-sm dark:shadow-none text-xs">
-            <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
-              <div className="flex items-center gap-2 font-display font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-white">
-                <Bell className="w-4 h-4 text-gold" />
-                <span>Notifications</span>
+          {/* Notifications Card (Strictly for Authenticated Users - Hidden for Guests) */}
+          {user && (
+            <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-5 space-y-3.5 shadow-sm dark:shadow-none text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+                <div className="flex items-center gap-2 font-display font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-white">
+                  <Bell className="w-4 h-4 text-gold" />
+                  <span>Notifications</span>
+                </div>
+                {(hostedThreadRequests.length > 0 || userNotifications.length > 0) && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
+                    {hostedThreadRequests.length + userNotifications.length}
+                  </span>
+                )}
               </div>
-              {hostedThreadRequests.length > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                  {hostedThreadRequests.length} pending
-                </span>
-              )}
-            </div>
 
-            {/* Unified Notification Stream */}
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5 scrollbar-thin">
-              {/* Host Thread Join Requests (High Priority Alerts) */}
-              {hostedThreadRequests.length > 0 && hostedThreadRequests.map(item => {
-                const isProcessing = processingRequestId === `${item.thread.$id}-${item.requesterStr}`
-                return (
-                  <div
-                    key={`join-req-${item.thread.$id}-${item.requesterStr}`}
-                    className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2 animate-in fade-in"
-                  >
-                    <div className="flex items-start justify-between gap-1 text-[11px]">
-                      <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white min-w-0">
-                        <UserPlus className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span className="truncate">
-                          <span className="text-gold font-bold">{item.displayHandle}</span> wants to join{' '}
-                          <span className="font-mono text-amber-500">#{item.thread.title}</span>
+              {/* Personal Notification Stream */}
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5 scrollbar-thin">
+                {/* Host Thread Join Requests (High Priority Alerts) */}
+                {hostedThreadRequests.length > 0 && hostedThreadRequests.map(item => {
+                  const isProcessing = processingRequestId === `${item.thread.$id}-${item.requesterStr}`
+                  return (
+                    <div
+                      key={`join-req-${item.thread.$id}-${item.requesterStr}`}
+                      className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2 animate-in fade-in"
+                    >
+                      <div className="flex items-start justify-between gap-1 text-[11px]">
+                        <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white min-w-0">
+                          <UserPlus className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span className="truncate">
+                            <span className="text-gold font-bold">{item.displayHandle}</span> wants to join{' '}
+                            <span className="font-mono text-amber-500">#{item.thread.title}</span>
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 font-bold">
+                          Request
                         </span>
                       </div>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 font-bold">
-                        Request
-                      </span>
+
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() => handleRespondToJoinRequest(item.thread.$id, item.requesterStr, 'approve')}
+                          className="flex-1 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] tracking-wide transition-colors cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
+                        >
+                          <Check className="w-3 h-3" />
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() => handleRespondToJoinRequest(item.thread.$id, item.requesterStr, 'decline')}
+                          className="flex-1 py-1 rounded-lg bg-surface hover:bg-rose-500/20 text-slate-700 dark:text-white/80 hover:text-rose-400 border border-black/[0.08] dark:border-white/[0.08] font-bold text-[10px] tracking-wide transition-colors cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
+                        >
+                          <X className="w-3 h-3" />
+                          <span>Decline</span>
+                        </button>
+                      </div>
                     </div>
+                  )
+                })}
 
-                    <div className="flex items-center gap-1.5 pt-0.5">
-                      <button
-                        type="button"
-                        disabled={isProcessing}
-                        onClick={() => handleRespondToJoinRequest(item.thread.$id, item.requesterStr, 'approve')}
-                        className="flex-1 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] tracking-wide transition-colors cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
-                      >
-                        <Check className="w-3 h-3" />
-                        <span>Approve</span>
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isProcessing}
-                        onClick={() => handleRespondToJoinRequest(item.thread.$id, item.requesterStr, 'decline')}
-                        className="flex-1 py-1 rounded-lg bg-surface hover:bg-rose-500/20 text-slate-700 dark:text-white/80 hover:text-rose-400 border border-black/[0.08] dark:border-white/[0.08] font-bold text-[10px] tracking-wide transition-colors cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
-                      >
-                        <X className="w-3 h-3" />
-                        <span>Decline</span>
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-              {/* User personal reply & activity alerts */}
-              {user && userActivityItems.length > 0 && userActivityItems.map(post => (
-                <div
-                  key={`activity-${post.$id}`}
-                  onClick={() => openComments(post)}
-                  className="group p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.04] hover:border-gold/30 transition-all cursor-pointer space-y-1"
-                >
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="font-semibold text-emerald-500 font-mono flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3" />
-                      {post.comments_count} {post.comments_count === 1 ? 'reply' : 'replies'}
-                    </span>
-                    <span className="text-gold font-mono text-[9px]">{post.likes_count} upvotes</span>
-                  </div>
-                  <p className="text-[11px] text-slate-700 dark:text-white/70 line-clamp-2 leading-relaxed">
-                    {post.content}
-                  </p>
-                </div>
-              ))}
-
-              {/* Official broadcasts / dispatches */}
-              {broadcastItems.length > 0 && broadcastItems.map(post => (
-                <div
-                  key={`broadcast-${post.$id}`}
-                  onClick={() => openComments(post)}
-                  className="group p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.04] hover:border-gold/30 transition-all cursor-pointer space-y-1.5"
-                >
-                  <div className="flex items-center justify-between text-[10px]">
-                    <div className="flex items-center gap-1 min-w-0 max-w-[150px]">
-                      <span className="font-semibold text-gold truncate">
-                        {post.author_display_name.startsWith('@') ? post.author_display_name : `@${post.author_display_name}`}
-                      </span>
-                      {(post.is_officer || post.is_verified) && <InstagramVerifiedBadge className="w-3 h-3" />}
-                    </div>
-                    <span className="text-slate-400 font-mono text-[9px]">
-                      {new Date(post.$createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-700 dark:text-white/70 line-clamp-2 leading-relaxed group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
-                    {post.content}
-                  </p>
-                </div>
-              ))}
-
-              {/* Empty / Clean fallback */}
-              {(!user || userActivityItems.length === 0) && broadcastItems.length === 0 && (
-                <div className="py-5 text-center space-y-1">
-                  <div className="w-8 h-8 rounded-full bg-surface-subtle mx-auto flex items-center justify-center text-slate-400">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div className="text-[11px] font-semibold text-slate-700 dark:text-white/80">All caught up!</div>
-                  <p className="text-[10px] text-slate-400 leading-tight">No unread notifications.</p>
-                </div>
-              )}
-
-              {/* Connect student ID callout if not logged in */}
-              {!user && (
-                <div className="p-3 rounded-xl bg-surface-subtle border border-dashed border-gold/30 text-center space-y-1.5 mt-2">
-                  <p className="text-[10px] text-slate-500 dark:text-white/50 leading-relaxed">
-                    Connect your student ID to receive mention alerts.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOnboardingInitialStep(1)
-                      setIsOnboardingOpen(true)
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-gold hover:bg-gold-muted text-slate-950 font-bold text-[10px] tracking-wide transition-colors cursor-pointer w-full"
+                {/* Personal Mentions & Post Activity Alerts */}
+                {userNotifications.length > 0 && userNotifications.map(item => (
+                  <div
+                    key={`notif-${item.post.$id}`}
+                    onClick={() => openComments(item.post)}
+                    className="group p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.04] hover:border-gold/30 transition-all cursor-pointer space-y-1.5"
                   >
-                    Connect Student ID
-                  </button>
-                </div>
-              )}
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className={`font-semibold font-mono flex items-center gap-1 ${item.type === 'mention' ? 'text-gold' : 'text-emerald-500'}`}>
+                        {item.type === 'mention' ? (
+                          <>
+                            <AtSign className="w-3 h-3" />
+                            <span>Mentioned you</span>
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquare className="w-3 h-3" />
+                            <span>{item.title}</span>
+                          </>
+                        )}
+                      </span>
+                      <span className="text-slate-400 font-mono text-[9px]">
+                        {new Date(item.time).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-700 dark:text-white/70 line-clamp-2 leading-relaxed group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                      {item.post.content}
+                    </p>
+                  </div>
+                ))}
+
+                {/* Clean empty fallback for authenticated user */}
+                {hostedThreadRequests.length === 0 && userNotifications.length === 0 && (
+                  <div className="py-5 text-center space-y-1">
+                    <div className="w-8 h-8 rounded-full bg-surface-subtle mx-auto flex items-center justify-center text-slate-400">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className="text-[11px] font-semibold text-slate-700 dark:text-white/80">All caught up!</div>
+                    <p className="text-[10px] text-slate-400 leading-tight">No unread notifications.</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Quick Resource Shortcuts Card */}
           <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-5 space-y-3 shadow-sm dark:shadow-none text-xs font-mono">
