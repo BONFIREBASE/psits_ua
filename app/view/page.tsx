@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Palette,
   X,
@@ -9,6 +10,7 @@ import {
   ChevronRight,
   Trophy,
   ImageOff,
+  Info,
 } from "lucide-react";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -395,6 +397,31 @@ export default function ViewPage() {
   const [loading, setLoading] = useState(true);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [lightboxCustomEntry, setLightboxCustomEntry] = useState<ApprovedEntry | null>(null);
+  const [showSnackbar, setShowSnackbar] = useState(false);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const isDismissed = sessionStorage.getItem("view_snackbar_dismissed");
+      if (!isDismissed) {
+        timer = setTimeout(() => setShowSnackbar(true), 500);
+      }
+    } catch {
+      timer = setTimeout(() => setShowSnackbar(true), 500);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+
+  const handleDismissSnackbar = () => {
+    setShowSnackbar(false);
+    try {
+      sessionStorage.setItem("view_snackbar_dismissed", "true");
+    } catch {
+      // ignore
+    }
+  };
 
   // Determine winner (highest vote_count)
   const winner = entries.length > 0
@@ -482,6 +509,45 @@ export default function ViewPage() {
           </div>
         )}
       </div>
+      {/* Minimalist Theme-Aware Announcement Banner with Premium Glide Animation */}
+      <AnimatePresence>
+        {showSnackbar && (
+          <motion.aside
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, y: -48, scale: 0.96, filter: "blur(4px)" }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+            exit={{
+              opacity: 0,
+              y: -48,
+              scale: 0.95,
+              filter: "blur(6px)",
+              transition: { duration: 0.28, ease: [0.32, 0.72, 0, 1] },
+            }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-lg select-none"
+          >
+            <div className="rounded-2xl bg-white/95 dark:bg-[#0D1117]/95 backdrop-blur-2xl border border-black/10 dark:border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.7)] px-4 py-3 sm:px-5 sm:py-3.5 flex items-center justify-between gap-3.5">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-xl bg-gold/15 text-gold">
+                  <Info className="w-4 h-4" />
+                </div>
+                <p className="text-xs sm:text-[13px] text-slate-900 dark:text-slate-100 font-medium leading-snug">
+                  The final entry has been finalized, but the announcement will be delayed for the meantime. Stay tuned!
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleDismissSnackbar}
+                aria-label="Dismiss notice"
+                className="flex-shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
 
       {/* Lightbox */}
       {(lightboxIndex !== null || lightboxCustomEntry !== null) && (

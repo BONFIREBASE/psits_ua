@@ -11,6 +11,7 @@ export const APPWRITE_COLLECTIONS = {
   REACTIONS: 'reactions',
   FOLLOWS: 'follows',
   REPORTS: 'reports',
+  THREADS: 'threads',
 } as const
 
 /* ─── Client-Side SDK (Browser, Public Read, WebSockets) ─── */

@@ -18,6 +18,21 @@ const links = [
   { href: '/projects', label: 'Projects' },
 ]
 
+function InstagramVerifiedBadge({ className = 'w-3 h-3' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-label="Verified"
+      className={`${className} shrink-0 text-amber-400 inline-block align-middle select-none drop-shadow-sm`}
+      fill="currentColor"
+    >
+      <title>Verified</title>
+      <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.79-4-4-4-.495 0-.965.084-1.4.238C14.55 2.475 13.18 1.6 11.6 1.6s-2.95.875-3.6 2.148c-.435-.154-.905-.238-1.4-.238-2.21 0-4 1.79-4 4 0 .495.084.965.238 1.4C1.575 9.55.7 10.92.7 12.5s.875 2.95 2.148 3.6c-.154.435-.238.905-.238 1.4 0 2.21 1.79 4 4 4 .495 0 .965-.084 1.4-.238.65 1.273 2.02 2.148 3.6 2.148s2.95-.875 3.6-2.148c.435.154.905.238 1.4.238 2.21 0 4-1.79 4-4 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6z" />
+      <path d="M10.2 16.2 6.5 12.5l1.4-1.4 2.3 2.3 6-6 1.4 1.4z" className="fill-slate-950 dark:fill-[#0c1017]" />
+    </svg>
+  )
+}
+
 export default function Navbar() {
   const pathname = usePathname()
   const isCommunity = pathname === '/community' || pathname.startsWith('/community')
@@ -25,7 +40,12 @@ export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [hoveredPath, setHoveredPath] = useState<string | null>(null)
-  const [communityUser, setCommunityUser] = useState<{ name: string; username?: string; avatar?: string } | null>(null)
+  const [communityUser, setCommunityUser] = useState<{
+    name: string
+    username?: string
+    avatar?: string
+    isVerified?: boolean
+  } | null>(null)
 
   useEffect(() => {
     if (!isCommunity) return
@@ -34,10 +54,13 @@ export default function Navbar() {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
           const meta = session.user.user_metadata || {}
+          const isOfficer = meta.role === 'officer' || meta.role === 'admin'
+          const isVerified = Boolean(isOfficer || meta.is_verified || meta.community_tos_accepted)
           setCommunityUser({
             name: meta.full_name || session.user.email?.split('@')[0] || 'Student',
             username: meta.community_username || '',
             avatar: meta.community_avatar || meta.avatar_url || '',
+            isVerified,
           })
         } else {
           setCommunityUser(null)
@@ -255,23 +278,35 @@ export default function Navbar() {
                           transition={{ duration: 0.15 }}
                           className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-2.5 space-y-1.5 z-50 backdrop-blur-xl"
                         >
-                          {/* Student Details Header */}
-                          <div className="p-2.5 rounded-xl bg-surface-subtle border border-black/[0.04] dark:border-white/[0.06] flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold font-bold text-xs shrink-0 overflow-hidden">
-                              {communityUser.avatar && !communityUser.avatar.startsWith('preset:') ? (
-                                <Image
-                                  src={communityUser.avatar}
-                                  alt="Avatar"
-                                  width={32}
-                                  height={32}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span>{communityUser.name.charAt(0).toUpperCase()}</span>
+                          {/* Student Details Header (Clickable Link to Profile) */}
+                          <Link
+                            href={`/community/${(communityUser.username || communityUser.name || 'kasubay').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')}`}
+                            onClick={() => setProfileMenuOpen(false)}
+                            className="p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.06] hover:border-gold/30 flex items-center gap-2.5 transition-all cursor-pointer group"
+                            title="View your public profile"
+                          >
+                            <div className="relative shrink-0 w-8 h-8">
+                              <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold font-bold text-xs shrink-0 overflow-hidden">
+                                {communityUser.avatar && !communityUser.avatar.startsWith('preset:') ? (
+                                  <Image
+                                    src={communityUser.avatar}
+                                    alt="Avatar"
+                                    width={32}
+                                    height={32}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span>{communityUser.name.charAt(0).toUpperCase()}</span>
+                                )}
+                              </div>
+                              {communityUser.isVerified && (
+                                <div className="absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-white dark:ring-[#161b22] bg-white dark:bg-[#161b22] flex items-center justify-center pointer-events-none shadow-sm">
+                                  <InstagramVerifiedBadge className="w-3 h-3" />
+                                </div>
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                              <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-gold transition-colors truncate">
                                 {communityUser.name}
                               </div>
                               <div className="text-[10px] font-mono text-gold truncate">
@@ -280,7 +315,7 @@ export default function Navbar() {
                                   : '@kasubay'}
                               </div>
                             </div>
-                          </div>
+                          </Link>
 
                           {/* Quick Dark / Light Mode Switcher */}
                           <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface-subtle border border-black/[0.04] dark:border-white/[0.06]">
@@ -421,22 +456,35 @@ export default function Navbar() {
                           transition={{ duration: 0.15 }}
                           className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-2.5 space-y-1.5 z-50 backdrop-blur-xl"
                         >
-                          <div className="p-2.5 rounded-xl bg-surface-subtle border border-black/[0.04] dark:border-white/[0.06] flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold font-bold text-xs shrink-0 overflow-hidden">
-                              {communityUser.avatar && !communityUser.avatar.startsWith('preset:') ? (
-                                <Image
-                                  src={communityUser.avatar}
-                                  alt="Avatar"
-                                  width={32}
-                                  height={32}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span>{communityUser.name.charAt(0).toUpperCase()}</span>
+                          {/* Student Details Header (Clickable Link to Profile) */}
+                          <Link
+                            href={`/community/${(communityUser.username || communityUser.name || 'kasubay').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')}`}
+                            onClick={() => setProfileMenuOpen(false)}
+                            className="p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.06] hover:border-gold/30 flex items-center gap-2.5 transition-all cursor-pointer group"
+                            title="View your public profile"
+                          >
+                            <div className="relative shrink-0 w-8 h-8">
+                              <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold font-bold text-xs shrink-0 overflow-hidden">
+                                {communityUser.avatar && !communityUser.avatar.startsWith('preset:') ? (
+                                  <Image
+                                    src={communityUser.avatar}
+                                    alt="Avatar"
+                                    width={32}
+                                    height={32}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span>{communityUser.name.charAt(0).toUpperCase()}</span>
+                                )}
+                              </div>
+                              {communityUser.isVerified && (
+                                <div className="absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-white dark:ring-[#161b22] bg-white dark:bg-[#161b22] flex items-center justify-center pointer-events-none shadow-sm">
+                                  <InstagramVerifiedBadge className="w-3 h-3" />
+                                </div>
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                              <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-gold transition-colors truncate">
                                 {communityUser.name}
                               </div>
                               <div className="text-[10px] font-mono text-gold truncate">
@@ -445,7 +493,7 @@ export default function Navbar() {
                                   : '@kasubay'}
                               </div>
                             </div>
-                          </div>
+                          </Link>
 
                           <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface-subtle border border-black/[0.04] dark:border-white/[0.06]">
                             <div className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-white/80">

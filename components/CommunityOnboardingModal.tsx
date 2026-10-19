@@ -20,6 +20,8 @@ import {
 } from '@/app/community/actions'
 import { detectProhibitedHandle } from '@/lib/community-validation'
 import { compressImageToWebP } from '@/lib/image-compress'
+import { appwriteStorage, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
+import { ID } from 'appwrite'
 
 function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
@@ -280,15 +282,17 @@ function CommunityOnboardingModalContent({
     setIsUploadingAvatar(true)
     try {
       const compressed = await compressImageToWebP(file, { maxWidth: 512, maxHeight: 512, quality: 0.85 })
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        const previewUrl = event.target?.result as string
-        setCustomAvatarUrl(previewUrl)
-        setAvatarMode('custom')
-      }
-      reader.readAsDataURL(compressed)
+      const createdFile = await appwriteStorage.createFile(
+        APPWRITE_STORAGE_BUCKET_ID,
+        ID.unique(),
+        compressed
+      )
+      const uploadedUrl = appwriteStorage.getFileView(APPWRITE_STORAGE_BUCKET_ID, createdFile.$id)
+      setCustomAvatarUrl(uploadedUrl)
+      setAvatarMode('custom')
     } catch (err) {
       console.error('Avatar processing error:', err)
+      alert('Failed to upload custom avatar to Appwrite storage. Please try again.')
     } finally {
       setIsUploadingAvatar(false)
       if (avatarFileInputRef.current) avatarFileInputRef.current.value = ''
