@@ -1126,18 +1126,7 @@ export default function CommunityPage() {
       setUser(null)
       setUserProfile(null)
       setIsAdmin(false)
-      setPosts([])
-      setCustomThreads([])
-      setLoading(false)
       setAuthLoading(false)
-      try {
-        localStorage.removeItem(LOCAL_STORAGE_KEY)
-      } catch {}
-      // If user previously completed the tour on this browser, default to 'continue' (Sign In); otherwise 'create'
-      const hasSeenTour = typeof window !== 'undefined' && localStorage.getItem('psits_community_tour_completed') === 'true'
-      setOnboardingAuthMode(hasSeenTour ? 'continue' : 'create')
-      setOnboardingInitialStep(1)
-      setIsOnboardingOpen(true)
     }
 
     // 1. Initial Session Check
@@ -2031,7 +2020,6 @@ export default function CommunityPage() {
 
   // Filtered & Sorted post results based on search input, category, tags, and quick-filters
   const filteredPosts = useMemo(() => {
-    if (!user) return []
     let list = posts.filter(post => {
       // 1. Search Query Filter
       if (searchQuery.trim()) {
