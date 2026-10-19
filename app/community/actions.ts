@@ -171,7 +171,7 @@ export async function autoResolveStudentEligibilityAction(params: {
       isOfficer: false,
       name: cleanGoogleName || cleanEmail,
       yearSection: 'Non-IT',
-      error: 'Access restricted: Please sign in with your official @antiquespride.edu.ph student account.',
+      error: 'Access restricted: Please sign in with your official university student account.',
     }
   }
 
@@ -366,6 +366,66 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
   }
 }
 
+export async function getSingleCommunityPostAction(postId: string): Promise<{
+  success: boolean
+  post?: CommunityPostItem
+  error?: string
+}> {
+  try {
+    if (!postId || typeof postId !== 'string') {
+      return { success: false, error: 'Invalid post ID' }
+    }
+    const { databases } = createServerAppwriteClient()
+    const doc = (await databases.getDocument(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.POSTS,
+      postId.trim()
+    )) as unknown as AppwritePostRecord
+
+    if (!doc || doc.status === 'hidden' || doc.status === 'archived') {
+      return { success: false, error: 'Post is no longer available' }
+    }
+
+    const isAnon = Boolean(doc.is_anonymous)
+    const isOff = Boolean(doc.is_officer) && !isAnon
+    const offTitle = isOff ? String(doc.officer_title || 'Officer') : undefined
+
+    const postItem: CommunityPostItem = {
+      $id: doc.$id,
+      $createdAt: doc.$createdAt,
+      content: String(doc.content || ''),
+      author_student_no: undefined,
+      author_display_name: isAnon
+        ? 'Anonymous Kasubay'
+        : (String(doc.author_display_name || '').startsWith('@')
+          ? String(doc.author_display_name)
+          : `@${String(doc.author_display_name || 'kasubay').toLowerCase().replace(/[^a-z0-9_.]/g, '')}`),
+      author_avatar: isAnon ? '' : (doc.author_avatar ? String(doc.author_avatar) : ''),
+      author_year_section: isAnon ? 'BSIT Student' : (doc.author_year_section ? String(doc.author_year_section) : 'BSIT'),
+      is_anonymous: isAnon,
+      is_verified: false,
+      is_officer: isOff,
+      officer_title: offTitle,
+      attachments: Array.isArray(doc.attachments) ? doc.attachments.map(String) : [],
+      attachment_names: Array.isArray(doc.attachment_names) ? doc.attachment_names.map(String) : [],
+      attachment_types: Array.isArray(doc.attachment_types) ? doc.attachment_types.map(String) : [],
+      attachment_sizes: Array.isArray(doc.attachment_sizes) ? doc.attachment_sizes.map(String) : [],
+      likes_count: Number(doc.likes_count) || 0,
+      comments_count: Number(doc.comments_count) || 0,
+      tags: Array.isArray(doc.tags) ? doc.tags.map(String) : [],
+      is_locked: Boolean(doc.is_locked),
+      is_flagged: Boolean(doc.is_flagged),
+      flag_count: Number(doc.flag_count) || 0,
+      status: (doc.status as 'active' | 'hidden' | 'archived') || 'active',
+    }
+
+    return { success: true, post: postItem }
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error)?.message || 'Post not found' }
+  }
+}
+
+
 /* ─── Pure Appwrite Storage Avatar Resolver ─── */
 async function resolveAvatarUrl(avatar?: string): Promise<string> {
   if (!avatar) return ''
@@ -421,32 +481,34 @@ export async function createCommunityPostAction(payload: {
     }
 
     const { databases } = createServerAppwriteClient()
-    const officerCheck = await resolveOfficerStatus(payload.userEmail, payload.userName)
+    const [officerCheck, resolvedAvatar] = await Promise.all([
+      resolveOfficerStatus(payload.userEmail, payload.userName),
+      payload.isAnonymous ? Promise.resolve('') : resolveAvatarUrl(payload.userAvatar),
+    ])
     const isOfficer = officerCheck.isOfficer && !payload.isAnonymous
     const officerTitle = isOfficer ? officerCheck.title : ''
-    const resolvedAvatar = payload.isAnonymous ? '' : await resolveAvatarUrl(payload.userAvatar)
 
     const newDoc = await databases.createDocument(
       APPWRITE_DATABASE_ID,
       APPWRITE_COLLECTIONS.POSTS,
       ID.unique(),
       {
-        content: payload.content.trim(),
-        author_student_no: payload.userEmail.trim(), // Audit accountability
-        author_display_name: payload.isAnonymous ? 'Anonymous Kasubay' : payload.userName,
-        author_avatar: resolvedAvatar,
-        author_year_section: payload.userYearSection || 'BSIT',
+        content: payload.content.trim().slice(0, 5000),
+        author_student_no: payload.userEmail.trim().slice(0, 255), // Audit accountability
+        author_display_name: (payload.isAnonymous ? 'Anonymous Kasubay' : payload.userName).slice(0, 100),
+        author_avatar: resolvedAvatar ? resolvedAvatar.slice(0, 2048) : '',
+        author_year_section: (payload.userYearSection || 'BSIT').slice(0, 20),
         is_anonymous: Boolean(payload.isAnonymous),
         is_verified: false, // Regular students have NO badge
         is_officer: isOfficer,
-        officer_title: officerTitle,
-        attachments: payload.attachments || [],
-        attachment_names: payload.attachmentNames || [],
-        attachment_types: payload.attachmentTypes || [],
-        attachment_sizes: payload.attachmentSizes || [],
+        officer_title: officerTitle.slice(0, 100),
+        attachments: (payload.attachments || []).map(a => String(a).slice(0, 500)),
+        attachment_names: (payload.attachmentNames || []).map(a => String(a).slice(0, 255)),
+        attachment_types: (payload.attachmentTypes || []).map(a => String(a).slice(0, 50)),
+        attachment_sizes: (payload.attachmentSizes || []).map(a => String(a).slice(0, 50)),
         likes_count: 0,
         comments_count: 0,
-        tags: payload.tags || ['Feed'],
+        tags: (payload.tags || ['Feed']).map(t => String(t).slice(0, 50)),
         is_locked: false,
         is_flagged: false,
         flag_count: 0,
@@ -454,8 +516,8 @@ export async function createCommunityPostAction(payload: {
       }
     )
 
-    // Invalidate Redis feed cache so edge servers drop stale cache
-    await deleteCache(FEED_CACHE_KEY)
+    // Invalidate Redis feed cache non-blockingly so client gets 0ms return
+    void deleteCache(FEED_CACHE_KEY).catch(() => {})
 
     const postItem: CommunityPostItem = {
       $id: newDoc.$id,
@@ -676,13 +738,6 @@ export async function togglePostReactionAction(params: {
       [Query.equal('post_id', postId), Query.equal('student_no', userEmail)]
     )
 
-    const postDoc = await databases.getDocument(
-      APPWRITE_DATABASE_ID,
-      APPWRITE_COLLECTIONS.POSTS,
-      postId
-    )
-
-    let currentLikes = (postDoc.likes_count as number) || 0
     let liked = false
 
     if (existing.total > 0) {
@@ -691,7 +746,6 @@ export async function togglePostReactionAction(params: {
         APPWRITE_COLLECTIONS.REACTIONS,
         existing.documents[0].$id
       )
-      currentLikes = Math.max(0, currentLikes - 1)
       liked = false
     } else {
       await databases.createDocument(
@@ -704,18 +758,25 @@ export async function togglePostReactionAction(params: {
           reaction_type: reactionType,
         }
       )
-      currentLikes += 1
       liked = true
     }
+
+    // Authoritative ACID document count query directly from REACTIONS collection
+    const reactionsCount = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.REACTIONS,
+      [Query.equal('post_id', postId), Query.limit(1)]
+    )
+    const authoritativeLikes = reactionsCount.total
 
     await databases.updateDocument(
       APPWRITE_DATABASE_ID,
       APPWRITE_COLLECTIONS.POSTS,
       postId,
-      { likes_count: currentLikes }
+      { likes_count: authoritativeLikes }
     )
 
-    return { success: true, newLikesCount: currentLikes, liked }
+    return { success: true, newLikesCount: authoritativeLikes, liked }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to toggle reaction.'
     console.error('[Reaction Error]:', err)
@@ -741,11 +802,12 @@ export async function addCommentAction(params: {
     }
 
     const { databases } = createServerAppwriteClient()
-    const officerCheck = await resolveOfficerStatus(userEmail, userName)
+    const [officerCheck, resolvedCommentAvatar] = await Promise.all([
+      resolveOfficerStatus(userEmail, userName),
+      isAnonymous ? Promise.resolve('') : resolveAvatarUrl(userAvatar),
+    ])
     const isOfficer = officerCheck.isOfficer && !isAnonymous
     const officerTitle = isOfficer ? officerCheck.title : ''
-
-    const resolvedCommentAvatar = isAnonymous ? '' : await resolveAvatarUrl(userAvatar)
 
     const commentDoc = await databases.createDocument(
       APPWRITE_DATABASE_ID,
@@ -770,18 +832,24 @@ export async function addCommentAction(params: {
       }
     )
 
-    // Increment comment count on post
-    try {
-      const post = await databases.getDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.POSTS, postId)
-      await databases.updateDocument(
-        APPWRITE_DATABASE_ID,
-        APPWRITE_COLLECTIONS.POSTS,
-        postId,
-        { comments_count: ((post.comments_count as number) || 0) + 1 }
-      )
-    } catch {
-      // Non-blocking
-    }
+    // Authoritative active comments count update on post non-blockingly
+    void (async () => {
+      try {
+        const commentsCount = await databases.listDocuments(
+          APPWRITE_DATABASE_ID,
+          APPWRITE_COLLECTIONS.COMMENTS,
+          [Query.equal('post_id', postId), Query.equal('status', 'active'), Query.limit(1)]
+        )
+        await databases.updateDocument(
+          APPWRITE_DATABASE_ID,
+          APPWRITE_COLLECTIONS.POSTS,
+          postId,
+          { comments_count: commentsCount.total }
+        )
+      } catch {
+        // Non-blocking
+      }
+    })()
 
     return {
       success: true,
@@ -878,6 +946,28 @@ export async function deleteCommunityCommentAction(params: {
         status: 'deleted',
       }
     )
+
+    // Authoritative comments count update on post non-blockingly
+    void (async () => {
+      try {
+        const targetPostId = String(doc.post_id || '')
+        if (targetPostId) {
+          const commentsCount = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            APPWRITE_COLLECTIONS.COMMENTS,
+            [Query.equal('post_id', targetPostId), Query.equal('status', 'active'), Query.limit(1)]
+          )
+          await databases.updateDocument(
+            APPWRITE_DATABASE_ID,
+            APPWRITE_COLLECTIONS.POSTS,
+            targetPostId,
+            { comments_count: commentsCount.total }
+          )
+        }
+      } catch {
+        // Non-blocking
+      }
+    })()
 
     return { success: true }
   } catch (err: unknown) {
@@ -1205,6 +1295,69 @@ export async function getFollowListAction(
   }
 }
 
+export async function getMutualFollowsAction(
+  rawHandle: string
+): Promise<{ success: boolean; mutuals: FollowUserInfo[] }> {
+  try {
+    const handle = (rawHandle || '').toLowerCase().replace(/^@/, '').trim()
+    if (!handle) return { success: true, mutuals: [] }
+
+    const { databases } = createServerAppwriteClient()
+
+    // 1. Fetch people who the user follows (following)
+    const followingRes = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.FOLLOWS,
+      [Query.equal('follower_handle', handle), Query.limit(100)]
+    )
+
+    if (!followingRes.documents || followingRes.documents.length === 0) {
+      return { success: true, mutuals: [] }
+    }
+
+    // Map of followed handles
+    const followingMap = new Map<string, { handle: string; name: string }>()
+    for (const doc of followingRes.documents) {
+      const h = String(doc.following_handle || '').toLowerCase().trim()
+      if (h) {
+        followingMap.set(h, {
+          handle: h,
+          name: (doc.following_handle as string) || h,
+        })
+      }
+    }
+
+    // 2. Fetch people who follow the user (followers)
+    const followersRes = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.FOLLOWS,
+      [Query.equal('following_handle', handle), Query.limit(100)]
+    )
+
+    // 3. Intersection: followers who are also followed back by the user (mutuals)
+    const mutuals: FollowUserInfo[] = []
+    const seen = new Set<string>()
+
+    for (const doc of followersRes.documents) {
+      const followerHandle = String(doc.follower_handle || '').toLowerCase().trim()
+      if (followerHandle && followingMap.has(followerHandle) && !seen.has(followerHandle)) {
+        seen.add(followerHandle)
+        mutuals.push({
+          handle: followerHandle,
+          name: (doc.follower_name as string) || followerHandle,
+          avatar: (doc.follower_avatar as string) || '',
+        })
+      }
+    }
+
+    return { success: true, mutuals }
+  } catch (err: unknown) {
+    console.error('[Mutuals Action Error]:', err)
+    return { success: true, mutuals: [] }
+  }
+}
+
+
 /* ─── Persistent Student Profile Lookup ─── */
 export interface StudentProfileData {
   displayName: string
@@ -1392,15 +1545,15 @@ export async function createCommunityThreadAction(params: {
       APPWRITE_COLLECTIONS.THREADS,
       ID.unique(),
       {
-        title: cleanTitle,
-        slug: finalSlug,
+        title: cleanTitle.slice(0, 100),
+        slug: finalSlug.slice(0, 100),
         description: description.trim().slice(0, 1000),
-        category: category.trim() || 'Feed',
-        creator_student_no: userEmail,
-        creator_display_name: userName.startsWith('@') ? userName : `@${userName}`,
-        creator_avatar: resolvedAvatar,
+        category: category.trim().slice(0, 50) || 'Feed',
+        creator_student_no: userEmail.slice(0, 100),
+        creator_display_name: (userName.startsWith('@') ? userName : `@${userName}`).slice(0, 100),
+        creator_avatar: resolvedAvatar ? resolvedAvatar.slice(0, 500) : '',
         is_private: Boolean(isPrivate),
-        allowed_users: sanitizedAllowed,
+        allowed_users: sanitizedAllowed.map(u => String(u).slice(0, 100)),
         pending_requests: [],
         is_verified_creator: hasUnlimited,
         status: 'active',
@@ -1436,6 +1589,7 @@ export async function getAvailableThreadsAction(_params?: {
   userEmail?: string
   userHandle?: string
 }): Promise<{ success: boolean; threads: CommunityThreadItem[]; error?: string }> {
+  void _params
   try {
     const { databases } = createServerAppwriteClient()
     const res = await databases.listDocuments(

@@ -310,3 +310,47 @@ export function VotingPageSkeleton() {
   )
 }
 
+export function CommentsListSkeleton() {
+  return (
+    <div className="space-y-4 pt-1 select-none animate-pulse">
+      {[
+        { nameW: 'w-24', line1W: 'w-3/4', line2W: 'w-1/2', reply: true },
+        { nameW: 'w-28', line1W: 'w-5/6', line2W: '', reply: false },
+        { nameW: 'w-20', line1W: 'w-2/3', line2W: 'w-1/3', reply: true },
+        { nameW: 'w-32', line1W: 'w-4/5', line2W: '', reply: false },
+      ].map((item, idx) => (
+        <div key={idx} className="space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/[0.08] shrink-0" />
+            <div className="flex-1 space-y-2 pt-0.5">
+              <div className="flex items-center gap-2">
+                <div className={`h-3.5 ${item.nameW} bg-slate-200 dark:bg-white/[0.08] rounded-full`} />
+                <div className="w-10 h-2.5 bg-slate-200 dark:bg-white/[0.04] rounded" />
+              </div>
+              <div className={`h-3 ${item.line1W} bg-slate-200 dark:bg-white/[0.06] rounded-md`} />
+              {item.line2W && (
+                <div className={`h-3 ${item.line2W} bg-slate-200 dark:bg-white/[0.04] rounded-md`} />
+              )}
+              <div className="w-14 h-2 bg-slate-200 dark:bg-white/[0.03] rounded pt-0.5" />
+            </div>
+          </div>
+
+          {item.reply && (
+            <div className="pl-9 sm:pl-11 flex items-start gap-2.5 pt-0.5">
+              <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-white/[0.06] shrink-0" />
+              <div className="flex-1 space-y-1.5 pt-0.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-20 h-3 bg-slate-200 dark:bg-white/[0.07] rounded-full" />
+                  <div className="w-8 h-2 bg-slate-200 dark:bg-white/[0.03] rounded" />
+                </div>
+                <div className="w-3/5 h-2.5 bg-slate-200 dark:bg-white/[0.05] rounded-md" />
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+

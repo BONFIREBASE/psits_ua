@@ -3,11 +3,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import {
   ChevronLeft,
   Heart,
   MessageCircle,
+  MessageSquare,
+  CornerDownLeft,
   Share2,
   Trash2,
   Bookmark,
@@ -16,7 +18,6 @@ import {
   FileText,
   FileCode,
   ShieldCheck,
-  CheckCircle2,
   X,
   RefreshCw,
   Terminal,
@@ -26,6 +27,7 @@ import {
   GraduationCap,
   Grid,
   Check,
+  Hash,
 } from 'lucide-react'
 import { appwrite, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, appwriteStorage, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
@@ -46,6 +48,8 @@ import {
 } from '../actions'
 import { supabase } from '@/lib/supabase'
 import { NumberTicker } from '@/components/motion/number-ticker'
+import { SharePostModal } from '@/components/SharePostModal'
+import { CommentsListSkeleton } from '@/components/PublicSkeletonPreloader'
 
 function InstagramVerifiedBadge({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -114,6 +118,7 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 export default function StudentProfilePage() {
+  const router = useRouter()
   const params = useParams()
   const rawParam = params?.username as string | undefined
   const targetUsername = useMemo(() => {
@@ -137,7 +142,6 @@ export default function StudentProfilePage() {
   // Engagement & Action state
   const [savedPostIds, setSavedPostIds] = useState<string[]>([])
   const [userLikedPosts, setUserLikedPosts] = useState<string[]>([])
-  const [copiedPostId, setCopiedPostId] = useState<string | null>(null)
   const [activeMenuPostId, setActiveMenuPostId] = useState<string | null>(null)
   const [confirmDeletePostId, setConfirmDeletePostId] = useState<string | null>(null)
   const [isDeletingPostId, setIsDeletingPostId] = useState<string | null>(null)
@@ -170,7 +174,7 @@ export default function StudentProfilePage() {
   const [activeCommentPost, setActiveCommentPost] = useState<CommunityPostItem | null>(null)
   const [comments, setComments] = useState<CommunityCommentItem[]>([])
   const [newCommentText, setNewCommentText] = useState('')
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const [replyingToComment, setReplyingToComment] = useState<{ id: string; author: string } | null>(null)
   const [commentsLoading, setCommentsLoading] = useState(false)
 
   // Load auth state
@@ -190,26 +194,48 @@ export default function StudentProfilePage() {
         if (email.toLowerCase() === 'psits-ua@antiquespride.edu.ph' || email.toLowerCase().includes('admin')) {
           setIsAdmin(true)
         }
+
+        try {
+          const cached = localStorage.getItem('psits_community_cached_posts_v4')
+          if (cached) {
+            const parsed = JSON.parse(cached)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setPosts(parsed)
+              setLoading(false)
+            }
+          }
+        } catch {}
+      } else {
+        router.replace('/community')
+      }
+    }).catch(() => {
+      router.replace('/community')
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        setUser(null)
+        setPosts([])
+        try {
+          localStorage.removeItem('psits_community_cached_posts_v4')
+        } catch {}
+        router.replace('/community')
       }
     })
 
     queueMicrotask(() => {
       try {
-        const cached = localStorage.getItem('psits_community_cached_posts_v4')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setPosts(parsed)
-            setLoading(false)
-          }
-        }
         const cachedSaved = localStorage.getItem('psits_community_saved_posts')
         if (cachedSaved) setSavedPostIds(JSON.parse(cachedSaved))
         const cachedLiked = localStorage.getItem('psits_community_liked_posts')
         if (cachedLiked) setUserLikedPosts(JSON.parse(cachedLiked))
       } catch {}
     })
-  }, [])
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [router])
 
   // Fetch persistent student profile metadata by handle
   useEffect(() => {
@@ -225,22 +251,6 @@ export default function StudentProfilePage() {
     }
   }, [targetUsername])
 
-  // Load Feed to extract this author's posts (Smart SWR background revalidation)
-  const loadPosts = useCallback(async () => {
-    try {
-      const res = await getCommunityFeedAction()
-      if (res.success && res.posts) {
-        setPosts(res.posts)
-        try {
-          localStorage.setItem('psits_community_cached_posts_v4', JSON.stringify(res.posts))
-        } catch {}
-      }
-    } catch (err) {
-      console.error('Failed to load profile posts:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -266,17 +276,18 @@ export default function StudentProfilePage() {
 
   // Filter posts by this username
   const authorPosts = useMemo(() => {
-    if (!targetUsername) return []
+    if (!user || !targetUsername) return []
     return posts.filter(p => {
       const pHandle = (p.author_display_name || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
       return pHandle === targetUsername
     })
-  }, [posts, targetUsername])
+  }, [posts, targetUsername, user])
 
   // Filter saved posts from all loaded feed posts
   const savedPosts = useMemo(() => {
+    if (!user) return []
     return posts.filter(p => savedPostIds.includes(p.$id))
-  }, [posts, savedPostIds])
+  }, [posts, savedPostIds, user])
 
   const displayedPosts = useMemo(() => {
     return activeTab === 'posts' ? authorPosts : savedPosts
@@ -446,13 +457,34 @@ export default function StudentProfilePage() {
     }
   }
 
-  const handleCopyPostLink = (post: CommunityPostItem) => {
-    const url = typeof window !== 'undefined' ? `${window.location.origin}/community#post-${post.$id}` : ''
-    if (navigator.clipboard && url) {
-      navigator.clipboard.writeText(url)
-      setCopiedPostId(post.$id)
-      setTimeout(() => setCopiedPostId(null), 2500)
+  const [shareModalPost, setShareModalPost] = useState<CommunityPostItem | null>(null)
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+
+  const handleSharePost = async (post: CommunityPostItem) => {
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/community?post=${post.$id}` : ''
+    const authorName = post.is_anonymous ? 'Anonymous Kasubay' : post.author_display_name
+    const cleanSnippet = post.content
+      ? post.content.replace(/[#*`_~]/g, '').trim().slice(0, 100)
+      : 'Join the discussion on PSITS Community'
+    const shareTitle = `PSITS Community: ${authorName}`
+    const shareText = `Check out this post by ${authorName} on PSITS Community: "${cleanSnippet}"`
+
+    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    if (isMobile && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url,
+        })
+        return
+      } catch (err: unknown) {
+        if ((err as Error)?.name === 'AbortError') return
+      }
     }
+
+    setShareModalPost(post)
+    setIsShareModalOpen(true)
   }
 
   const handleReaction = async (post: CommunityPostItem) => {
@@ -547,23 +579,92 @@ export default function StudentProfilePage() {
   }
 
   const handleAddComment = async () => {
-    if (!user || !activeCommentPost || !newCommentText.trim() || isSubmittingComment) return
-    setIsSubmittingComment(true)
-    try {
-      const res = await addCommentAction({
-        postId: activeCommentPost.$id,
-        content: newCommentText.trim(),
-        userEmail: user.email,
-        userName: user.username ? `@${user.username.replace(/^@/, '')}` : user.name,
-      })
-      if (res.success) {
-        setNewCommentText('')
-        const updated = await getCommentsForPostAction(activeCommentPost.$id)
-        if (updated.success && updated.comments) setComments(updated.comments)
-      }
-    } finally {
-      setIsSubmittingComment(false)
+    if (!user || !activeCommentPost || !newCommentText.trim()) return
+
+    const contentToSubmit = newCommentText.trim()
+    const currentPostId = activeCommentPost.$id
+    const authorHandle = user.username ? `@${user.username.replace(/^@/, '')}` : user.name
+    const replyingParent = replyingToComment
+
+    const tempCommentId = `optimistic-c-${Date.now()}`
+    const optimisticComment: CommunityCommentItem = {
+      $id: tempCommentId,
+      $createdAt: new Date().toISOString(),
+      content: contentToSubmit,
+      author_student_no: user.email,
+      author_display_name: authorHandle,
+      author_avatar: user.avatar,
+      is_anonymous: false,
+      is_verified: Boolean(user.isVerified),
+      is_officer: Boolean(user.isOfficer),
+      parent_id: replyingParent?.id,
+      reply_to_handle: replyingParent?.author,
+      is_edited: false,
+      status: 'active',
     }
+
+    // 1. Instantly append comment (0ms perceived latency)
+    setComments(prev => [...prev, optimisticComment])
+    setPosts(prev =>
+      prev.map(p =>
+        p.$id === currentPostId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p
+      )
+    )
+    setActiveCommentPost(prev =>
+      prev && prev.$id === currentPostId
+        ? { ...prev, comments_count: (prev.comments_count || 0) + 1 }
+        : prev
+    )
+    setNewCommentText('')
+    setReplyingToComment(null)
+
+    // 2. Background persistence and reconciliation
+    addCommentAction({
+      postId: currentPostId,
+      content: contentToSubmit,
+      userEmail: user.email,
+      userName: authorHandle,
+      parentId: replyingParent?.id,
+      replyToHandle: replyingParent?.author,
+    })
+      .then(res => {
+        if (res.success && res.comment) {
+          setComments(prev =>
+            prev.map(c => (c.$id === tempCommentId ? res.comment! : c))
+          )
+        } else {
+          setComments(prev => prev.filter(c => c.$id !== tempCommentId))
+          setPosts(prev =>
+            prev.map(p =>
+              p.$id === currentPostId
+                ? { ...p, comments_count: Math.max(0, (p.comments_count || 1) - 1) }
+                : p
+            )
+          )
+          setActiveCommentPost(prev =>
+            prev && prev.$id === currentPostId
+              ? { ...prev, comments_count: Math.max(0, (prev.comments_count || 1) - 1) }
+              : prev
+          )
+          alert(res.error || 'Failed to post comment.')
+        }
+      })
+      .catch(() => {
+        setComments(prev => prev.filter(c => c.$id !== tempCommentId))
+        setPosts(prev =>
+          prev.map(p =>
+            p.$id === currentPostId
+              ? { ...p, comments_count: Math.max(0, (p.comments_count || 1) - 1) }
+              : p
+          )
+        )
+        setActiveCommentPost(prev =>
+          prev && prev.$id === currentPostId
+            ? { ...prev, comments_count: Math.max(0, (prev.comments_count || 1) - 1) }
+            : prev
+        )
+        alert('Network error while posting comment.')
+      })
   }
 
   return (
@@ -811,7 +912,6 @@ export default function StudentProfilePage() {
               {displayedPosts.map(post => {
                 const isLiked = userLikedPosts.includes(post.$id)
                 const isSaved = savedPostIds.includes(post.$id)
-                const isCopied = copiedPostId === post.$id
 
                 const myHandle = (user?.username || user?.name || '').toLowerCase().replace(/[^a-z0-9_.]/g, '')
                 const postHandle = (post.author_display_name || '').toLowerCase().replace(/[^a-z0-9_.]/g, '')
@@ -824,47 +924,49 @@ export default function StudentProfilePage() {
                   <article
                     key={post.$id}
                     id={`post-${post.$id}`}
-                    className={`relative rounded-2xl border border-black/[0.08] dark:border-white/[0.08] hover:border-black/15 dark:hover:border-white/[0.15] transition-all duration-300 p-4 sm:p-5 space-y-3.5 bg-white/80 dark:bg-[#0c1017]/80 backdrop-blur-xl shadow-sm dark:shadow-none ${
+                    className={`relative rounded-2xl border border-black/[0.05] dark:border-white/[0.06] hover:border-black/10 dark:hover:border-white/[0.12] transition-all duration-200 p-3.5 sm:p-5 space-y-3 bg-white/80 dark:bg-[#0c1017]/80 backdrop-blur-xl shadow-xs dark:shadow-none ${
                       activeMenuPostId === post.$id ? 'z-40' : 'z-0'
                     }`}
                   >
                     {/* Header */}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="relative shrink-0 w-10 h-10">
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="relative shrink-0 w-8 h-8 sm:w-9 sm:h-9">
                           <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/10">
                             {post.author_avatar && !post.author_avatar.startsWith('preset:') ? (
                               <Image
                                 src={post.author_avatar}
                                 alt={post.author_display_name}
-                                width={40}
-                                height={40}
+                                width={36}
+                                height={36}
                                 className="w-full h-full object-cover"
                                 unoptimized={Boolean(post.author_avatar.startsWith('data:') || post.author_avatar.includes('appwrite'))}
                               />
                             ) : (
-                              renderAvatarIcon(post.author_avatar, post.author_display_name, 'w-5 h-5 text-gold')
+                              renderAvatarIcon(post.author_avatar, post.author_display_name, 'w-4 h-4 text-gold')
                             )}
                           </div>
                           {(post.is_officer || post.is_verified) && (
-                            <div className="absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-white dark:ring-[#0c1017] bg-white dark:bg-[#0c1017] flex items-center justify-center pointer-events-none shadow-sm">
-                              <InstagramVerifiedBadge className="w-3.5 h-3.5" />
+                            <div className="absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-white dark:ring-[#0c1017] bg-white dark:bg-[#0c1017] flex items-center justify-center pointer-events-none shadow-xs">
+                              <InstagramVerifiedBadge className="w-3 h-3" />
                             </div>
                           )}
                         </div>
 
-                        <div className="min-w-0 flex flex-col">
-                          <span className="font-semibold text-[13px] sm:text-sm text-slate-900 dark:text-slate-100 truncate">
-                            {post.author_display_name.startsWith('@') ? post.author_display_name.slice(1) : post.author_display_name}
-                          </span>
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-white/40 font-mono">
-                            <span title={new Date(post.$createdAt).toLocaleString()}>{formatRelativeTime(post.$createdAt)}</span>
+                        <div className="min-w-0 flex flex-col justify-center">
+                          <div className="flex items-center gap-1.5 flex-wrap leading-tight">
+                            <span className="font-semibold text-xs sm:text-[13px] text-slate-900 dark:text-slate-100 truncate">
+                              {post.author_display_name.startsWith('@') ? post.author_display_name.slice(1) : post.author_display_name}
+                            </span>
                             {post.tags?.[0] && (
-                              <>
-                                <span>•</span>
-                                <span className="text-gold font-medium">#{post.tags[0]}</span>
-                              </>
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono text-[10px] font-medium">
+                                <Hash className="w-2.5 h-2.5" />
+                                <span>{post.tags[0]}</span>
+                              </span>
                             )}
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-slate-400 dark:text-white/40 font-mono pt-0.5">
+                            <span title={new Date(post.$createdAt).toLocaleString()}>{formatRelativeTime(post.$createdAt)}</span>
                           </div>
                         </div>
                       </div>
@@ -896,23 +998,21 @@ export default function StudentProfilePage() {
                               {(isAuthor || isAdmin) && (
                                 <>
                                   {confirmDeletePostId === post.$id ? (
-                                    <div className="p-2.5 mx-1.5 my-1 rounded-xl bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/25 space-y-1.5 animate-in fade-in duration-150">
-                                      <p className="text-[11px] font-semibold text-rose-500 text-center leading-tight">
-                                        Delete this discussion?
-                                      </p>
-                                      <div className="flex items-center gap-1.5 justify-center pt-0.5">
+                                    <div className="flex items-center justify-between gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 mx-1.5 my-1 rounded-lg animate-in fade-in duration-150">
+                                      <span className="text-red-500 text-[11px] font-medium">Confirm delete?</span>
+                                      <div className="flex items-center gap-1">
                                         <button
                                           type="button"
                                           disabled={isDeletingPostId === post.$id}
                                           onClick={() => handleDeletePost(post)}
-                                          className="flex-1 py-1 px-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] transition-colors cursor-pointer text-center"
+                                          className="px-2 py-0.5 rounded bg-red-500 hover:bg-red-600 text-white text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-50"
                                         >
-                                          {isDeletingPostId === post.$id ? 'Deleting...' : 'Delete'}
+                                          {isDeletingPostId === post.$id ? '...' : 'Yes'}
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => setConfirmDeletePostId(null)}
-                                          className="flex-1 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-slate-700 dark:text-slate-300 font-medium text-[10px] transition-colors cursor-pointer text-center"
+                                          className="px-1.5 py-0.5 rounded text-slate-400 hover:text-slate-700 dark:hover:text-white text-[11px] transition-colors cursor-pointer"
                                         >
                                           Cancel
                                         </button>
@@ -1016,17 +1116,17 @@ export default function StudentProfilePage() {
                       </div>
                     )}
 
-                    {/* Action Row */}
+                    {/* Threads Clean Action Row */}
                     <div className="flex items-center justify-between pt-2 border-t border-black/[0.04] dark:border-white/[0.05]">
-                      <div className="flex items-center gap-5 sm:gap-6 text-slate-600 dark:text-slate-300">
+                      <div className="flex items-center gap-4 sm:gap-6 text-slate-600 dark:text-slate-300">
                         <button
                           type="button"
                           onClick={() => handleReaction(post)}
-                          className="group flex items-center gap-1.5 transition-colors cursor-pointer select-none active:scale-90"
+                          className="group flex items-center gap-1.5 transition-colors cursor-pointer select-none active:scale-90 p-1 -m-1"
                           title="Like"
                         >
                           <Heart
-                            className={`w-5 h-5 transition-transform duration-200 group-hover:scale-110 ${
+                            className={`w-4.5 h-4.5 sm:w-5 sm:h-5 transition-transform duration-200 group-hover:scale-110 ${
                               isLiked ? 'fill-rose-500 text-rose-500' : 'text-slate-500 dark:text-white/60 hover:text-rose-500'
                             }`}
                           />
@@ -1038,10 +1138,10 @@ export default function StudentProfilePage() {
                         <button
                           type="button"
                           onClick={() => openComments(post)}
-                          className="group flex items-center gap-1.5 transition-colors cursor-pointer select-none active:scale-90"
+                          className="group flex items-center gap-1.5 transition-colors cursor-pointer select-none active:scale-90 p-1 -m-1"
                           title="Comments"
                         >
-                          <MessageCircle className="w-5 h-5 text-slate-500 dark:text-white/60 group-hover:text-sky-400 transition-transform duration-200 group-hover:scale-110" />
+                          <MessageCircle className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-slate-500 dark:text-white/60 group-hover:text-sky-400 transition-transform duration-200 group-hover:scale-110" />
                           <span className="text-xs font-mono font-semibold text-slate-500 dark:text-white/50 group-hover:text-sky-400">
                             <NumberTicker value={post.comments_count} duration={0.3} />
                           </span>
@@ -1049,26 +1149,22 @@ export default function StudentProfilePage() {
 
                         <button
                           type="button"
-                          onClick={() => handleCopyPostLink(post)}
-                          className="group flex items-center gap-1.5 transition-colors cursor-pointer select-none active:scale-90"
+                          onClick={() => handleSharePost(post)}
+                          className="group flex items-center gap-1.5 transition-colors cursor-pointer select-none active:scale-90 p-1 -m-1"
                           title="Share post"
                         >
-                          {isCopied ? (
-                            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                          ) : (
-                            <Share2 className="w-5 h-5 text-slate-500 dark:text-white/60 group-hover:text-gold transition-transform duration-200 group-hover:scale-110" />
-                          )}
+                          <Share2 className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-slate-500 dark:text-white/60 group-hover:text-gold transition-transform duration-200 group-hover:scale-110" />
                         </button>
                       </div>
 
                       <button
                         type="button"
                         onClick={() => handleToggleSavePost(post.$id)}
-                        className="group flex items-center transition-colors cursor-pointer select-none active:scale-90"
+                        className="group flex items-center transition-colors cursor-pointer select-none active:scale-90 p-1 -m-1"
                         title={isSaved ? 'Remove from saved' : 'Save post'}
                       >
                         <Bookmark
-                          className={`w-5 h-5 transition-transform duration-200 group-hover:scale-110 ${
+                          className={`w-4.5 h-4.5 sm:w-5 sm:h-5 transition-transform duration-200 group-hover:scale-110 ${
                             isSaved ? 'fill-gold text-gold' : 'text-slate-500 dark:text-white/60 hover:text-gold'
                           }`}
                         />
@@ -1147,13 +1243,22 @@ export default function StudentProfilePage() {
         <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150">
           <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-[24px] sm:rounded-[28px] bg-white dark:bg-[#0c1017] border border-black/[0.08] dark:border-white/[0.12] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
-              <div className="w-7" />
-              <h3 className="font-semibold text-sm text-slate-900 dark:text-white">
-                Comments
-              </h3>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0 bg-white dark:bg-[#0c1017]">
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                  Discussion
+                </h3>
+                {activeCommentPost.tags?.[0] && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-gold/15 text-gold border border-gold/25 font-bold truncate">
+                    #{activeCommentPost.tags[0]}
+                  </span>
+                )}
+              </div>
               <button
-                onClick={() => setActiveCommentPost(null)}
+                onClick={() => {
+                  setActiveCommentPost(null)
+                  setReplyingToComment(null)
+                }}
                 className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
                 title="Close"
               >
@@ -1161,49 +1266,143 @@ export default function StudentProfilePage() {
               </button>
             </div>
 
-            {/* Original Post Preview (Top Caption Row, IG Style) */}
-            <div className="px-5 py-3.5 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0 flex items-start gap-3 bg-black/[0.01] dark:bg-white/[0.01]">
-              <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-slate-900 flex items-center justify-center ring-1 ring-black/10 dark:ring-white/10">
-                {activeCommentPost.author_avatar && !activeCommentPost.author_avatar.startsWith('preset:') ? (
-                  <Image
-                    src={activeCommentPost.author_avatar}
-                    alt={activeCommentPost.author_display_name}
-                    width={32}
-                    height={32}
-                    className="w-full h-full object-cover"
-                    unoptimized={Boolean(activeCommentPost.author_avatar.startsWith('data:') || activeCommentPost.author_avatar.includes('appwrite'))}
-                  />
-                ) : (
-                  renderAvatarIcon(activeCommentPost.author_avatar, activeCommentPost.author_display_name, 'w-4 h-4 text-gold')
-                )}
-              </div>
-              <div className="flex-1 min-w-0 text-xs sm:text-[13px] leading-relaxed">
-                <div className="inline">
+            {/* Original Post Card Preview (Instagram / Threads Style) */}
+            <div className="p-4 sm:p-5 border-b border-black/[0.08] dark:border-white/[0.08] bg-slate-50/70 dark:bg-white/[0.02] space-y-3 shrink-0 max-h-[36vh] overflow-y-auto scrollbar-thin">
+              {/* Author Row */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <Link
-                    href={`/community/${activeCommentPost.author_display_name.replace(/^@/, '')}`}
-                    className="font-bold text-slate-900 dark:text-white hover:underline mr-1.5"
+                    href={activeCommentPost.is_anonymous ? '#' : `/community/${activeCommentPost.author_display_name.replace(/^@/, '')}`}
+                    className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-slate-900 flex items-center justify-center ring-2 ring-gold/25"
                   >
-                    {activeCommentPost.author_display_name}
+                    {activeCommentPost.author_avatar && !activeCommentPost.author_avatar.startsWith('preset:') ? (
+                      <Image
+                        src={activeCommentPost.author_avatar}
+                        alt={activeCommentPost.author_display_name}
+                        width={40}
+                        height={40}
+                        className="w-full h-full object-cover"
+                        unoptimized={Boolean(activeCommentPost.author_avatar.startsWith('data:') || activeCommentPost.author_avatar.includes('appwrite'))}
+                      />
+                    ) : (
+                      renderAvatarIcon(activeCommentPost.author_avatar, activeCommentPost.author_display_name, 'w-5 h-5 text-gold')
+                    )}
                   </Link>
-                  {(activeCommentPost.is_officer || activeCommentPost.is_verified) && (
-                    <InstagramVerifiedBadge className="w-3.5 h-3.5 inline-block mr-1.5" />
-                  )}
-                  <span className="text-slate-800 dark:text-slate-200">{activeCommentPost.content}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Link
+                        href={activeCommentPost.is_anonymous ? '#' : `/community/${activeCommentPost.author_display_name.replace(/^@/, '')}`}
+                        className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white hover:underline truncate"
+                      >
+                        {activeCommentPost.author_display_name}
+                      </Link>
+                      {(activeCommentPost.is_officer || activeCommentPost.is_verified) && (
+                        <InstagramVerifiedBadge className="w-3.5 h-3.5 inline-block shrink-0" />
+                      )}
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
+                        Author
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-white/40">
+                      <span>{activeCommentPost.author_year_section || 'BSIT'}</span>
+                      <span>•</span>
+                      <span>{formatRelativeTime(activeCommentPost.$createdAt)}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400 dark:text-white/40">
-                  <span>{formatRelativeTime(activeCommentPost.$createdAt)}</span>
+              </div>
+
+              {/* Post Content */}
+              <div className="text-[13px] sm:text-sm text-slate-800 dark:text-slate-100 leading-relaxed font-sans pl-0.5 whitespace-pre-wrap">
+                {activeCommentPost.content}
+              </div>
+
+              {/* Attachments / Media Preview */}
+              {activeCommentPost.attachments && activeCommentPost.attachments.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  {activeCommentPost.attachments.map((fileId, i) => {
+                    const name = activeCommentPost.attachment_names?.[i] || 'Document Attachment'
+                    const size = activeCommentPost.attachment_sizes?.[i] || ''
+                    const isPdf = name.toLowerCase().endsWith('.pdf')
+                    const isImg = /\.(jpg|jpeg|png|webp|gif)$/i.test(name)
+                    const fileUrl = appwriteStorage.getFileView(APPWRITE_STORAGE_BUCKET_ID, fileId)
+
+                    if (isImg) {
+                      return (
+                        <div key={fileId} className="relative rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 max-h-56 bg-black/5 dark:bg-black/30">
+                          <Image
+                            src={fileUrl}
+                            alt={name}
+                            width={800}
+                            height={450}
+                            className="w-full h-auto max-h-56 object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div
+                        key={fileId}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08] hover:border-gold/40 transition-colors text-xs"
+                      >
+                        <div className="flex items-center gap-2.5 truncate pr-2">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                            isPdf ? 'bg-rose-500/15 border-rose-500/30 text-rose-500' : 'bg-gold/15 border-gold/30 text-gold'
+                          }`}>
+                            {isPdf ? <FileText className="w-3.5 h-3.5" /> : <FileCode className="w-3.5 h-3.5" />}
+                          </div>
+                          <div className="truncate">
+                            <div className="font-semibold text-slate-900 dark:text-white truncate">{name}</div>
+                            {size && <div className="text-[10px] text-slate-500 dark:text-white/40 font-mono">{size}</div>}
+                          </div>
+                        </div>
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 rounded-lg bg-surface hover:bg-gold hover:text-slate-950 text-slate-800 dark:text-slate-200 border border-black/[0.08] dark:border-white/[0.1] font-bold text-[10px] font-mono transition-colors shrink-0"
+                        >
+                          Download
+                        </a>
+                      </div>
+                    )
+                  })}
                 </div>
+              )}
+
+              {/* Engagement Stats Bar */}
+              <div className="flex items-center gap-4 pt-1 text-[11px] text-slate-500 dark:text-white/40 border-t border-black/[0.04] dark:border-white/[0.04]">
+                <span className="flex items-center gap-1.5 font-mono">
+                  <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500/20" />
+                  <span>{activeCommentPost.likes_count || 0} likes</span>
+                </span>
+                <span className="flex items-center gap-1.5 font-mono">
+                  <MessageCircle className="w-3.5 h-3.5 text-gold" />
+                  <span>{comments.length} comments</span>
+                </span>
               </div>
             </div>
 
-            {/* Comments Scrollable Area (Fluid Unboxed List) */}
+            {/* Discussion Header Strip */}
+            <div className="px-5 py-2.5 bg-black/[0.015] dark:bg-white/[0.015] border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-3.5 h-3.5 text-gold" />
+                <span className="text-[11px] font-bold text-slate-700 dark:text-white/80 uppercase tracking-wider">
+                  Comments ({comments.length})
+                </span>
+              </div>
+            </div>
+
+            {/* Comments Scrollable Area */}
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4 scrollbar-thin">
               {commentsLoading ? (
-                <div className="text-center py-12 text-xs text-slate-400">Loading comments...</div>
+                <CommentsListSkeleton />
               ) : comments.length === 0 ? (
                 <div className="text-center py-12 space-y-1">
                   <div className="font-semibold text-xs text-slate-700 dark:text-white/80">No comments yet</div>
-                  <div className="text-[11px] text-slate-400">Start the conversation.</div>
+                  <div className="text-[11px] text-slate-400">Start the conversation below.</div>
                 </div>
               ) : (
                 comments.map(c => {
@@ -1211,8 +1410,9 @@ export default function StudentProfilePage() {
                     ? c.author_display_name
                     : `@${c.author_display_name.toLowerCase().replace(/[^a-z0-9_.]/g, '')}`
                   const cleanHandle = handle.replace(/^@/, '')
+                  const isReplyingThis = replyingToComment?.id === (c.parent_id || c.$id)
                   return (
-                    <div key={c.$id} className="flex items-start gap-3 group">
+                    <div key={c.$id} className={`flex items-start gap-3 group transition-all duration-150 rounded-xl p-1 -m-1 ${isReplyingThis ? 'bg-gold/[0.05] ring-1 ring-gold/25' : ''}`}>
                       <Link
                         href={c.is_anonymous ? '#' : `/community/${cleanHandle}`}
                         className="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-slate-900 flex items-center justify-center ring-1 ring-black/10 dark:ring-white/10 mt-0.5"
@@ -1242,14 +1442,23 @@ export default function StudentProfilePage() {
                           {(c.is_officer || c.is_verified) && (
                             <InstagramVerifiedBadge className="w-3.5 h-3.5 inline-block mr-1.5" />
                           )}
+                          {c.reply_to_handle && (
+                            <span className="font-semibold text-gold mr-1.5 select-none">
+                              @{c.reply_to_handle.replace(/^@/, '')}
+                            </span>
+                          )}
                           <span className="text-slate-800 dark:text-slate-200 break-words">{c.content}</span>
                         </div>
-                        <div className="flex items-center gap-4 mt-1 text-[11px] text-slate-400 dark:text-white/40">
+                        <div className="flex items-center gap-3.5 mt-1 text-[11px] text-slate-400 dark:text-white/40">
                           <span>{formatRelativeTime(c.$createdAt)}</span>
                           <button
                             type="button"
-                            onClick={() => setNewCommentText(`@${cleanHandle} `)}
-                            className="font-semibold hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                            onClick={() => {
+                              const targetId = c.parent_id || c.$id
+                              setReplyingToComment({ id: targetId, author: cleanHandle })
+                              setNewCommentText(`@${cleanHandle} `)
+                            }}
+                            className="font-bold text-slate-600 dark:text-white/70 hover:text-gold transition-colors cursor-pointer"
                           >
                             Reply
                           </button>
@@ -1271,6 +1480,28 @@ export default function StudentProfilePage() {
 
             {/* Sticky Instagram Comment Input Bar */}
             <div className="px-4 sm:px-5 py-3 border-t border-black/[0.06] dark:border-white/[0.06] bg-white dark:bg-[#0c1017] shrink-0">
+              {replyingToComment && (
+                <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-gold/10 border border-gold/25 text-xs text-gold mb-2.5 animate-in fade-in slide-in-from-bottom-1 duration-150">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <CornerDownLeft className="w-3.5 h-3.5 text-gold shrink-0" />
+                    <span className="truncate">
+                      Replying to <span className="font-bold underline decoration-gold/40">@{replyingToComment.author}</span>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReplyingToComment(null)
+                      setNewCommentText('')
+                    }}
+                    className="p-1 rounded-full hover:bg-gold/20 text-gold transition-colors cursor-pointer shrink-0"
+                    title="Cancel reply"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-slate-900 flex items-center justify-center ring-1 ring-black/10 dark:ring-white/10">
                   {user?.avatar && !user.avatar.startsWith('preset:') ? (
@@ -1293,17 +1524,17 @@ export default function StudentProfilePage() {
                     value={newCommentText}
                     onChange={e => setNewCommentText(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleAddComment()}
-                    placeholder={user ? 'Add a comment...' : 'Connect account to comment'}
-                    disabled={!user || isSubmittingComment}
+                    placeholder={user ? (replyingToComment ? `Reply to @${replyingToComment.author}...` : 'Add a comment...') : 'Connect account to comment'}
+                    disabled={!user}
                     className="w-full bg-transparent text-xs sm:text-[13px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none"
                   />
                   <button
                     type="button"
-                    disabled={!user || !newCommentText.trim() || isSubmittingComment}
+                    disabled={!user || !newCommentText.trim()}
                     onClick={handleAddComment}
                     className="text-xs font-bold text-gold hover:text-gold-muted disabled:opacity-20 disabled:cursor-not-allowed transition-opacity cursor-pointer pl-2 shrink-0"
                   >
-                    {isSubmittingComment ? 'Posting...' : 'Post'}
+                    Post
                   </button>
                 </div>
               </div>
@@ -1363,6 +1594,16 @@ export default function StudentProfilePage() {
           </div>
         </div>
       )}
+
+      {/* ─── Social Media Share Post Modal ─── */}
+      <SharePostModal
+        isOpen={isShareModalOpen}
+        onClose={() => {
+          setIsShareModalOpen(false)
+          setShareModalPost(null)
+        }}
+        post={shareModalPost}
+      />
     </div>
   )
 }

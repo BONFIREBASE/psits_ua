@@ -391,15 +391,7 @@ export default function Navbar() {
                     </AnimatePresence>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.dispatchEvent(new CustomEvent('psits:open-onboarding'))
-                    }}
-                    className="px-3 py-1 rounded-full bg-gold hover:bg-gold-muted text-slate-950 font-bold text-[11px] font-mono uppercase tracking-wider transition-transform active:scale-95 cursor-pointer shadow-sm"
-                  >
-                    Connect
-                  </button>
+                  <ThemeToggle size={17} />
                 )}
               </div>
             ) : (
@@ -567,13 +559,7 @@ export default function Navbar() {
                     </AnimatePresence>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => window.dispatchEvent(new CustomEvent('psits:open-onboarding'))}
-                    className="px-2.5 py-1 rounded-full bg-gold text-slate-950 font-bold text-[10px] font-mono uppercase"
-                  >
-                    Connect
-                  </button>
+                  <ThemeToggle size={18} />
                 )}
               </div>
             ) : (
