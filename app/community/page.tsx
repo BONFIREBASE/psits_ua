@@ -2869,12 +2869,6 @@ export default function CommunityPage() {
                             </div>
                             <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-slate-400 dark:text-white/40 font-mono pt-0.5">
                               <span title={new Date(post.$createdAt).toLocaleString()}>{formatRelativeTime(post.$createdAt)}</span>
-                              {post.author_year_section && (
-                                <>
-                                  <span>•</span>
-                                  <span className="truncate max-w-[120px]">{post.author_year_section}</span>
-                                </>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -4310,12 +4304,6 @@ export default function CommunityPage() {
                   {/* Clean Instagram Meta (time • likes count) */}
                   <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-400 dark:text-white/40">
                     <span>{formatRelativeTime(activeCommentPost.$createdAt)}</span>
-                    {activeCommentPost.author_year_section && (
-                      <>
-                        <span>•</span>
-                        <span>{activeCommentPost.author_year_section}</span>
-                      </>
-                    )}
                     {activeCommentPost.likes_count > 0 && (
                       <>
                         <span>•</span>

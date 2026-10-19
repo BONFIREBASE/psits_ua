@@ -52,6 +52,7 @@ import { supabase } from '@/lib/supabase'
 import { NumberTicker } from '@/components/motion/number-ticker'
 import { SharePostModal } from '@/components/SharePostModal'
 import { CommentsListSkeleton } from '@/components/PublicSkeletonPreloader'
+import CommunityOnboardingModal, { type CommunityUserProfile } from '@/components/CommunityOnboardingModal'
 
 function InstagramVerifiedBadge({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -139,6 +140,8 @@ export default function StudentProfilePage() {
   } | null>(null)
   const [fetchedProfile, setFetchedProfile] = useState<StudentProfileData | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
+  const [userProfile, setUserProfile] = useState<CommunityUserProfile | null>(null)
 
   // Engagement & Action state
   const [savedPostIds, setSavedPostIds] = useState<string[]>([])
@@ -192,15 +195,31 @@ export default function StudentProfilePage() {
         const isVerified = Boolean(isOfficer || metadata.is_verified || metadata.community_tos_accepted)
         const yearSection = metadata.year_section || 'BSIT'
         setUser({ email, name, avatar, username, isOfficer, isVerified, yearSection })
+        setUserProfile({
+          email,
+          name,
+          username,
+          avatar,
+          yearSection,
+          bio: (metadata.bio as string) || '',
+          hobbies: (metadata.hobbies as string[]) || [],
+          github: (metadata.github as string) || '',
+          linkedin: (metadata.linkedin as string) || '',
+          portfolio: (metadata.portfolio as string) || '',
+          tosAccepted: Boolean(metadata.community_tos_accepted),
+          tosAcceptedAt: (metadata.community_tos_accepted_at as string) || '',
+        })
 
         if (email.toLowerCase() === 'psits-ua@antiquespride.edu.ph' || email.toLowerCase().includes('admin')) {
           setIsAdmin(true)
         }
       } else {
         setUser(null)
+        setUserProfile(null)
       }
     }).catch(() => {
       setUser(null)
+      setUserProfile(null)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -458,12 +477,53 @@ export default function StudentProfilePage() {
     }
   }
 
-  const handleShareProfile = () => {
-    if (typeof window !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href)
-      setCopiedProfile(true)
-      setTimeout(() => setCopiedProfile(false), 2000)
+  const handleShareProfile = async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : ''
+    const shareData = {
+      title: `${profileInfo.displayName} (${profileInfo.handle}) · PSITS Community`,
+      text: `Check out ${profileInfo.displayName}'s student profile on PSITS Community!`,
+      url,
     }
+    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare?.(shareData)) {
+      try {
+        await navigator.share(shareData)
+        return
+      } catch {}
+    }
+    if (typeof window !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(url)
+        setCopiedProfile(true)
+        setTimeout(() => setCopiedProfile(false), 2000)
+      } catch {}
+    }
+  }
+
+  const handleProfileUpdated = (updated: CommunityUserProfile) => {
+    setUserProfile(updated)
+    setUser(prev =>
+      prev
+        ? {
+            ...prev,
+            name: updated.name,
+            avatar: updated.avatar,
+            username: updated.username,
+            yearSection: updated.yearSection,
+          }
+        : null
+    )
+    setFetchedProfile(prev =>
+      prev
+        ? {
+            ...prev,
+            displayName: updated.name,
+            avatar: updated.avatar || prev.avatar,
+            handle: updated.username ? `@${updated.username.replace(/^@/, '')}` : prev.handle,
+            yearSection: updated.yearSection || prev.yearSection,
+          }
+        : null
+    )
+    setIsEditProfileOpen(false)
   }
 
   const [shareModalPost, setShareModalPost] = useState<CommunityPostItem | null>(null)
@@ -787,7 +847,7 @@ export default function StudentProfilePage() {
                 <>
                   <button
                     type="button"
-                    onClick={() => window.dispatchEvent(new CustomEvent('psits:open-profile'))}
+                    onClick={() => setIsEditProfileOpen(true)}
                     className="flex-1 py-1.5 px-3 rounded-lg bg-black/[0.05] dark:bg-white/[0.08] hover:bg-black/10 dark:hover:bg-white/12 text-slate-900 dark:text-white text-xs font-semibold transition-colors cursor-pointer text-center"
                   >
                     Edit profile
@@ -1692,6 +1752,16 @@ export default function StudentProfilePage() {
           setShareModalPost(null)
         }}
         post={shareModalPost}
+      />
+
+      {/* ─── Community Profile Setup & Edit Modal ─── */}
+      <CommunityOnboardingModal
+        isOpen={isEditProfileOpen}
+        onClose={() => setIsEditProfileOpen(false)}
+        user={user}
+        currentProfile={userProfile}
+        onProfileUpdated={handleProfileUpdated}
+        initialStep={3}
       />
     </div>
   )
