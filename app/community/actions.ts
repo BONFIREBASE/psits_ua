@@ -35,7 +35,22 @@ export interface CommunityPostItem {
   is_locked: boolean
   is_flagged: boolean
   flag_count: number
-  status: 'active' | 'hidden' | 'archived'
+  status?: 'active' | 'hidden' | 'archived'
+}
+
+export interface CommunityNotificationItem {
+  $id: string
+  $createdAt: string
+  recipient_email: string
+  recipient_handle: string
+  actor_name: string
+  actor_handle: string
+  actor_avatar?: string
+  type: 'reaction' | 'comment' | 'reply' | 'mention' | 'follow'
+  post_id?: string
+  comment_id?: string
+  summary: string
+  is_read: boolean
 }
 
 interface AppwritePostRecord extends Models.Document {
@@ -96,45 +111,102 @@ export interface CommunityCommentItem {
   status?: string
 }
 
-async function resolveOfficerStatus(email: string, name?: string): Promise<{ isOfficer: boolean; title: string }> {
+function formatStudentFullName(rawName: string): string {
+  if (!rawName) return ''
+  const trimmed = rawName.trim()
+  if (trimmed.includes(',')) {
+    const parts = trimmed.split(',').map(p => p.trim()).filter(Boolean)
+    if (parts.length >= 2) {
+      const lastName = parts[0]
+      const givenParts = parts.slice(1).join(' ').trim().split(/\s+/).filter(Boolean)
+      if (givenParts.length > 1) {
+        // Drop middle name (the trailing token in Philippine roster format: LAST, FIRST(S) MIDDLE)
+        const firstNames = givenParts.slice(0, -1).join(' ')
+        return `${firstNames} ${lastName}`.trim()
+      }
+      return `${givenParts.join(' ')} ${lastName}`.trim()
+    }
+  }
+  return trimmed
+}
+
+function normalizeWords(str: string): string[] {
+  return (str || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+function matchStudentNameSimilarity(nameA?: string, nameB?: string): boolean {
+  if (!nameA || !nameB) return false
+  const tokensA = normalizeWords(nameA).filter(t => t.length >= 2)
+  const tokensB = normalizeWords(nameB).filter(t => t.length >= 2)
+  if (tokensA.length === 0 || tokensB.length === 0) return false
+  return tokensA.some(t => tokensB.includes(t))
+}
+
+async function resolveOfficerStatus(email: string, name?: string): Promise<{ isOfficer: boolean; title: string; name?: string }> {
   const normalizedEmail = (email || '').toLowerCase().trim()
   if (normalizedEmail === SUPER_ADMIN_EMAIL || normalizedEmail.includes('admin')) {
     return { isOfficer: true, title: 'PSITS Super Admin' }
   }
 
-  // 1. Check official static officers roster
-  const cleanName = (name || '').trim().toLowerCase()
-  if (cleanName) {
+  const cleanName = (name || '').trim().toLowerCase().replace(/^@/, '')
+
+  // 1. If email is an institutional email, resolve the student's real full name from students roster
+  let studentFullName = ''
+  if (normalizedEmail) {
+    try {
+      const idMatch = normalizedEmail.match(/^(\d{4})s(\d{5})@antiquespride\.edu\.ph$/i)
+      const possibleNos = idMatch
+        ? [`${idMatch[1]}-S${idMatch[2]}`, `${idMatch[1]}s${idMatch[2]}`, normalizedEmail.split('@')[0]]
+        : [normalizedEmail.split('@')[0]]
+
+      const { data: sDocs } = await supabaseAdmin
+        .from('students')
+        .select('full_name, student_no')
+        .in('student_no', possibleNos)
+        .eq('is_active', true)
+
+      const matched = sDocs?.find(s => cleanName ? matchStudentNameSimilarity(cleanName, s.full_name) : true) || sDocs?.[0]
+      if (matched?.full_name && (!cleanName || matchStudentNameSimilarity(cleanName, matched.full_name))) {
+        studentFullName = formatStudentFullName(matched.full_name).toLowerCase().trim()
+      }
+    } catch {}
+  }
+
+  // 2. Check static officers list against both name and resolved student full name
+  const namesToCheck = [cleanName, studentFullName].filter(Boolean)
+  for (const n of namesToCheck) {
     const staticMatch = staticOfficers.find(o => {
       const oName = o.name.toLowerCase().trim()
-      return oName === cleanName || cleanName.includes(oName) || oName.includes(cleanName)
+      return oName === n || n.includes(oName) || oName.includes(n)
     })
     if (staticMatch) {
-      return { isOfficer: true, title: staticMatch.position }
+      return { isOfficer: true, title: staticMatch.position, name: staticMatch.name }
     }
   }
 
+  // 3. Check Supabase officers table
   try {
     let query = supabaseAdmin.from('officers').select('position, role_group, name, email')
-    if (normalizedEmail && cleanName) {
-      query = query.or(`email.eq.${normalizedEmail},name.ilike.%${cleanName}%`)
-    } else if (normalizedEmail) {
-      query = query.eq('email', normalizedEmail)
-    } else if (cleanName) {
-      query = query.ilike('name', `%${cleanName}%`)
-    } else {
-      return { isOfficer: false, title: '' }
-    }
+    const orClauses: string[] = []
+    if (normalizedEmail) orClauses.push(`email.eq.${normalizedEmail}`)
+    if (cleanName && cleanName.length >= 3) orClauses.push(`name.ilike.%${cleanName}%`)
+    if (studentFullName && studentFullName.length >= 3) orClauses.push(`name.ilike.%${studentFullName}%`)
 
-    const { data: dbOfficers } = await query
+    if (orClauses.length > 0) {
+      query = query.or(orClauses.join(','))
+      const { data: dbOfficers } = await query
 
-    if (dbOfficers && dbOfficers.length > 0) {
-      // Prioritize Executive titles (e.g. Vice President, President)
-      const exec = dbOfficers.find(o => o.role_group === 'Executive' || o.position.toLowerCase().includes('president'))
-      if (exec) {
-        return { isOfficer: true, title: exec.position }
+      if (dbOfficers && dbOfficers.length > 0) {
+        const exec = dbOfficers.find(o => o.role_group === 'Executive' || o.position.toLowerCase().includes('president'))
+        if (exec) {
+          return { isOfficer: true, title: exec.position, name: exec.name }
+        }
+        return { isOfficer: true, title: dbOfficers[0].position, name: dbOfficers[0].name }
       }
-      return { isOfficer: true, title: dbOfficers[0].position }
     }
   } catch {
     // ignore
@@ -153,11 +225,6 @@ export interface AutoResolveEligibilityResult {
   error?: string
 }
 
-function normalizeWords(str: string): string[] {
-  return str.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean)
-}
-
-
 export async function autoResolveStudentEligibilityAction(params: {
   email: string
   googleName?: string
@@ -175,23 +242,24 @@ export async function autoResolveStudentEligibilityAction(params: {
     }
   }
 
-
   let studentMatch: { student_no: string; full_name: string; year_section: string } | null = null
-
 
   const idMatch = cleanEmail.match(/^(\d{4})s(\d{5})@antiquespride\.edu\.ph$/i)
   if (idMatch) {
-    const studentNo = `${idMatch[1]}-S${idMatch[2]}`
-    const { data: student } = await supabaseAdmin
+    const possibleNos = [`${idMatch[1]}-S${idMatch[2]}`, `${idMatch[1]}s${idMatch[2]}`, cleanEmail.split('@')[0]]
+    const { data: candidates } = await supabaseAdmin
       .from('students')
       .select('student_no, full_name, year_section')
-      .eq('student_no', studentNo)
+      .in('student_no', possibleNos)
       .eq('program', 'BSIT')
       .eq('is_active', true)
-      .maybeSingle()
 
-    if (student) {
-      studentMatch = student
+    if (candidates && candidates.length > 0) {
+      if (cleanGoogleName) {
+        studentMatch = candidates.find(c => matchStudentNameSimilarity(cleanGoogleName, c.full_name)) || null
+      } else {
+        studentMatch = candidates[0]
+      }
     }
   }
 
@@ -255,7 +323,11 @@ export async function autoResolveStudentEligibilityAction(params: {
       isOfficer: true,
       officerTitle: officerCheck.title,
       studentNo: studentMatch?.student_no,
-      name: cleanGoogleName || studentMatch?.full_name || 'PSITS Executive',
+      name: officerCheck.name
+        ? formatStudentFullName(officerCheck.name)
+        : studentMatch
+        ? formatStudentFullName(studentMatch.full_name)
+        : cleanGoogleName || 'PSITS Executive',
       yearSection: studentMatch?.year_section || 'CCIS Faculty',
     }
   }
@@ -266,7 +338,7 @@ export async function autoResolveStudentEligibilityAction(params: {
       verified: true,
       isOfficer: false,
       studentNo: studentMatch.student_no,
-      name: studentMatch.full_name,
+      name: formatStudentFullName(studentMatch.full_name),
       yearSection: studentMatch.year_section,
     }
   }
@@ -320,10 +392,26 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
     )
 
 
+    // Collect known officer handles from Supabase Auth
+    const officerHandles = new Set<string>()
+    try {
+      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+      usersData?.users.forEach(u => {
+        const meta = u.user_metadata || {}
+        const uHandle = String(meta.community_username || '').toLowerCase().replace(/^@/, '').trim()
+        const isOff = Boolean(meta.role === 'officer' || meta.role === 'admin' || (u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL))
+        if (isOff && uHandle) {
+          officerHandles.add(uHandle)
+        }
+      })
+    } catch {}
+
     const sanitizedPosts: CommunityPostItem[] = (res.documents as unknown as AppwritePostRecord[]).map(doc => {
       const isAnon = Boolean(doc.is_anonymous)
-      const isOff = Boolean(doc.is_officer) && !isAnon
-      const offTitle = isOff ? String(doc.officer_title || 'Officer') : undefined
+      const cleanAuthor = String(doc.author_display_name || '').toLowerCase().replace(/^@/, '').trim()
+      const isOff = !isAnon && (Boolean(doc.is_officer) || officerHandles.has(cleanAuthor))
+      const isVer = isOff || Boolean(doc.is_verified)
+      const offTitle = isOff ? String(doc.officer_title || 'PSITS Officer') : undefined
 
       return {
         $id: doc.$id,
@@ -338,7 +426,7 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
         author_avatar: isAnon ? '' : (doc.author_avatar ? String(doc.author_avatar) : ''),
         author_year_section: isAnon ? 'BSIT Student' : (doc.author_year_section ? String(doc.author_year_section) : 'BSIT'),
         is_anonymous: isAnon,
-        is_verified: false,
+        is_verified: isVer,
         is_officer: isOff,
         officer_title: offTitle,
         attachments: Array.isArray(doc.attachments) ? doc.attachments.map(String) : [],
@@ -457,6 +545,68 @@ async function resolveAvatarUrl(avatar?: string): Promise<string> {
   return trimmed.slice(0, 2048)
 }
 
+/* ─── Notification Dispatcher Helper (Non-Blocking) ─── */
+async function createNotificationRecord(params: {
+  recipientEmail?: string
+  recipientHandle?: string
+  actorName: string
+  actorHandle: string
+  actorAvatar?: string
+  type: 'reaction' | 'comment' | 'reply' | 'mention' | 'follow'
+  postId?: string
+  commentId?: string
+  summary: string
+}): Promise<void> {
+  try {
+    const actorHandleClean = (params.actorHandle || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
+    const recipientHandleClean = (params.recipientHandle || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
+    const recipientEmailClean = (params.recipientEmail || '').toLowerCase().trim()
+
+    // Do not notify self
+    if (recipientHandleClean && actorHandleClean && recipientHandleClean === actorHandleClean) return
+
+    let finalRecipientHandle = recipientHandleClean
+    const finalRecipientEmail = recipientEmailClean
+
+    // If handle is missing, look it up by email
+    if (!finalRecipientHandle && finalRecipientEmail) {
+      const { data: student } = await supabaseAdmin
+        .from('students')
+        .select('full_name')
+        .eq('student_no', finalRecipientEmail)
+        .maybeSingle()
+      if (student) {
+        finalRecipientHandle = student.full_name.toLowerCase().replace(/[^a-z0-9_.]/g, '')
+      } else {
+        finalRecipientHandle = finalRecipientEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9_.]/g, '')
+      }
+    }
+
+    if (!finalRecipientHandle) return
+
+    const { databases } = createServerAppwriteClient()
+    await databases.createDocument(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.NOTIFICATIONS,
+      ID.unique(),
+      {
+        recipient_email: finalRecipientEmail || `${finalRecipientHandle}@antiquespride.edu.ph`,
+        recipient_handle: finalRecipientHandle,
+        actor_name: (params.actorName || actorHandleClean).slice(0, 100),
+        actor_handle: actorHandleClean.slice(0, 100),
+        actor_avatar: (params.actorAvatar || '').slice(0, 2048),
+        type: params.type,
+        post_id: params.postId ? String(params.postId).slice(0, 100) : '',
+        comment_id: params.commentId ? String(params.commentId).slice(0, 100) : '',
+        summary: params.summary.slice(0, 1000),
+        is_read: false,
+      }
+    )
+  } catch (err) {
+    console.warn('[Notification Error]:', err)
+  }
+}
+
 /* ─── 2. Create Community Post (Direct Appwrite Write + Cache Invalidation) ─── */
 export async function createCommunityPostAction(payload: {
   content: string
@@ -498,8 +648,7 @@ export async function createCommunityPostAction(payload: {
         author_display_name: (payload.isAnonymous ? 'Anonymous Kasubay' : payload.userName).slice(0, 100),
         author_avatar: resolvedAvatar ? resolvedAvatar.slice(0, 2048) : '',
         author_year_section: (payload.userYearSection || 'BSIT').slice(0, 20),
-        is_anonymous: Boolean(payload.isAnonymous),
-        is_verified: false, // Regular students have NO badge
+        is_verified: isOfficer,
         is_officer: isOfficer,
         officer_title: officerTitle.slice(0, 100),
         attachments: (payload.attachments || []).map(a => String(a).slice(0, 500)),
@@ -517,7 +666,35 @@ export async function createCommunityPostAction(payload: {
     )
 
     // Invalidate Redis feed cache non-blockingly so client gets 0ms return
-    void deleteCache(FEED_CACHE_KEY).catch(() => {})
+    void (async () => {
+      try {
+        await deleteCache(FEED_CACHE_KEY)
+        for (const tag of payload.tags || []) {
+          await deleteCache(`${FEED_CACHE_KEY}:${tag}`)
+        }
+      } catch {}
+    })()
+
+    // Dispatch mention notifications non-blockingly
+    void (async () => {
+      try {
+        const mentions = Array.from(new Set(payload.content.match(/@([a-zA-Z0-9_.]+)/g) || [])).map(m => m.slice(1).toLowerCase())
+        const snippet = payload.content.trim().slice(0, 80)
+        for (const mHandle of mentions) {
+          if (mHandle !== payload.userName.replace(/^@/, '').toLowerCase()) {
+            await createNotificationRecord({
+              recipientHandle: mHandle,
+              actorName: payload.isAnonymous ? 'Anonymous Kasubay' : payload.userName,
+              actorHandle: payload.isAnonymous ? 'anonymous' : payload.userName,
+              actorAvatar: payload.isAnonymous ? '' : resolvedAvatar,
+              type: 'mention',
+              postId: newDoc.$id,
+              summary: `mentioned you in a discussion: "${snippet}..."`,
+            })
+          }
+        }
+      } catch {}
+    })()
 
     const postItem: CommunityPostItem = {
       $id: newDoc.$id,
@@ -528,7 +705,7 @@ export async function createCommunityPostAction(payload: {
       author_avatar: newDoc.author_avatar,
       author_year_section: newDoc.author_year_section,
       is_anonymous: Boolean(newDoc.is_anonymous),
-      is_verified: false,
+      is_verified: isOfficer,
       is_officer: Boolean(newDoc.is_officer),
       officer_title: newDoc.officer_title || undefined,
       attachments: newDoc.attachments,
@@ -724,9 +901,11 @@ export async function togglePostReactionAction(params: {
   postId: string
   userEmail: string
   reactionType?: string
+  userName?: string
+  userAvatar?: string
 }): Promise<{ success: boolean; newLikesCount?: number; liked?: boolean; error?: string }> {
   try {
-    const { postId, userEmail, reactionType = 'like' } = params
+    const { postId, userEmail, reactionType = 'like', userName, userAvatar } = params
     if (!postId || !userEmail) return { success: false, error: 'Missing parameters.' }
 
     const { databases } = createServerAppwriteClient()
@@ -776,6 +955,36 @@ export async function togglePostReactionAction(params: {
       { likes_count: authoritativeLikes }
     )
 
+    // Dispatch reaction notification non-blockingly to post author
+    if (liked) {
+      void (async () => {
+        try {
+          const postDoc = await databases.getDocument(
+            APPWRITE_DATABASE_ID,
+            APPWRITE_COLLECTIONS.POSTS,
+            postId
+          )
+          const targetAuthorEmail = String(postDoc.author_student_no || '')
+          const targetAuthorHandle = String(postDoc.author_display_name || '').replace(/^@/, '')
+          const actorDisplay = userName || userEmail.split('@')[0]
+          const snippet = String(postDoc.content || '').trim().slice(0, 60)
+
+          if (targetAuthorEmail !== userEmail) {
+            await createNotificationRecord({
+              recipientEmail: targetAuthorEmail,
+              recipientHandle: targetAuthorHandle,
+              actorName: actorDisplay,
+              actorHandle: actorDisplay,
+              actorAvatar: userAvatar || '',
+              type: 'reaction',
+              postId,
+              summary: `reacted to your discussion: "${snippet}..."`,
+            })
+          }
+        } catch {}
+      })()
+    }
+
     return { success: true, newLikesCount: authoritativeLikes, liked }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to toggle reaction.'
@@ -820,7 +1029,7 @@ export async function addCommentAction(params: {
         author_display_name: isAnonymous ? 'Anonymous Kasubay' : userName,
         author_avatar: resolvedCommentAvatar,
         is_anonymous: Boolean(isAnonymous),
-        is_verified: false,
+        is_verified: isOfficer,
         is_officer: isOfficer,
         officer_title: officerTitle,
         is_flagged: false,
@@ -851,6 +1060,73 @@ export async function addCommentAction(params: {
       }
     })()
 
+    // Dispatch comment, reply, and mention notifications non-blockingly
+    void (async () => {
+      try {
+        const postDoc = await databases.getDocument(
+          APPWRITE_DATABASE_ID,
+          APPWRITE_COLLECTIONS.POSTS,
+          postId
+        )
+        const targetAuthorEmail = String(postDoc.author_student_no || '')
+        const targetAuthorHandle = String(postDoc.author_display_name || '').replace(/^@/, '')
+        const snippet = content.trim().slice(0, 80)
+        const actorDisplay = isAnonymous ? 'Anonymous Kasubay' : userName
+        const actorHandle = isAnonymous ? 'anonymous' : userName
+        const actorAvatar = isAnonymous ? '' : resolvedCommentAvatar
+
+        // 1. Notify post author (if not self and not anonymous post author)
+        if (targetAuthorEmail !== userEmail) {
+          await createNotificationRecord({
+            recipientEmail: targetAuthorEmail,
+            recipientHandle: targetAuthorHandle,
+            actorName: actorDisplay,
+            actorHandle: actorHandle,
+            actorAvatar: actorAvatar,
+            type: 'comment',
+            postId,
+            commentId: commentDoc.$id,
+            summary: `commented: "${snippet}"`,
+          })
+        }
+
+        // 2. Notify replied user if replying to another comment
+        if (replyToHandle) {
+          const cleanReplyTarget = replyToHandle.replace(/^@/, '').toLowerCase().trim()
+          const cleanMyHandle = userName.replace(/^@/, '').toLowerCase().trim()
+          if (cleanReplyTarget !== cleanMyHandle && cleanReplyTarget !== targetAuthorHandle.toLowerCase().trim()) {
+            await createNotificationRecord({
+              recipientHandle: cleanReplyTarget,
+              actorName: actorDisplay,
+              actorHandle: actorHandle,
+              actorAvatar: actorAvatar,
+              type: 'reply',
+              postId,
+              commentId: commentDoc.$id,
+              summary: `replied to your comment: "${snippet}"`,
+            })
+          }
+        }
+
+        // 3. Mentions in comment
+        const mentions = Array.from(new Set(content.match(/@([a-zA-Z0-9_.]+)/g) || [])).map(m => m.slice(1).toLowerCase().trim())
+        for (const mHandle of mentions) {
+          if (mHandle !== userName.replace(/^@/, '').toLowerCase().trim() && mHandle !== replyToHandle?.replace(/^@/, '').toLowerCase().trim()) {
+            await createNotificationRecord({
+              recipientHandle: mHandle,
+              actorName: actorDisplay,
+              actorHandle: actorHandle,
+              actorAvatar: actorAvatar,
+              type: 'mention',
+              postId,
+              commentId: commentDoc.$id,
+              summary: `mentioned you in a comment: "${snippet}"`,
+            })
+          }
+        }
+      } catch {}
+    })()
+
     return {
       success: true,
       comment: {
@@ -861,7 +1137,7 @@ export async function addCommentAction(params: {
         author_display_name: commentDoc.author_display_name,
         author_avatar: commentDoc.author_avatar,
         is_anonymous: Boolean(commentDoc.is_anonymous),
-        is_verified: false,
+        is_verified: isOfficer || Boolean(commentDoc.is_verified),
         is_officer: Boolean(commentDoc.is_officer),
         officer_title: commentDoc.officer_title || undefined,
         parent_id: commentDoc.parent_id || undefined,
@@ -1009,13 +1285,13 @@ export async function getCommentsForPostAction(postId: string): Promise<{
           content: isDeleted ? 'This comment has been deleted' : String(c.content || ''),
           author_student_no: isDeleted ? undefined : String(c.author_student_no || ''),
           author_display_name: isDeleted
-            ? 'Kasubay'
+            ? ''
             : isAnon
             ? 'Anonymous Kasubay'
             : String(c.author_display_name || 'Kasubay Student'),
           author_avatar: isDeleted || isAnon ? '' : (c.author_avatar ? String(c.author_avatar) : ''),
           is_anonymous: isAnon,
-          is_verified: isDeleted ? false : Boolean(c.is_verified),
+          is_verified: isDeleted ? false : (isOff || Boolean(c.is_verified)),
           is_officer: isDeleted ? false : isOff,
           officer_title: isDeleted || !isOff ? undefined : String(c.officer_title || 'Officer'),
           parent_id: c.parent_id ? String(c.parent_id) : undefined,
@@ -1148,6 +1424,8 @@ export interface FollowUserInfo {
   handle: string
   name: string
   avatar: string
+  isFollowing?: boolean
+  isFollowedBy?: boolean
 }
 
 export async function toggleFollowAction(params: {
@@ -1155,6 +1433,8 @@ export async function toggleFollowAction(params: {
   followingHandle: string
   followerName?: string
   followerAvatar?: string
+  followingName?: string
+  followingAvatar?: string
 }): Promise<{ success: boolean; isFollowing: boolean; error?: string }> {
   try {
     const follower = (params.followerHandle || '').toLowerCase().replace(/^@/, '').trim()
@@ -1195,14 +1475,26 @@ export async function toggleFollowAction(params: {
       APPWRITE_COLLECTIONS.FOLLOWS,
       ID.unique(),
       {
-        follower_student_no: follower.slice(0, 20),
-        following_student_no: following.slice(0, 20),
+        follower_student_no: follower,
+        following_student_no: following,
         follower_handle: follower,
         following_handle: following,
         follower_name: params.followerName || follower,
         follower_avatar: params.followerAvatar || '',
+        following_name: params.followingName || following,
+        following_avatar: params.followingAvatar || '',
       }
     )
+
+    // Dispatch follow notification non-blockingly
+    void createNotificationRecord({
+      recipientHandle: following,
+      actorName: params.followerName || follower,
+      actorHandle: follower,
+      actorAvatar: params.followerAvatar || '',
+      type: 'follow',
+      summary: 'started following you',
+    })
 
     return { success: true, isFollowing: true }
   } catch (err: unknown) {
@@ -1219,13 +1511,14 @@ export async function getFollowStatsAction(
   followersCount: number
   followingCount: number
   isFollowing: boolean
+  isFollowedBy: boolean
 }> {
   try {
     const target = (targetHandle || '').toLowerCase().replace(/^@/, '').trim()
     const viewer = (viewerHandle || '').toLowerCase().replace(/^@/, '').trim()
 
     if (!target) {
-      return { success: false, followersCount: 0, followingCount: 0, isFollowing: false }
+      return { success: false, followersCount: 0, followingCount: 0, isFollowing: false, isFollowedBy: false }
     }
 
     const { databases } = createServerAppwriteClient()
@@ -1242,17 +1535,32 @@ export async function getFollowStatsAction(
     ])
 
     let isFollowing = false
+    let isFollowedBy = false
+
     if (viewer && viewer !== target) {
-      const checkRes = await databases.listDocuments(
-        APPWRITE_DATABASE_ID,
-        APPWRITE_COLLECTIONS.FOLLOWS,
-        [
-          Query.equal('follower_handle', viewer),
-          Query.equal('following_handle', target),
-          Query.limit(1),
-        ]
-      )
-      isFollowing = checkRes.documents.length > 0
+      const [checkViewerFollowsTarget, checkTargetFollowsViewer] = await Promise.all([
+        databases.listDocuments(
+          APPWRITE_DATABASE_ID,
+          APPWRITE_COLLECTIONS.FOLLOWS,
+          [
+            Query.equal('follower_handle', viewer),
+            Query.equal('following_handle', target),
+            Query.limit(1),
+          ]
+        ),
+        databases.listDocuments(
+          APPWRITE_DATABASE_ID,
+          APPWRITE_COLLECTIONS.FOLLOWS,
+          [
+            Query.equal('follower_handle', target),
+            Query.equal('following_handle', viewer),
+            Query.limit(1),
+          ]
+        ),
+      ])
+
+      isFollowing = checkViewerFollowsTarget.documents.length > 0
+      isFollowedBy = checkTargetFollowsViewer.documents.length > 0
     }
 
     return {
@@ -1260,18 +1568,21 @@ export async function getFollowStatsAction(
       followersCount: followersRes.total || 0,
       followingCount: followingRes.total || 0,
       isFollowing,
+      isFollowedBy,
     }
   } catch {
-    return { success: false, followersCount: 0, followingCount: 0, isFollowing: false }
+    return { success: false, followersCount: 0, followingCount: 0, isFollowing: false, isFollowedBy: false }
   }
 }
 
 export async function getFollowListAction(
   targetHandle: string,
-  type: 'followers' | 'following'
+  type: 'followers' | 'following',
+  viewerHandle?: string
 ): Promise<{ success: boolean; users: FollowUserInfo[] }> {
   try {
     const target = (targetHandle || '').toLowerCase().replace(/^@/, '').trim()
+    const viewer = (viewerHandle || '').toLowerCase().replace(/^@/, '').trim()
     if (!target) return { success: true, users: [] }
 
     const { databases } = createServerAppwriteClient()
@@ -1283,15 +1594,73 @@ export async function getFollowListAction(
 
     const res = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.FOLLOWS, query)
 
-    const users: FollowUserInfo[] = res.documents.map(doc => ({
-      handle: (type === 'followers' ? doc.follower_handle : doc.following_handle) || 'student',
-      name: (doc.follower_name as string) || (type === 'followers' ? doc.follower_handle : doc.following_handle) || 'Kasubay',
-      avatar: (doc.follower_avatar as string) || '',
-    }))
+    // Viewer's following set for inline indicators
+    let viewerFollowingSet = new Set<string>()
+    let viewerFollowersSet = new Set<string>()
+    if (viewer) {
+      try {
+        const [vFollowingRes, vFollowersRes] = await Promise.all([
+          databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.FOLLOWS, [
+            Query.equal('follower_handle', viewer),
+            Query.limit(100),
+          ]),
+          databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.FOLLOWS, [
+            Query.equal('following_handle', viewer),
+            Query.limit(100),
+          ]),
+        ])
+        viewerFollowingSet = new Set(vFollowingRes.documents.map(d => String(d.following_handle || '').toLowerCase()))
+        viewerFollowersSet = new Set(vFollowersRes.documents.map(d => String(d.follower_handle || '').toLowerCase()))
+      } catch {}
+    }
+
+    const users: FollowUserInfo[] = res.documents.map(doc => {
+      const handle = String((type === 'followers' ? doc.follower_handle : doc.following_handle) || 'student').toLowerCase()
+      const rawName = (type === 'followers' ? doc.follower_name : doc.following_name) as string | undefined
+      const name = rawName || handle
+      const avatar = String((type === 'followers' ? doc.follower_avatar : doc.following_avatar) || '')
+
+      return {
+        handle,
+        name,
+        avatar,
+        isFollowing: viewerFollowingSet.has(handle),
+        isFollowedBy: viewerFollowersSet.has(handle),
+      }
+    })
 
     return { success: true, users }
   } catch {
     return { success: true, users: [] }
+  }
+}
+
+export async function getMyFollowRelationshipsAction(
+  rawViewerHandle: string
+): Promise<{ success: boolean; following: string[]; followers: string[] }> {
+  try {
+    const viewer = (rawViewerHandle || '').toLowerCase().replace(/^@/, '').trim()
+    if (!viewer) return { success: true, following: [], followers: [] }
+
+    const { databases } = createServerAppwriteClient()
+
+    const [followingRes, followersRes] = await Promise.all([
+      databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.FOLLOWS, [
+        Query.equal('follower_handle', viewer),
+        Query.limit(200),
+      ]),
+      databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.FOLLOWS, [
+        Query.equal('following_handle', viewer),
+        Query.limit(200),
+      ]),
+    ])
+
+    const following = followingRes.documents.map(d => String(d.following_handle || '').toLowerCase()).filter(Boolean)
+    const followers = followersRes.documents.map(d => String(d.follower_handle || '').toLowerCase()).filter(Boolean)
+
+    return { success: true, following, followers }
+  } catch {
+    return { success: true, following: [], followers: [] }
   }
 }
 
@@ -1322,7 +1691,7 @@ export async function getMutualFollowsAction(
       if (h) {
         followingMap.set(h, {
           handle: h,
-          name: (doc.following_handle as string) || h,
+          name: (doc.following_name as string) || (doc.following_handle as string) || h,
         })
       }
     }
@@ -1367,6 +1736,12 @@ export interface StudentProfileData {
   isOfficer: boolean
   isVerified: boolean
   officerTitle: string
+  bio?: string
+  github?: string
+  linkedin?: string
+  portfolio?: string
+  instagram?: string
+  hobbies?: string[]
 }
 
 export async function getStudentProfileByHandleAction(
@@ -1377,7 +1752,7 @@ export async function getStudentProfileByHandleAction(
     if (!cleanHandle) return { success: false }
 
     // 1. Search in Supabase Auth users for this handle
-    const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 100 })
+    const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
     const matchedUser = usersData?.users.find(u => {
       const uHandle = (u.user_metadata?.community_username || '').toLowerCase().replace(/^@/, '').trim()
       return uHandle === cleanHandle
@@ -1385,12 +1760,59 @@ export async function getStudentProfileByHandleAction(
 
     if (matchedUser) {
       const meta = matchedUser.user_metadata || {}
-      const email = matchedUser.email || ''
-      const name = meta.full_name || email.split('@')[0] || cleanHandle
+      const email = (matchedUser.email || '').toLowerCase().trim()
+      let name = meta.full_name || email.split('@')[0] || cleanHandle
       const avatar = meta.community_avatar || meta.avatar_url || ''
-      const yearSection = meta.year_section || 'BSIT'
+      let yearSection = meta.year_section || 'BSIT'
+      const bio = (meta.bio as string) || ''
+      const github = (meta.social_github || meta.github as string) || ''
+      const linkedin = (meta.social_linkedin || meta.linkedin as string) || ''
+      const portfolio = (meta.social_portfolio || meta.portfolio as string) || ''
+      const instagram = (meta.social_instagram || meta.instagram as string) || ''
+      const hobbies = (meta.hobbies as string[]) || []
 
+      // Check officers table first for authoritative executive name
       const officerCheck = await resolveOfficerStatus(email, name)
+      if (officerCheck.name) {
+        name = formatStudentFullName(officerCheck.name)
+      }
+
+      // Check students table for authoritative student record
+      if (email) {
+        const idMatch = email.match(/^(\d{4})s(\d{5})@antiquespride\.edu\.ph$/i)
+        const possibleNos = idMatch
+          ? [`${idMatch[1]}-S${idMatch[2]}`, `${idMatch[1]}s${idMatch[2]}`, email.split('@')[0]]
+          : [email.split('@')[0]]
+
+        const { data: candidates } = await supabaseAdmin
+          .from('students')
+          .select('student_no, full_name, year_section')
+          .in('student_no', possibleNos)
+          .eq('is_active', true)
+
+        let matchingStudent = candidates?.find(c => matchStudentNameSimilarity(name, c.full_name))
+
+        // If no candidate matched by student_no and name similarity, try searching all students by name
+        if (!matchingStudent && name && name.trim().split(/\s+/).length >= 2) {
+          const { data: nameCandidates } = await supabaseAdmin
+            .from('students')
+            .select('student_no, full_name, year_section')
+            .eq('is_active', true)
+            .limit(1000)
+
+          matchingStudent = nameCandidates?.find(c => matchStudentNameSimilarity(name, c.full_name))
+        }
+
+        if (matchingStudent) {
+          if (matchingStudent.full_name) {
+            name = formatStudentFullName(matchingStudent.full_name)
+          }
+          if (matchingStudent.year_section) {
+            yearSection = matchingStudent.year_section
+          }
+        }
+      }
+
       const isOfficer = Boolean(officerCheck.isOfficer || meta.role === 'officer' || meta.role === 'admin')
       const isVerified = Boolean(isOfficer || meta.is_verified || meta.community_tos_accepted)
 
@@ -1404,11 +1826,43 @@ export async function getStudentProfileByHandleAction(
           isOfficer,
           isVerified,
           officerTitle: officerCheck.title || (isOfficer ? 'PSITS Officer' : ''),
+          bio,
+          github,
+          linkedin,
+          portfolio,
+          instagram,
+          hobbies,
         },
       }
     }
 
-    // 2. Fallback to Appwrite posts collection history
+    // 2. Direct fallback to students database table
+    const { data: directStudent } = await supabaseAdmin
+      .from('students')
+      .select('student_no, full_name, year_section')
+      .ilike('student_no', `%${cleanHandle}%`)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (directStudent) {
+      const formattedName = formatStudentFullName(directStudent.full_name)
+      const officerCheck = await resolveOfficerStatus('', formattedName)
+
+      return {
+        success: true,
+        profile: {
+          displayName: formattedName,
+          handle: `@${cleanHandle}`,
+          avatar: '',
+          yearSection: directStudent.year_section || 'BSIT',
+          isOfficer: officerCheck.isOfficer,
+          isVerified: true,
+          officerTitle: officerCheck.title || (officerCheck.isOfficer ? 'PSITS Officer' : ''),
+        },
+      }
+    }
+
+    // 3. Fallback to Appwrite posts collection history
     const { databases } = createServerAppwriteClient()
     const searchHandles = [`@${cleanHandle}`, cleanHandle]
     const postRes = await databases.listDocuments(
@@ -1850,4 +2304,171 @@ export async function getUserThreadQuotaAction(params: {
     return { success: false, canCreate: true, usedCount: 0, maxLimit: 1, isVerified: false }
   }
 }
+
+/* ─── 14. Notifications Hub Actions (Realtime Mobile & Desktop) ─── */
+export async function getMyNotificationsAction(params: {
+  userHandle: string
+  userEmail?: string
+  limit?: number
+}): Promise<{
+  success: boolean
+  notifications?: CommunityNotificationItem[]
+  unreadCount?: number
+  error?: string
+}> {
+  try {
+    const cleanHandle = (params.userHandle || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
+    if (!cleanHandle) return { success: true, notifications: [], unreadCount: 0 }
+
+    const { databases } = createServerAppwriteClient()
+    const limitCount = params.limit || 30
+
+    const res = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.NOTIFICATIONS,
+      [
+        Query.equal('recipient_handle', cleanHandle),
+        Query.orderDesc('$createdAt'),
+        Query.limit(limitCount),
+      ]
+    )
+
+    interface AppwriteNotificationDoc extends Models.Document {
+      recipient_email?: string
+      recipient_handle?: string
+      actor_name?: string
+      actor_handle?: string
+      actor_avatar?: string
+      type?: string
+      post_id?: string
+      comment_id?: string
+      summary?: string
+      is_read?: boolean
+    }
+
+    const notifications: CommunityNotificationItem[] = (res.documents as unknown as AppwriteNotificationDoc[]).map(d => ({
+      $id: d.$id,
+      $createdAt: d.$createdAt,
+      recipient_email: d.recipient_email || '',
+      recipient_handle: d.recipient_handle || '',
+      actor_name: d.actor_name || 'Kasubay',
+      actor_handle: d.actor_handle || 'kasubay',
+      actor_avatar: d.actor_avatar || '',
+      type: (d.type as CommunityNotificationItem['type']) || 'mention',
+      post_id: d.post_id || undefined,
+      comment_id: d.comment_id || undefined,
+      summary: d.summary || '',
+      is_read: Boolean(d.is_read),
+    }))
+
+    const unreadCount = notifications.filter(n => !n.is_read).length
+    return { success: true, notifications, unreadCount }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to get notifications'
+    console.warn('[Get Notifications Error]:', err)
+    return { success: false, notifications: [], unreadCount: 0, error: message }
+  }
+}
+
+export async function markNotificationAsReadAction(notificationId: string): Promise<{ success: boolean }> {
+  try {
+    if (!notificationId) return { success: false }
+    const { databases } = createServerAppwriteClient()
+    await databases.updateDocument(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.NOTIFICATIONS,
+      notificationId,
+      { is_read: true }
+    )
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
+}
+
+export async function markAllNotificationsAsReadAction(userHandle: string): Promise<{ success: boolean }> {
+  try {
+    const cleanHandle = (userHandle || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
+    if (!cleanHandle) return { success: false }
+    const { databases } = createServerAppwriteClient()
+
+    const unread = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.NOTIFICATIONS,
+      [
+        Query.equal('recipient_handle', cleanHandle),
+        Query.equal('is_read', false),
+        Query.limit(50),
+      ]
+    )
+
+    await Promise.all(
+      unread.documents.map(d =>
+        databases.updateDocument(
+          APPWRITE_DATABASE_ID,
+          APPWRITE_COLLECTIONS.NOTIFICATIONS,
+          d.$id,
+          { is_read: true }
+        )
+      )
+    )
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
+}
+
+export async function deleteCommunityThreadAction(params: {
+  threadId: string
+  userEmail: string
+  userHandle?: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { threadId, userEmail, userHandle } = params
+    if (!threadId || !userEmail) {
+      return { success: false, error: 'Thread ID and user email are required.' }
+    }
+
+    const { databases } = createServerAppwriteClient()
+    const thread = await databases.getDocument(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.THREADS,
+      threadId
+    )
+
+    if (!thread) {
+      return { success: false, error: 'Thread not found.' }
+    }
+
+    const cleanEmail = userEmail.toLowerCase().trim()
+    const cleanHandle = (userHandle || '').trim().toLowerCase().replace(/^@/, '')
+    const threadCreator = String(thread.creator_student_no || '').toLowerCase().trim()
+    const threadCreatorDisplay = String(thread.creator_display_name || '').toLowerCase().trim().replace(/^@/, '')
+    const isSuperAdmin = cleanEmail === SUPER_ADMIN_EMAIL
+
+    const isHost =
+      threadCreator === cleanEmail ||
+      (cleanHandle && (threadCreatorDisplay === cleanHandle || threadCreator === cleanHandle)) ||
+      isSuperAdmin
+
+    if (!isHost) {
+      return { success: false, error: 'Unauthorized: Only the thread creator can delete this thread.' }
+    }
+
+    // Mark as deleted in Appwrite
+    await databases.updateDocument(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.THREADS,
+      threadId,
+      { status: 'deleted' }
+    )
+
+    return { success: true }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to delete thread.'
+    console.error('[Delete Thread Error]:', err)
+    return { success: false, error: msg }
+  }
+}
+
 

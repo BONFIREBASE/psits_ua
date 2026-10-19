@@ -30,6 +30,8 @@ import {
   Hash,
   Copy,
   Flag,
+  Link2,
+  Smile,
 } from 'lucide-react'
 import { appwrite, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, appwriteStorage, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
@@ -48,11 +50,43 @@ import {
   type FollowUserInfo,
   type StudentProfileData,
 } from '../actions'
+import { ProfileShareModal } from '@/components/ProfileShareModal'
+import { EditProfileModal } from '@/components/EditProfileModal'
 import { supabase } from '@/lib/supabase'
 import { NumberTicker } from '@/components/motion/number-ticker'
 
 import { CommentsListSkeleton } from '@/components/PublicSkeletonPreloader'
-import CommunityOnboardingModal, { type CommunityUserProfile } from '@/components/CommunityOnboardingModal'
+import { type CommunityUserProfile } from '@/components/CommunityOnboardingModal'
+
+function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+      />
+    </svg>
+  )
+}
+
+function LinkedinIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.2V10.9H6.46M7.83 6.64c-.95 0-1.68.73-1.68 1.68s.73 1.68 1.68 1.68 1.68-.73 1.68-1.68-.73-1.68-1.68-1.68z" />
+    </svg>
+  )
+}
+
+function InstagramIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  )
+}
 
 function InstagramVerifiedBadge({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -95,6 +129,27 @@ function renderAvatarIcon(avatarStr?: string, nameStr?: string, className = 'w-6
     }
   }
   return <span className="font-bold text-gold text-base">{nameStr ? nameStr.charAt(0).toUpperCase() : 'K'}</span>
+}
+
+function deduplicateComments(items: CommunityCommentItem[]): CommunityCommentItem[] {
+  const seenIds = new Set<string>()
+  const seenSignatures = new Set<string>()
+  const result: CommunityCommentItem[] = []
+
+  for (const item of items) {
+    if (!item || !item.$id) continue
+    if (seenIds.has(item.$id)) continue
+    seenIds.add(item.$id)
+
+    const sig = `${item.parent_id || 'root'}:${(item.author_display_name || '').toLowerCase().trim()}:${(item.content || '').trim()}`
+    if (item.$id.startsWith('optimistic-') && seenSignatures.has(sig)) {
+      continue
+    }
+    seenSignatures.add(sig)
+
+    result.push(item)
+  }
+  return result
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -159,9 +214,10 @@ export default function StudentProfilePage() {
     followersCount: 0,
     followingCount: 0,
     isFollowing: false,
+    isFollowedBy: false,
   })
   const [isFollowLoading, setIsFollowLoading] = useState(false)
-  const [copiedProfile, setCopiedProfile] = useState(false)
+  const [isProfileShareModalOpen, setIsProfileShareModalOpen] = useState(false)
   const [followModal, setFollowModal] = useState<{
     open: boolean
     type: 'followers' | 'following'
@@ -180,6 +236,7 @@ export default function StudentProfilePage() {
   const [newCommentText, setNewCommentText] = useState('')
   const [replyingToComment, setReplyingToComment] = useState<{ id: string; author: string } | null>(null)
   const [commentsLoading, setCommentsLoading] = useState(false)
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
   // Load auth state
   useEffect(() => {
@@ -195,7 +252,7 @@ export default function StudentProfilePage() {
         const isVerified = Boolean(isOfficer || metadata.is_verified || metadata.community_tos_accepted)
         const yearSection = metadata.year_section || 'BSIT'
         setUser({ email, name, avatar, username, isOfficer, isVerified, yearSection })
-        setUserProfile({
+        const userProfileObj: CommunityUserProfile = {
           email,
           name,
           username,
@@ -203,12 +260,21 @@ export default function StudentProfilePage() {
           yearSection,
           bio: (metadata.bio as string) || '',
           hobbies: (metadata.hobbies as string[]) || [],
-          github: (metadata.github as string) || '',
-          linkedin: (metadata.linkedin as string) || '',
-          portfolio: (metadata.portfolio as string) || '',
+          github: (metadata.social_github || metadata.github as string) || '',
+          linkedin: (metadata.social_linkedin || metadata.linkedin as string) || '',
+          portfolio: (metadata.social_portfolio || metadata.portfolio as string) || '',
           tosAccepted: Boolean(metadata.community_tos_accepted),
           tosAcceptedAt: (metadata.community_tos_accepted_at as string) || '',
-        })
+        }
+        ;(userProfileObj as { instagram?: string }).instagram = (metadata.social_instagram || metadata.instagram as string) || ''
+        try {
+          const cachedLocal = localStorage.getItem(`psits_community_profile_${email}`)
+          if (cachedLocal) {
+            const parsedLocal = JSON.parse(cachedLocal)
+            Object.assign(userProfileObj, parsedLocal)
+          }
+        } catch {}
+        setUserProfile(userProfileObj)
 
         if (email.toLowerCase() === 'psits-ua@antiquespride.edu.ph' || email.toLowerCase().includes('admin')) {
           setIsAdmin(true)
@@ -261,19 +327,52 @@ export default function StudentProfilePage() {
     }
   }, [])
 
-  // Fetch persistent student profile metadata by handle
-  useEffect(() => {
+  // Fetch persistent student profile metadata by handle with Realtime DB sync
+  const fetchProfile = useCallback(() => {
     if (!targetUsername) return
-    let isMounted = true
     getStudentProfileByHandleAction(targetUsername).then(res => {
-      if (isMounted && res.success && res.profile) {
+      if (res.success && res.profile) {
         setFetchedProfile(res.profile)
       }
     })
-    return () => {
-      isMounted = false
-    }
   }, [targetUsername])
+
+  useEffect(() => {
+    fetchProfile()
+
+    // 1. Realtime listener: Supabase Postgres updates on students and officers tables
+    const channelName = `realtime-profile-${targetUsername}-${Date.now()}`
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'students' },
+        () => {
+          fetchProfile()
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'officers' },
+        () => {
+          fetchProfile()
+        }
+      )
+      .subscribe()
+
+    // 2. Tab focus / visibility sync: instant refresh when switching back from Supabase dashboard
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchProfile()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      supabase.removeChannel(channel)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [targetUsername, fetchProfile])
 
 
   useEffect(() => {
@@ -335,16 +434,28 @@ export default function StudentProfilePage() {
     let isVerified = fetchedProfile?.isVerified
 
     let officerTitle = fetchedProfile?.officerTitle
+    let bio = fetchedProfile?.bio || ''
+    let portfolio = fetchedProfile?.portfolio || ''
+    let github = fetchedProfile?.github || ''
+    let linkedin = fetchedProfile?.linkedin || ''
+    let instagram = fetchedProfile?.instagram || ''
 
-    // If own profile, active user session guarantees immediate local freshness
+    // If own profile, active user session guarantees immediate local freshness with DB priority
     if (isOwnProfile && user) {
-      displayName = user.name || displayName || targetUsername
-      avatar = user.avatar || avatar || ''
-      yearSection = user.yearSection || yearSection || 'BSIT'
+      displayName = fetchedProfile?.displayName || user.name || displayName || targetUsername
+      avatar = fetchedProfile?.avatar || user.avatar || avatar || ''
+      yearSection = fetchedProfile?.yearSection || user.yearSection || yearSection || 'BSIT'
       if (user.isOfficer !== undefined) isOfficer = user.isOfficer
       if (user.isVerified !== undefined) isVerified = user.isVerified
       if ((user as { officerTitle?: string }).officerTitle) {
         officerTitle = (user as { officerTitle?: string }).officerTitle
+      }
+      if (userProfile?.bio !== undefined) bio = userProfile.bio
+      if (userProfile?.portfolio !== undefined) portfolio = userProfile.portfolio
+      if (userProfile?.github !== undefined) github = userProfile.github
+      if (userProfile?.linkedin !== undefined) linkedin = userProfile.linkedin
+      if ((userProfile as { instagram?: string })?.instagram !== undefined) {
+        instagram = (userProfile as { instagram?: string }).instagram || ''
       }
     }
 
@@ -366,10 +477,15 @@ export default function StudentProfilePage() {
       isVerified: Boolean(isVerified),
       officerTitle: officerTitle || (isOfficer ? 'PSITS Officer' : ''),
       yearSection: yearSection || 'BSIT',
+      bio,
+      portfolio,
+      github,
+      linkedin,
+      instagram,
       totalPosts: authorPosts.length,
       totalLikes: authorPosts.reduce((acc, p) => acc + (p.likes_count || 0), 0),
     }
-  }, [fetchedProfile, isOwnProfile, user, authorPosts, targetUsername])
+  }, [fetchedProfile, isOwnProfile, user, userProfile, authorPosts, targetUsername])
 
   const handleToggleSavePost = (postId: string) => {
     if (!user) {
@@ -395,6 +511,7 @@ export default function StudentProfilePage() {
         followersCount: res.followersCount,
         followingCount: res.followingCount,
         isFollowing: res.isFollowing,
+        isFollowedBy: res.isFollowedBy,
       })
     }
   }, [targetUsername, myHandle])
@@ -408,6 +525,7 @@ export default function StudentProfilePage() {
             followersCount: res.followersCount,
             followingCount: res.followingCount,
             isFollowing: res.isFollowing,
+            isFollowedBy: res.isFollowedBy,
           })
         }
       })
@@ -428,6 +546,102 @@ export default function StudentProfilePage() {
       if (unsubscribe) unsubscribe()
     }
   }, [targetUsername, myHandle, loadFollowStats])
+
+  // Realtime Live Profile Posts Sync (Appwrite WebSockets: .create, .update, .delete)
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined
+    try {
+      const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_COLLECTIONS.POSTS}.documents`
+      unsubscribe = appwrite.subscribe(channel, (response: { events: string[]; payload: Record<string, unknown> }) => {
+        const events = response.events || []
+        const payload = response.payload
+        const docId = String(payload.$id || '')
+        const docStatus = String(payload.status || 'active')
+
+        // Case A: Delete / Moderation Takedown
+        if (events.some(e => e.includes('.delete')) || (events.some(e => e.includes('.update')) && docStatus === 'hidden')) {
+          setPosts(prev => prev.filter(p => p.$id !== docId))
+          return
+        }
+
+        // Case B: Post Created
+        if (events.some(e => e.includes('.create'))) {
+          if (docStatus === 'active') {
+            const isAnon = Boolean(payload.is_anonymous)
+            const isOff = Boolean(payload.is_officer) && !isAnon
+            const isVer = isOff || Boolean(payload.is_verified)
+            const offTitle = isOff ? String(payload.officer_title || 'Officer') : undefined
+            const rawAuthorName = String(payload.author_display_name || 'kasubay')
+            const formattedAuthorName = isAnon
+              ? 'Anonymous Kasubay'
+              : (rawAuthorName.startsWith('@') ? rawAuthorName : `@${rawAuthorName.toLowerCase().replace(/[^a-z0-9_.]/g, '')}`)
+
+            const newPost: CommunityPostItem = {
+              $id: docId,
+              $createdAt: String(payload.$createdAt || new Date().toISOString()),
+              content: String(payload.content || ''),
+              author_student_no: undefined,
+              author_display_name: formattedAuthorName,
+              author_avatar: isAnon ? '' : (payload.author_avatar ? String(payload.author_avatar) : ''),
+              author_year_section: isAnon ? 'BSIT Student' : (payload.author_year_section ? String(payload.author_year_section) : 'BSIT'),
+              is_anonymous: isAnon,
+              is_verified: isVer,
+              is_officer: isOff,
+              officer_title: offTitle,
+              attachments: Array.isArray(payload.attachments) ? payload.attachments.map(String) : [],
+              attachment_names: Array.isArray(payload.attachment_names) ? payload.attachment_names.map(String) : [],
+              attachment_types: Array.isArray(payload.attachment_types) ? payload.attachment_types.map(String) : [],
+              attachment_sizes: Array.isArray(payload.attachment_sizes) ? payload.attachment_sizes.map(String) : [],
+              likes_count: Number(payload.likes_count) || 0,
+              comments_count: Number(payload.comments_count) || 0,
+              tags: Array.isArray(payload.tags) ? payload.tags.map(String) : [],
+              is_locked: Boolean(payload.is_locked),
+              is_flagged: Boolean(payload.is_flagged),
+              flag_count: Number(payload.flag_count) || 0,
+              status: 'active',
+            }
+
+            setPosts(prev => {
+              if (prev.some(p => p.$id === docId)) return prev
+              const optIndex = prev.findIndex(p => p.$id.startsWith('temp-') && p.content === newPost.content)
+              if (optIndex !== -1) {
+                const next = [...prev]
+                next[optIndex] = newPost
+                return next
+              }
+              return [newPost, ...prev]
+            })
+          }
+          return
+        }
+
+        // Case C: Post Updated
+        if (events.some(e => e.includes('.update'))) {
+          setPosts(prev =>
+            prev.map(p => {
+              if (p.$id !== docId) return p
+              return {
+                ...p,
+                content: typeof payload.content === 'string' ? payload.content : p.content,
+                likes_count: typeof payload.likes_count === 'number' ? payload.likes_count : p.likes_count,
+                comments_count: typeof payload.comments_count === 'number' ? payload.comments_count : p.comments_count,
+                is_locked: Boolean(payload.is_locked ?? p.is_locked),
+                is_officer: typeof payload.is_officer === 'boolean' ? payload.is_officer : p.is_officer,
+                is_verified: typeof payload.is_verified === 'boolean' ? payload.is_verified : (Boolean(payload.is_officer) || p.is_verified),
+                tags: Array.isArray(payload.tags) ? payload.tags.map(String) : p.tags,
+              }
+            })
+          )
+        }
+      })
+    } catch (err) {
+      console.warn('Realtime profile posts subscription error:', err)
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
+  }, [])
 
   const handleToggleFollow = async () => {
     if (!user) {
@@ -452,6 +666,8 @@ export default function StudentProfilePage() {
         followingHandle: targetUsername,
         followerName: user.name,
         followerAvatar: user.avatar,
+        followingName: profileInfo.displayName,
+        followingAvatar: profileInfo.avatar,
       })
       if (!res.success) {
         loadFollowStats()
@@ -466,7 +682,7 @@ export default function StudentProfilePage() {
   const openFollowList = async (type: 'followers' | 'following') => {
     setFollowModal({ open: true, type, users: [], loading: true })
     try {
-      const res = await getFollowListAction(targetUsername, type)
+      const res = await getFollowListAction(targetUsername, type, myHandle)
       if (res.success) {
         setFollowModal(prev => ({ ...prev, users: res.users, loading: false }))
       } else {
@@ -477,26 +693,47 @@ export default function StudentProfilePage() {
     }
   }
 
-  const handleShareProfile = async () => {
-    const url = typeof window !== 'undefined' ? window.location.href : ''
-    const shareData = {
-      title: `${profileInfo.displayName} (${profileInfo.handle}) · PSITS Community`,
-      text: `Check out ${profileInfo.displayName}'s student profile on PSITS Community!`,
-      url,
+  const handleToggleFollowInModal = async (
+    e: React.MouseEvent,
+    targetUserHandle: string,
+    targetUserName: string,
+    targetUserAvatar: string
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!user || !myHandle) {
+      alert('Please connect your student account to follow kasubays.')
+      return
     }
-    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare?.(shareData)) {
-      try {
-        await navigator.share(shareData)
-        return
-      } catch {}
+
+    const cleanTarget = targetUserHandle.toLowerCase().replace(/^@/, '').trim()
+    setFollowModal(prev => ({
+      ...prev,
+      users: prev.users.map(u => {
+        if (u.handle.toLowerCase() === cleanTarget) {
+          return { ...u, isFollowing: !u.isFollowing }
+        }
+        return u
+      }),
+    }))
+
+    try {
+      await toggleFollowAction({
+        followerHandle: myHandle,
+        followingHandle: cleanTarget,
+        followerName: user.name,
+        followerAvatar: user.avatar,
+        followingName: targetUserName,
+        followingAvatar: targetUserAvatar,
+      })
+      loadFollowStats()
+    } catch {
+      openFollowList(followModal.type)
     }
-    if (typeof window !== 'undefined' && navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(url)
-        setCopiedProfile(true)
-        setTimeout(() => setCopiedProfile(false), 2000)
-      } catch {}
-    }
+  }
+
+  const handleShareProfile = () => {
+    setIsProfileShareModalOpen(true)
   }
 
   const handleProfileUpdated = (updated: CommunityUserProfile) => {
@@ -520,6 +757,11 @@ export default function StudentProfilePage() {
             avatar: updated.avatar || prev.avatar,
             handle: updated.username ? `@${updated.username.replace(/^@/, '')}` : prev.handle,
             yearSection: updated.yearSection || prev.yearSection,
+            bio: updated.bio,
+            github: updated.github,
+            linkedin: updated.linkedin,
+            portfolio: updated.portfolio,
+            instagram: (updated as { instagram?: string }).instagram,
           }
         : null
     )
@@ -643,11 +885,12 @@ export default function StudentProfilePage() {
 
   const openComments = async (post: CommunityPostItem) => {
     setActiveCommentPost(post)
+    setComments([])
     setCommentsLoading(true)
     try {
       const res = await getCommentsForPostAction(post.$id)
       if (res.success && res.comments) {
-        setComments(res.comments)
+        setComments(deduplicateComments(res.comments))
       }
     } finally {
       setCommentsLoading(false)
@@ -655,8 +898,9 @@ export default function StudentProfilePage() {
   }
 
   const handleAddComment = async () => {
-    if (!user || !activeCommentPost || !newCommentText.trim()) return
+    if (isSubmittingComment || !user || !activeCommentPost || !newCommentText.trim()) return
 
+    setIsSubmittingComment(true)
     const contentToSubmit = newCommentText.trim()
     const currentPostId = activeCommentPost.$id
     const authorHandle = user.username ? `@${user.username.replace(/^@/, '')}` : user.name
@@ -680,7 +924,7 @@ export default function StudentProfilePage() {
     }
 
     // 1. Instantly append comment (0ms perceived latency)
-    setComments(prev => [...prev, optimisticComment])
+    setComments(prev => deduplicateComments([...prev, optimisticComment]))
     setPosts(prev =>
       prev.map(p =>
         p.$id === currentPostId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p
@@ -705,9 +949,14 @@ export default function StudentProfilePage() {
     })
       .then(res => {
         if (res.success && res.comment) {
-          setComments(prev =>
-            prev.map(c => (c.$id === tempCommentId ? res.comment! : c))
-          )
+          setComments(prev => {
+            if (prev.some(c => c.$id === res.comment!.$id)) {
+              return prev.filter(c => c.$id !== tempCommentId)
+            }
+            return deduplicateComments(
+              prev.map(c => (c.$id === tempCommentId ? res.comment! : c))
+            )
+          })
         } else {
           setComments(prev => prev.filter(c => c.$id !== tempCommentId))
           setPosts(prev =>
@@ -739,7 +988,9 @@ export default function StudentProfilePage() {
             ? { ...prev, comments_count: Math.max(0, (prev.comments_count || 1) - 1) }
             : prev
         )
-        alert('Network error while posting comment.')
+      })
+      .finally(() => {
+        setIsSubmittingComment(false)
       })
   }
 
@@ -789,7 +1040,7 @@ export default function StudentProfilePage() {
                   renderAvatarIcon(profileInfo.avatar, profileInfo.displayName, 'w-9 h-9 text-gold')
                 )}
               </div>
-              {profileInfo.isVerified && (
+              {(profileInfo.isOfficer || profileInfo.isVerified) && (
                 <div className="absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-white dark:ring-[#07090e] bg-white dark:bg-[#07090e] flex items-center justify-center pointer-events-none shadow-sm">
                   <InstagramVerifiedBadge className="w-5 h-5" />
                 </div>
@@ -829,11 +1080,21 @@ export default function StudentProfilePage() {
 
           {/* Details & Badges */}
           <div className="space-y-1">
-            <h1 className="font-display font-bold text-base sm:text-lg text-slate-900 dark:text-white tracking-tight">
-              {profileInfo.displayName}
-            </h1>
-            <div className="text-xs font-mono text-slate-500 dark:text-white/40">
-              {profileInfo.handle}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h1 className="font-display font-bold text-base sm:text-lg text-slate-900 dark:text-white tracking-tight">
+                {profileInfo.displayName}
+              </h1>
+              {(profileInfo.isOfficer || profileInfo.isVerified) && (
+                <InstagramVerifiedBadge className="w-4 h-4 inline-block" />
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-white/40">
+              <span>{profileInfo.handle}</span>
+              {!isOwnProfile && followStats.isFollowedBy && (
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/[0.08] text-slate-500 dark:text-slate-400 font-medium font-sans">
+                  Follows you
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1.5 pt-1 flex-wrap">
               {profileInfo.yearSection && (
@@ -841,12 +1102,75 @@ export default function StudentProfilePage() {
                   {profileInfo.yearSection}
                 </span>
               )}
-              {profileInfo.isOfficer && (
+              {isOwnProfile && profileInfo.isOfficer && (
                 <span className="px-2 py-0.5 rounded-md bg-gold/15 border border-gold/30 text-[11px] text-gold font-bold uppercase tracking-wider">
                   {profileInfo.officerTitle || 'PSITS Officer'}
                 </span>
               )}
             </div>
+
+            {/* Bio (Instagram Minimalist Style) */}
+            {profileInfo.bio && (
+              <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 whitespace-pre-line pt-1 leading-relaxed">
+                {profileInfo.bio}
+              </p>
+            )}
+
+            {/* Links & Socials (SEO & Portfolio friendly) */}
+            {(profileInfo.portfolio || profileInfo.github || profileInfo.linkedin || profileInfo.instagram) && (
+              <div className="flex items-center gap-3 pt-1.5 flex-wrap text-xs">
+                {profileInfo.portfolio && (
+                  <a
+                    href={profileInfo.portfolio.startsWith('http') ? profileInfo.portfolio : `https://${profileInfo.portfolio}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 font-semibold text-gold hover:text-amber-400 transition-colors group truncate max-w-[200px]"
+                    title="Website / Portfolio"
+                  >
+                    <Link2 className="w-3.5 h-3.5 text-gold shrink-0 rotate-[-45deg]" />
+                    <span className="truncate group-hover:underline">
+                      {profileInfo.portfolio.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+                    </span>
+                  </a>
+                )}
+                {profileInfo.github && (
+                  <a
+                    href={profileInfo.github.startsWith('http') ? profileInfo.github : `https://github.com/${profileInfo.github.replace(/^@/, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                    title="GitHub"
+                  >
+                    <GithubIcon className="w-3.5 h-3.5" />
+                    <span className="font-mono text-[11px]">{profileInfo.github.replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/^@/, '')}</span>
+                  </a>
+                )}
+                {profileInfo.linkedin && (
+                  <a
+                    href={profileInfo.linkedin.startsWith('http') ? profileInfo.linkedin : `https://linkedin.com/in/${profileInfo.linkedin.replace(/^@/, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-blue-500 transition-colors"
+                    title="LinkedIn"
+                  >
+                    <LinkedinIcon className="w-3.5 h-3.5" />
+                    <span className="font-mono text-[11px]">LinkedIn</span>
+                  </a>
+                )}
+                {profileInfo.instagram && (
+                  <a
+                    href={profileInfo.instagram.startsWith('http') ? profileInfo.instagram : `https://instagram.com/${profileInfo.instagram.replace(/^@/, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-pink-500 transition-colors"
+                    title="Instagram"
+                  >
+                    <InstagramIcon className="w-3.5 h-3.5" />
+                    <span className="font-mono text-[11px]">@{profileInfo.instagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '')}</span>
+                  </a>
+                )}
+              </div>
+            )}
 
             {/* Action Buttons Row (Minimalist Instagram Style) */}
             <div className="pt-2 flex items-center gap-2">
@@ -865,7 +1189,7 @@ export default function StudentProfilePage() {
                     className="flex-1 py-1.5 px-3 rounded-lg bg-black/[0.05] dark:bg-white/[0.08] hover:bg-black/10 dark:hover:bg-white/12 text-slate-900 dark:text-white text-xs font-semibold transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
                   >
                     <Share2 className="w-3.5 h-3.5 text-slate-500" />
-                    <span>{copiedProfile ? 'Copied Link!' : 'Share profile'}</span>
+                    <span>Share profile</span>
                   </button>
                 </>
               ) : (
@@ -885,6 +1209,8 @@ export default function StudentProfilePage() {
                         <Check className="w-3.5 h-3.5" />
                         <span>Following</span>
                       </>
+                    ) : followStats.isFollowedBy ? (
+                      <span>Follow Back</span>
                     ) : (
                       <span>Follow</span>
                     )}
@@ -1045,6 +1371,9 @@ export default function StudentProfilePage() {
                             <span className="font-semibold text-xs sm:text-[13px] text-slate-900 dark:text-slate-100 truncate">
                               {post.author_display_name.startsWith('@') ? post.author_display_name.slice(1) : post.author_display_name}
                             </span>
+                            {(post.is_officer || post.is_verified) && (
+                              <InstagramVerifiedBadge className="w-3.5 h-3.5 inline-block shrink-0" />
+                            )}
                             {post.tags?.[0] && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono text-[10px] font-medium">
                                 <Hash className="w-2.5 h-2.5" />
@@ -1052,8 +1381,20 @@ export default function StudentProfilePage() {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-slate-400 dark:text-white/40 font-mono pt-0.5">
+                          <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 dark:text-white/40 font-mono pt-0.5">
                             <span title={new Date(post.$createdAt).toLocaleString()}>{formatRelativeTime(post.$createdAt)}</span>
+                            {!isOwnProfile && !followStats.isFollowing && (
+                              <>
+                                <span className="text-slate-300 dark:text-white/20 select-none">·</span>
+                                <button
+                                  type="button"
+                                  onClick={handleToggleFollow}
+                                  className="font-sans font-semibold text-gold hover:text-amber-400 dark:text-gold dark:hover:text-amber-300 transition-colors cursor-pointer text-[11px]"
+                                >
+                                  {followStats.isFollowedBy ? 'Follow back' : 'Follow'}
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1658,6 +1999,24 @@ export default function StudentProfilePage() {
                 </div>
               )}
 
+              {/* Quick Emoji Bar for Comments */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+                <span className="text-[10px] text-slate-400 font-medium shrink-0 flex items-center gap-1">
+                  <Smile className="w-3.5 h-3.5 text-gold shrink-0" />
+                </span>
+                {['😊', '😂', '🔥', '❤️', '👍', '🚀', '💡', '👏', '🎉', '💯', '✨', '🙌', '👀', '😎', '💀', '🙏'].map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setNewCommentText(prev => prev + emoji)}
+                    className="text-sm px-1.5 py-0.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-transform cursor-pointer select-none shrink-0"
+                    title={`Insert ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-slate-900 flex items-center justify-center ring-1 ring-black/10 dark:ring-white/10">
                   {user?.avatar && !user.avatar.startsWith('preset:') ? (
@@ -1679,18 +2038,18 @@ export default function StudentProfilePage() {
                     type="text"
                     value={newCommentText}
                     onChange={e => setNewCommentText(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAddComment()}
+                    onKeyDown={e => e.key === 'Enter' && !isSubmittingComment && handleAddComment()}
                     placeholder={user ? (replyingToComment ? `Reply to @${replyingToComment.author}...` : 'Add a comment...') : 'Connect account to comment'}
-                    disabled={!user}
+                    disabled={!user || isSubmittingComment}
                     className="w-full bg-transparent text-xs sm:text-[13px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none"
                   />
                   <button
                     type="button"
-                    disabled={!user || !newCommentText.trim()}
+                    disabled={!user || !newCommentText.trim() || isSubmittingComment}
                     onClick={handleAddComment}
                     className="text-xs font-bold text-gold hover:text-gold-muted disabled:opacity-20 disabled:cursor-not-allowed transition-opacity cursor-pointer pl-2 shrink-0"
                   >
-                    Post
+                    {isSubmittingComment ? 'Posting...' : 'Post'}
                   </button>
                 </div>
               </div>
@@ -1721,30 +2080,53 @@ export default function StudentProfilePage() {
               ) : followModal.users.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">No {followModal.type} yet.</div>
               ) : (
-                followModal.users.map(u => (
-                  <Link
-                    key={u.handle}
-                    href={`/community/${u.handle}`}
-                    onClick={() => setFollowModal(prev => ({ ...prev, open: false }))}
-                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
-                  >
-                    <div className="w-9 h-9 rounded-full bg-slate-900 overflow-hidden shrink-0 flex items-center justify-center text-gold font-bold text-xs ring-1 ring-black/5 dark:ring-white/10">
-                      {u.avatar && !u.avatar.startsWith('preset:') ? (
-                        <Image src={u.avatar} alt={u.name} width={36} height={36} className="w-full h-full object-cover" />
-                      ) : (
-                        renderAvatarIcon(u.avatar, u.name, 'w-4 h-4 text-gold')
+                followModal.users.map(u => {
+                  const isSelf = myHandle && u.handle.toLowerCase() === myHandle.toLowerCase()
+                  return (
+                    <div
+                      key={u.handle}
+                      className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+                    >
+                      <Link
+                        href={`/community/${u.handle}`}
+                        onClick={() => setFollowModal(prev => ({ ...prev, open: false }))}
+                        className="flex items-center gap-3 min-w-0 flex-1"
+                      >
+                        <div className="w-9 h-9 rounded-full bg-slate-900 overflow-hidden shrink-0 flex items-center justify-center text-gold font-bold text-xs ring-1 ring-black/5 dark:ring-white/10">
+                          {u.avatar && !u.avatar.startsWith('preset:') ? (
+                            <Image src={u.avatar} alt={u.name} width={36} height={36} className="w-full h-full object-cover" />
+                          ) : (
+                            renderAvatarIcon(u.avatar, u.name, 'w-4 h-4 text-gold')
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                            {u.name}
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-400 truncate">
+                            @{u.handle}
+                          </div>
+                        </div>
+                      </Link>
+
+                      {!isSelf && (
+                        <button
+                          type="button"
+                          onClick={e => handleToggleFollowInModal(e, u.handle, u.name, u.avatar)}
+                          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0 ${
+                            u.isFollowing
+                              ? 'bg-black/[0.05] dark:bg-white/[0.08] text-slate-700 dark:text-slate-300 hover:bg-rose-500/10 hover:text-rose-500 border border-transparent'
+                              : u.isFollowedBy
+                              ? 'bg-gold hover:bg-gold-muted text-slate-950 font-bold'
+                              : 'bg-gold hover:bg-gold-muted text-slate-950 font-bold'
+                          }`}
+                        >
+                          {u.isFollowing ? 'Following' : u.isFollowedBy ? 'Follow Back' : 'Follow'}
+                        </button>
                       )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
-                        {u.name}
-                      </div>
-                      <div className="text-[11px] font-mono text-slate-400 truncate">
-                        @{u.handle}
-                      </div>
-                    </div>
-                  </Link>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
@@ -1761,14 +2143,27 @@ export default function StudentProfilePage() {
         </div>
       )}
 
-      {/* ─── Community Profile Setup & Edit Modal ─── */}
-      <CommunityOnboardingModal
+      {/* ─── Instagram-Style Profile Share Modal with QR ─── */}
+      <ProfileShareModal
+        isOpen={isProfileShareModalOpen}
+        onClose={() => setIsProfileShareModalOpen(false)}
+        profile={{
+          displayName: profileInfo.displayName,
+          handle: targetUsername,
+          avatar: profileInfo.avatar,
+          yearSection: profileInfo.yearSection,
+          isOfficer: profileInfo.isOfficer,
+          isVerified: profileInfo.isVerified,
+        }}
+      />
+
+      {/* ─── Instagram-Style Minimalist Edit Profile Modal ─── */}
+      <EditProfileModal
         isOpen={isEditProfileOpen}
         onClose={() => setIsEditProfileOpen(false)}
         user={user}
         currentProfile={userProfile}
         onProfileUpdated={handleProfileUpdated}
-        initialStep={3}
       />
     </div>
   )

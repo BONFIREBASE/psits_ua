@@ -54,6 +54,7 @@ import {
   List,
   AtSign,
   Flag,
+  Smile,
 } from 'lucide-react'
 import { appwrite, appwriteStorage, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
@@ -68,6 +69,7 @@ import {
   editCommunityCommentAction,
   deleteCommunityCommentAction,
   createCommunityThreadAction,
+  deleteCommunityThreadAction,
   getAvailableThreadsAction,
   getUserThreadQuotaAction,
   requestToJoinThreadAction,
@@ -75,10 +77,16 @@ import {
   joinPublicThreadAction,
   getSingleCommunityPostAction,
   getMutualFollowsAction,
+  toggleFollowAction,
+  getMyFollowRelationshipsAction,
+  getMyNotificationsAction,
+  markNotificationAsReadAction,
+  markAllNotificationsAsReadAction,
   type FollowUserInfo,
   type CommunityPostItem,
   type CommunityCommentItem,
   type CommunityThreadItem,
+  type CommunityNotificationItem,
 } from './actions'
 import { supabase } from '@/lib/supabase'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
@@ -86,13 +94,36 @@ import { compressImageToWebP } from '@/lib/image-compress'
 import { ID } from 'appwrite'
 import ScrollReveal from '@/components/ScrollReveal'
 import CommunityOnboardingModal, { type CommunityUserProfile } from '@/components/CommunityOnboardingModal'
+import NotificationModal from '@/components/NotificationModal'
 
 import { CommentsListSkeleton } from '@/components/PublicSkeletonPreloader'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Tabs, TabsList, TabsTrigger } from '@/components/motion/tabs'
 import { NumberTicker } from '@/components/motion/number-ticker'
 
 const LOCAL_STORAGE_KEY = 'psits_community_cached_posts_v4'
+
+function deduplicateComments(items: CommunityCommentItem[]): CommunityCommentItem[] {
+  const seenIds = new Set<string>()
+  const seenSignatures = new Set<string>()
+  const result: CommunityCommentItem[] = []
+
+  for (const item of items) {
+    if (!item || !item.$id) continue
+    if (seenIds.has(item.$id)) continue
+    seenIds.add(item.$id)
+
+    // Deduplicate identical pending/optimistic comments if server document arrived
+    const sig = `${item.parent_id || 'root'}:${(item.author_display_name || '').toLowerCase().trim()}:${(item.content || '').trim()}`
+    if (item.$id.startsWith('optimistic-') && seenSignatures.has(sig)) {
+      continue
+    }
+    seenSignatures.add(sig)
+
+    result.push(item)
+  }
+  return result
+}
 
 function formatRelativeTime(dateStr: string): string {
   try {
@@ -371,7 +402,14 @@ export default function CommunityPage() {
   const [selectedTag, setSelectedTag] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [isOffline, setIsOffline] = useState(false)
-  const [user, setUser] = useState<{ email: string; name: string; avatar?: string } | null>(null)
+  const [user, setUser] = useState<{
+    email: string
+    name: string
+    avatar?: string
+    isOfficer?: boolean
+    isVerified?: boolean
+    officerTitle?: string
+  } | null>(null)
   const [userProfile, setUserProfile] = useState<CommunityUserProfile | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [authLoading, setAuthLoading] = useState(true)
@@ -387,6 +425,7 @@ export default function CommunityPage() {
   const [selectedPostTag, setSelectedPostTag] = useState('general')
   const [attachments, setAttachments] = useState<{ id: string; name: string; size: string; type: string; previewUrl?: string }[]>([])
   const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const postTextareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -403,6 +442,8 @@ export default function CommunityPage() {
 
   // Threads & Start Discussion State
   const [customThreads, setCustomThreads] = useState<CommunityThreadItem[]>([])
+  const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null)
+  const [confirmDeleteThreadId, setConfirmDeleteThreadId] = useState<string | null>(null)
   const [isCreateThreadOpen, setIsCreateThreadOpen] = useState(false)
   const [threadTitle, setThreadTitle] = useState('')
   const [threadDescription, setThreadDescription] = useState('')
@@ -418,6 +459,19 @@ export default function CommunityPage() {
     maxLimit: number | 'unlimited'
     isVerified: boolean
   } | null>(null)
+
+  // Realtime Online Community Members Presence
+  const [onlineMembers, setOnlineMembers] = useState<{
+    key: string
+    handle: string
+    name: string
+    avatar?: string
+    isOfficer?: boolean
+    isVerified?: boolean
+    yearSection?: string
+    isGuest?: boolean
+    onlineAt: string
+  }[]>([])
 
   // Feed Controls & Engagement State
   const [sortBy, setSortBy] = useState<'latest' | 'popular' | 'discussed'>('latest')
@@ -641,6 +695,7 @@ export default function CommunityPage() {
   const [comments, setComments] = useState<CommunityCommentItem[]>([])
   const [newCommentText, setNewCommentText] = useState('')
   const [commentsLoading, setCommentsLoading] = useState(false)
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [replyingToComment, setReplyingToComment] = useState<{ id: string; author: string } | null>(null)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editingCommentText, setEditingCommentText] = useState('')
@@ -649,6 +704,348 @@ export default function CommunityPage() {
   const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState<string | null>(null)
   const commentInputRef = useRef<HTMLInputElement>(null)
   const [collapsedReplyIds, setCollapsedReplyIds] = useState<Set<string>>(new Set())
+
+  // Follow System & Feed Relationships State
+  const [myFollowingSet, setMyFollowingSet] = useState<Set<string>>(new Set())
+  const [myFollowerSet, setMyFollowerSet] = useState<Set<string>>(new Set())
+
+  const myHandleNormalized = useMemo(() => {
+    return (userProfile?.username || user?.name || '').toLowerCase().replace(/[^a-z0-9_.]/g, '')
+  }, [userProfile?.username, user?.name])
+
+  const loadFollowRelationships = useCallback(async () => {
+    if (!myHandleNormalized) return
+    const res = await getMyFollowRelationshipsAction(myHandleNormalized)
+    if (res.success) {
+      setMyFollowingSet(new Set(res.following))
+      setMyFollowerSet(new Set(res.followers))
+    }
+  }, [myHandleNormalized])
+
+  // Follow relationships data fetching & realtime subscription
+  useEffect(() => {
+    if (!myHandleNormalized) return
+    let ignore = false
+
+    const fetchFollows = async () => {
+      const res = await getMyFollowRelationshipsAction(myHandleNormalized)
+      if (!ignore && res.success) {
+        setMyFollowingSet(new Set(res.following))
+        setMyFollowerSet(new Set(res.followers))
+      }
+    }
+
+    void fetchFollows()
+
+    let unsubscribe: (() => void) | undefined
+    try {
+      const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_COLLECTIONS.FOLLOWS}.documents`
+      unsubscribe = appwrite.subscribe(channel, () => {
+        void fetchFollows()
+      })
+    } catch (err) {
+      console.warn('Realtime follows subscription error:', err)
+    }
+    return () => {
+      ignore = true
+      if (unsubscribe) unsubscribe()
+    }
+  }, [myHandleNormalized])
+
+  // ─── Realtime Active Community Members Presence (Supabase Phoenix WebSockets) ───
+  useEffect(() => {
+    let guestKey = ''
+    if (typeof window !== 'undefined') {
+      try {
+        guestKey = sessionStorage.getItem('psits_guest_sid') || ''
+        if (!guestKey) {
+          guestKey = `guest_${Math.random().toString(36).slice(2, 9)}`
+          sessionStorage.setItem('psits_guest_sid', guestKey)
+        }
+      } catch {}
+    }
+
+    const currentKey = user?.email
+      ? user.email.toLowerCase().trim()
+      : (userProfile?.username ? userProfile.username.toLowerCase().trim() : (guestKey || 'guest'))
+
+    const currentHandle = userProfile?.username
+      ? userProfile.username.replace(/^@/, '')
+      : (user?.name ? user.name.toLowerCase().replace(/[^a-z0-9_.]/g, '') : 'guest')
+
+    const currentDisplayName = userProfile?.name || user?.name || (user ? 'Kasubay' : 'Guest Visitor')
+    const currentAvatar = userProfile?.avatar || user?.avatar || ''
+    const currentIsOfficer = Boolean(isAdmin)
+    const currentIsVerified = Boolean(isAdmin || userProfile?.tosAccepted)
+    const currentYearSection = userProfile?.yearSection || 'BSIT'
+
+    const presenceChannel = supabase.channel('community-presence', {
+      config: {
+        presence: {
+          key: currentKey,
+        },
+      },
+    })
+
+    const syncPresence = () => {
+      const state = presenceChannel.presenceState()
+      const membersMap = new Map<string, {
+        key: string
+        handle: string
+        name: string
+        avatar?: string
+        isOfficer?: boolean
+        isVerified?: boolean
+        yearSection?: string
+        isGuest?: boolean
+        onlineAt: string
+      }>()
+
+      for (const [key, presences] of Object.entries(state)) {
+        if (Array.isArray(presences) && presences.length > 0) {
+          const latest = presences[presences.length - 1] as unknown as Record<string, unknown>
+          if (latest) {
+            const handle = String(latest.handle || latest.username || 'kasubay')
+            const name = String(latest.name || latest.displayName || 'Kasubay Student')
+            const avatar = String(latest.avatar || '')
+            const isOfficer = Boolean(latest.isOfficer)
+            const isVerified = Boolean(latest.isVerified)
+            const yearSection = latest.yearSection ? String(latest.yearSection) : undefined
+            const isGuest = Boolean(latest.isGuest)
+            const onlineAt = String(latest.onlineAt || new Date().toISOString())
+
+            membersMap.set(key, {
+              key,
+              handle,
+              name,
+              avatar,
+              isOfficer,
+              isVerified,
+              yearSection,
+              isGuest,
+              onlineAt,
+            })
+          }
+        }
+      }
+
+      setOnlineMembers(Array.from(membersMap.values()))
+    }
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, syncPresence)
+      .on('presence', { event: 'join' }, syncPresence)
+      .on('presence', { event: 'leave' }, syncPresence)
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          try {
+            await presenceChannel.track({
+              handle: currentHandle,
+              name: currentDisplayName,
+              avatar: currentAvatar,
+              isOfficer: currentIsOfficer,
+              isVerified: currentIsVerified,
+              yearSection: currentYearSection,
+              isGuest: !user,
+              onlineAt: new Date().toISOString(),
+            })
+          } catch (trackErr) {
+            console.warn('[Community Presence Track Error]:', trackErr)
+          }
+        }
+      })
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void presenceChannel.track({
+          handle: currentHandle,
+          name: currentDisplayName,
+          avatar: currentAvatar,
+          isOfficer: currentIsOfficer,
+          isVerified: currentIsVerified,
+          yearSection: currentYearSection,
+          isGuest: !user,
+          onlineAt: new Date().toISOString(),
+        })
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      void supabase.removeChannel(presenceChannel)
+    }
+  }, [user, userProfile, isAdmin])
+
+  const displayOnlineMembers = useMemo(() => {
+    if (onlineMembers.length > 0) return onlineMembers
+    if (user) {
+      return [{
+        key: user.email,
+        handle: userProfile?.username ? userProfile.username.replace(/^@/, '') : (user.name ? user.name.toLowerCase().replace(/[^a-z0-9_.]/g, '') : 'you'),
+        name: userProfile?.name || user.name || 'You',
+        avatar: userProfile?.avatar || user.avatar || '',
+        isOfficer: Boolean(isAdmin),
+        isVerified: Boolean(isAdmin || userProfile?.tosAccepted),
+        yearSection: userProfile?.yearSection || 'BSIT',
+        isGuest: false,
+        onlineAt: new Date().toISOString(),
+      }]
+    }
+    return []
+  }, [onlineMembers, user, userProfile, isAdmin])
+
+  const handleToggleFollowAuthor = async (
+    targetHandle: string,
+    targetName?: string,
+    targetAvatar?: string
+  ) => {
+    if (!user) {
+      setOnboardingInitialStep(1)
+      setIsOnboardingOpen(true)
+      return
+    }
+    if (!myHandleNormalized || !targetHandle) return
+
+    const cleanTarget = targetHandle.toLowerCase().replace(/[^a-z0-9_.]/g, '')
+    if (cleanTarget === myHandleNormalized) return
+
+    const isCurrentlyFollowing = myFollowingSet.has(cleanTarget)
+    setMyFollowingSet(prev => {
+      const next = new Set(prev)
+      if (isCurrentlyFollowing) {
+        next.delete(cleanTarget)
+      } else {
+        next.add(cleanTarget)
+      }
+      return next
+    })
+
+    try {
+      const res = await toggleFollowAction({
+        followerHandle: myHandleNormalized,
+        followingHandle: cleanTarget,
+        followerName: user.name,
+        followerAvatar: userProfile?.avatar || user.avatar,
+        followingName: targetName,
+        followingAvatar: targetAvatar,
+      })
+      if (!res.success) {
+        loadFollowRelationships()
+      }
+    } catch {
+      loadFollowRelationships()
+    }
+  }
+
+  // ─── Realtime Notifications Hub State & Sync (Mobile & Desktop) ───
+  const [notifications, setNotifications] = useState<CommunityNotificationItem[]>([])
+  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0)
+  const [isNotifModalOpen, setIsNotifModalOpen] = useState<boolean>(false)
+  const [liveToastNotif, setLiveToastNotif] = useState<CommunityNotificationItem | null>(null)
+
+  // Realtime subscription for NOTIFICATIONS collection (Appwrite WebSocket)
+  useEffect(() => {
+    if (!myHandleNormalized) return
+    let ignore = false
+
+    const fetchNotifs = async () => {
+      const res = await getMyNotificationsAction({
+        userHandle: myHandleNormalized,
+        userEmail: user?.email,
+        limit: 30,
+      })
+      if (!ignore && res.success && res.notifications) {
+        setNotifications(res.notifications)
+        setUnreadNotifCount(res.unreadCount || 0)
+      }
+    }
+
+    void fetchNotifs()
+
+    let unsubscribe: (() => void) | undefined
+    try {
+      const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_COLLECTIONS.NOTIFICATIONS}.documents`
+      unsubscribe = appwrite.subscribe(channel, (response: { events: string[]; payload: Record<string, unknown> }) => {
+        const events = response.events || []
+        const payload = response.payload
+        const recipientHandle = String(payload.recipient_handle || '').toLowerCase().replace(/^@/, '').trim()
+        const recipientEmail = String(payload.recipient_email || '').toLowerCase().trim()
+        const myEmail = (user?.email || '').toLowerCase().trim()
+
+        if (recipientHandle !== myHandleNormalized && recipientEmail !== myEmail) return
+
+        if (events.some(e => e.includes('.create'))) {
+          const item: CommunityNotificationItem = {
+            $id: String(payload.$id || ''),
+            $createdAt: String(payload.$createdAt || new Date().toISOString()),
+            recipient_email: recipientEmail,
+            recipient_handle: recipientHandle,
+            actor_name: String(payload.actor_name || 'Kasubay'),
+            actor_handle: String(payload.actor_handle || 'kasubay'),
+            actor_avatar: payload.actor_avatar ? String(payload.actor_avatar) : '',
+            type: (payload.type as CommunityNotificationItem['type']) || 'reaction',
+            post_id: payload.post_id ? String(payload.post_id) : undefined,
+            comment_id: payload.comment_id ? String(payload.comment_id) : undefined,
+            summary: String(payload.summary || ''),
+            is_read: false,
+          }
+
+          setNotifications(prev => [item, ...prev.filter(n => n.$id !== item.$id)])
+          setUnreadNotifCount(prev => prev + 1)
+
+          // Show floating in-app notification toast (Facebook/IG style)
+          setLiveToastNotif(item)
+          try {
+            navigator.vibrate?.([40, 50, 40])
+          } catch {}
+
+          setTimeout(() => {
+            setLiveToastNotif(current => (current?.$id === item.$id ? null : current))
+          }, 4500)
+        }
+
+        if (events.some(e => e.includes('.update'))) {
+          void fetchNotifs()
+        }
+      })
+    } catch (err) {
+      console.warn('Realtime notifications subscription error:', err)
+    }
+
+    return () => {
+      ignore = true
+      if (unsubscribe) unsubscribe()
+    }
+  }, [myHandleNormalized, user?.email])
+
+  const handleMarkNotifAsRead = async (notifId: string) => {
+    setNotifications(prev =>
+      prev.map(n => (n.$id === notifId ? { ...n, is_read: true } : n))
+    )
+    setUnreadNotifCount(prev => Math.max(0, prev - 1))
+    await markNotificationAsReadAction(notifId)
+  }
+
+  const handleMarkAllNotifsAsRead = async () => {
+    if (!myHandleNormalized) return
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+    setUnreadNotifCount(0)
+    await markAllNotificationsAsReadAction(myHandleNormalized)
+  }
+
+  const handleOpenNotificationPost = (postId: string) => {
+    const existing = posts.find(p => p.$id === postId)
+    if (existing) {
+      openComments(existing)
+    } else {
+      getSingleCommunityPostAction(postId).then(res => {
+        if (res.success && res.post) {
+          openComments(res.post)
+        }
+      })
+    }
+  }
 
   // Mutual Followers & Comment Mentions State
   const [myMutuals, setMyMutuals] = useState<FollowUserInfo[]>([])
@@ -948,6 +1345,66 @@ export default function CommunityPage() {
     }
   }
 
+  const handleDeleteThread = async (thread: CommunityThreadItem) => {
+    if (!user || deletingThreadId) return
+    setDeletingThreadId(thread.$id)
+    try {
+      const res = await deleteCommunityThreadAction({
+        threadId: thread.$id,
+        userEmail: user.email,
+        userHandle: userProfile?.username,
+      })
+      if (res.success) {
+        setCustomThreads(prev => prev.filter(t => t.$id !== thread.$id))
+        setConfirmDeleteThreadId(null)
+        if (selectedTag === thread.title || selectedTag === thread.slug) {
+          setSelectedTag('All')
+          reloadFeed('All')
+        }
+      } else {
+        alert(res.error || 'Failed to delete thread.')
+      }
+    } catch {
+      alert('Error deleting thread.')
+    } finally {
+      setDeletingThreadId(null)
+    }
+  }
+
+  const handleInsertPostEmoji = (emoji: string) => {
+    const textarea = postTextareaRef.current
+    if (!textarea) {
+      setPostContent(prev => prev + emoji)
+      return
+    }
+    const start = textarea.selectionStart || 0
+    const end = textarea.selectionEnd || 0
+    const updated = postContent.slice(0, start) + emoji + postContent.slice(end)
+    setPostContent(updated)
+    setTimeout(() => {
+      textarea.focus()
+      const newPos = start + emoji.length
+      textarea.setSelectionRange(newPos, newPos)
+    }, 0)
+  }
+
+  const handleInsertCommentEmoji = (emoji: string) => {
+    const input = commentInputRef.current
+    if (!input) {
+      setNewCommentText(prev => prev + emoji)
+      return
+    }
+    const start = input.selectionStart || 0
+    const end = input.selectionEnd || 0
+    const updated = newCommentText.slice(0, start) + emoji + newCommentText.slice(end)
+    setNewCommentText(updated)
+    setTimeout(() => {
+      input.focus()
+      const newPos = start + emoji.length
+      input.setSelectionRange(newPos, newPos)
+    }, 0)
+  }
+
   const hostedThreadRequests = useMemo(() => {
     if (!user) return []
     const requests: { thread: CommunityThreadItem; requesterStr: string; displayHandle: string }[] = []
@@ -1031,15 +1488,32 @@ export default function CommunityPage() {
     const handleFilterMyPosts = () => {
       setFilterOnlyMyPosts(prev => !prev)
     }
+    const handleOpenPostEvent = (e: Event) => {
+      const custom = e as CustomEvent<{ postId: string }>
+      const targetId = custom.detail?.postId
+      if (!targetId) return
+      const existing = posts.find(p => p.$id === targetId)
+      if (existing) {
+        openComments(existing)
+      } else {
+        getSingleCommunityPostAction(targetId).then(res => {
+          if (res.success && res.post) {
+            openComments(res.post)
+          }
+        })
+      }
+    }
     window.addEventListener('psits:open-profile', handleOpenProfile)
     window.addEventListener('psits:open-onboarding', handleOpenOnboarding)
     window.addEventListener('psits:filter-my-posts', handleFilterMyPosts)
+    window.addEventListener('psits:open-post', handleOpenPostEvent)
     return () => {
       window.removeEventListener('psits:open-profile', handleOpenProfile)
       window.removeEventListener('psits:open-onboarding', handleOpenOnboarding)
       window.removeEventListener('psits:filter-my-posts', handleFilterMyPosts)
+      window.removeEventListener('psits:open-post', handleOpenPostEvent)
     }
-  }, [])
+  }, [posts])
 
   /* ─── 3. Auth State Sync & Institutional Onboarding Check ─── */
   useEffect(() => {
@@ -1049,7 +1523,10 @@ export default function CommunityPage() {
       const name = (typeof metadata.full_name === 'string' && metadata.full_name) || email.split('@')[0]
       const avatar = (typeof metadata.community_avatar === 'string' && metadata.community_avatar) || (typeof metadata.avatar_url === 'string' && metadata.avatar_url) || ''
       const username = typeof metadata.community_username === 'string' ? metadata.community_username : ''
-      setUser({ email, name, avatar })
+      const isOfficer = Boolean(metadata.role === 'officer' || metadata.role === 'admin' || email.toLowerCase() === 'psits-ua@antiquespride.edu.ph')
+      const isVerified = Boolean(isOfficer || metadata.is_verified || metadata.community_tos_accepted)
+      const officerTitle = typeof metadata.officer_title === 'string' ? metadata.officer_title : undefined
+      setUser({ email, name, avatar, isOfficer, isVerified, officerTitle })
 
       const initialProf: CommunityUserProfile = {
         email,
@@ -1248,28 +1725,90 @@ export default function CommunityPage() {
         return
       }
 
-      // Case B: Post Created -> Prepend or trigger Floating Indicator
+      // Case B: Post Created -> Prepend or Reconcile instantly without user refresh (Facebook style)
       if (events.some(e => e.includes('.create'))) {
         if (docStatus === 'active') {
-          setHasNewPosts(true)
+          const isAnon = Boolean(payload.is_anonymous)
+          const isOff = Boolean(payload.is_officer) && !isAnon
+          const isVer = isOff || Boolean(payload.is_verified)
+          const offTitle = isOff ? String(payload.officer_title || 'Officer') : undefined
+
+          const rawAuthorName = String(payload.author_display_name || 'kasubay')
+          const formattedAuthorName = isAnon
+            ? 'Anonymous Kasubay'
+            : (rawAuthorName.startsWith('@') ? rawAuthorName : `@${rawAuthorName.toLowerCase().replace(/[^a-z0-9_.]/g, '')}`)
+
+          const newPostItem: CommunityPostItem = {
+            $id: docId,
+            $createdAt: String(payload.$createdAt || new Date().toISOString()),
+            content: String(payload.content || ''),
+            author_student_no: undefined,
+            author_display_name: formattedAuthorName,
+            author_avatar: isAnon ? '' : (payload.author_avatar ? String(payload.author_avatar) : ''),
+            author_year_section: isAnon ? 'BSIT Student' : (payload.author_year_section ? String(payload.author_year_section) : 'BSIT'),
+            is_anonymous: isAnon,
+            is_verified: isVer,
+            is_officer: isOff,
+            officer_title: offTitle,
+            attachments: Array.isArray(payload.attachments) ? payload.attachments.map(String) : [],
+            attachment_names: Array.isArray(payload.attachment_names) ? payload.attachment_names.map(String) : [],
+            attachment_types: Array.isArray(payload.attachment_types) ? payload.attachment_types.map(String) : [],
+            attachment_sizes: Array.isArray(payload.attachment_sizes) ? payload.attachment_sizes.map(String) : [],
+            likes_count: Number(payload.likes_count) || 0,
+            comments_count: Number(payload.comments_count) || 0,
+            tags: Array.isArray(payload.tags) ? payload.tags.map(String) : [],
+            is_locked: Boolean(payload.is_locked),
+            is_flagged: Boolean(payload.is_flagged),
+            flag_count: Number(payload.flag_count) || 0,
+            status: 'active',
+          }
+
+          setPosts(prev => {
+            // 1. If document already present, don't duplicate
+            if (prev.some(p => p.$id === docId)) return prev
+
+            // 2. If matching an optimistic post (starts with temp-), replace it in-place
+            const optimisticIndex = prev.findIndex(p => p.$id.startsWith('temp-') && p.content === newPostItem.content)
+            let next: CommunityPostItem[]
+            if (optimisticIndex !== -1) {
+              next = [...prev]
+              next[optimisticIndex] = newPostItem
+            } else {
+              // 3. Prepend directly into the feed
+              next = [newPostItem, ...prev]
+            }
+
+            try {
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next))
+            } catch {}
+            return next
+          })
+          setHasNewPosts(false)
         }
         return
       }
 
-      // Case C: Post Updated (Reactions or Comments Count)
+      // Case C: Post Updated (Reactions, Comments, Content Edit, Officer Badge, Lock Status)
       if (events.some(e => e.includes('.update'))) {
-        setPosts(prev =>
-          prev.map(p =>
-            p.$id === docId
-              ? {
-                  ...p,
-                  likes_count: typeof payload.likes_count === 'number' ? payload.likes_count : p.likes_count,
-                  comments_count: typeof payload.comments_count === 'number' ? payload.comments_count : p.comments_count,
-                  is_locked: Boolean(payload.is_locked ?? p.is_locked),
-                }
-              : p
-          )
-        )
+        setPosts(prev => {
+          const updated = prev.map(p => {
+            if (p.$id !== docId) return p
+            return {
+              ...p,
+              content: typeof payload.content === 'string' ? payload.content : p.content,
+              likes_count: typeof payload.likes_count === 'number' ? payload.likes_count : p.likes_count,
+              comments_count: typeof payload.comments_count === 'number' ? payload.comments_count : p.comments_count,
+              is_locked: Boolean(payload.is_locked ?? p.is_locked),
+              is_officer: typeof payload.is_officer === 'boolean' ? payload.is_officer : p.is_officer,
+              is_verified: typeof payload.is_verified === 'boolean' ? payload.is_verified : (Boolean(payload.is_officer) || p.is_verified),
+              tags: Array.isArray(payload.tags) ? payload.tags.map(String) : p.tags,
+            }
+          })
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated))
+          } catch {}
+          return updated
+        })
       }
     })
 
@@ -1279,6 +1818,33 @@ export default function CommunityPage() {
       } catch {}
     }
   }, [])
+
+  /* ─── 5.2. Background Tab Focus Sync (Silently updates feed when user returns without reload) ─── */
+  useEffect(() => {
+    let lastSync = Date.now()
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastSync > 15000) {
+        lastSync = Date.now()
+        getCommunityFeedAction(selectedTag)
+          .then(res => {
+            if (res.success && res.posts) {
+              setPosts(res.posts)
+              try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(res.posts))
+              } catch {}
+            }
+          })
+          .catch(() => {})
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus)
+    window.addEventListener('focus', handleVisibilityOrFocus)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus)
+      window.removeEventListener('focus', handleVisibilityOrFocus)
+    }
+  }, [selectedTag])
 
   /* ─── 5.5. Appwrite Realtime Comment Stream (Live Instagram-style comment sync) ─── */
   const activeCommentPostId = activeCommentPost?.$id
@@ -1331,17 +1897,17 @@ export default function CommunityPage() {
         return
       }
 
-      // Case C: New Comment Created by another student
+      // Case C: New Comment Created (by current user or another student)
       if (events.some(e => e.includes('.create'))) {
         setComments(prev => {
-          // If already in list (e.g. from our own optimistic UI), avoid duplicate
+          // If already in list with same ID, avoid duplicate
           if (prev.some(c => c.$id === commentId)) return prev
 
           const incoming: CommunityCommentItem = {
             $id: commentId,
             $createdAt: String(payload.$createdAt || new Date().toISOString()),
             content: String(payload.content || ''),
-            author_student_no: undefined,
+            author_student_no: payload.author_student_no ? String(payload.author_student_no) : undefined,
             author_display_name: String(payload.author_display_name || 'Kasubay'),
             author_avatar: payload.author_avatar ? String(payload.author_avatar) : '',
             is_anonymous: Boolean(payload.is_anonymous),
@@ -1354,7 +1920,20 @@ export default function CommunityPage() {
             status: 'active',
           }
 
-          return [...prev, incoming]
+          // If there is an optimistic comment matching same content and parent, replace it!
+          const optimisticIdx = prev.findIndex(
+            c => c.$id.startsWith('optimistic-') &&
+                 c.content.trim() === incoming.content.trim() &&
+                 (c.parent_id || undefined) === (incoming.parent_id || undefined)
+          )
+
+          if (optimisticIdx !== -1) {
+            const updated = [...prev]
+            updated[optimisticIdx] = incoming
+            return deduplicateComments(updated)
+          }
+
+          return deduplicateComments([...prev, incoming])
         })
       }
     })
@@ -1585,9 +2164,9 @@ export default function CommunityPage() {
       author_avatar: authorAvatar,
       author_year_section: authorYearSection,
       is_anonymous: false,
-      is_verified: isAdmin,
-      is_officer: isAdmin,
-      officer_title: isAdmin ? 'PSITS Administrator' : undefined,
+      is_verified: Boolean(isAdmin || user?.isOfficer || user?.isVerified),
+      is_officer: Boolean(isAdmin || user?.isOfficer),
+      officer_title: isAdmin ? 'PSITS Administrator' : (user?.officerTitle || 'PSITS Officer'),
       attachments: pendingAttachments.map(a => a.id),
       attachment_names: pendingAttachments.map(a => a.name),
       attachment_types: pendingAttachments.map(a => a.type),
@@ -1696,6 +2275,8 @@ export default function CommunityPage() {
         postId: post.$id,
         userEmail: user.email,
         reactionType: 'like',
+        userName: userProfile?.name || user.name,
+        userAvatar: userProfile?.avatar || user.avatar,
       })
       if (res.success && typeof res.newLikesCount === 'number') {
         setPosts(prev =>
@@ -1729,11 +2310,12 @@ export default function CommunityPage() {
     setReplyingToComment(null)
     setEditingCommentId(null)
     setNewCommentText('')
+    setComments([]) // Instantly clear previous comments so stale comments never show
     setCommentsLoading(true)
     try {
       const res = await getCommentsForPostAction(post.$id)
       if (res.success) {
-        setComments(res.comments)
+        setComments(deduplicateComments(res.comments))
       }
     } finally {
       setCommentsLoading(false)
@@ -1845,6 +2427,8 @@ export default function CommunityPage() {
   }
 
   const handleAddComment = async () => {
+    if (isSubmittingComment) return
+
     if (!user) {
       setOnboardingInitialStep(1)
       setIsOnboardingOpen(true)
@@ -1859,6 +2443,7 @@ export default function CommunityPage() {
 
     if (!activeCommentPost || !newCommentText.trim()) return
 
+    setIsSubmittingComment(true)
     const contentToSubmit = newCommentText.trim()
     const currentPostId = activeCommentPost.$id
     const replyingParent = replyingToComment
@@ -1871,6 +2456,7 @@ export default function CommunityPage() {
       const nonMutuals = explicitMentions.filter(m => !myMutuals.some(mutual => mutual.handle.toLowerCase() === m))
       if (nonMutuals.length > 0) {
         setMentionError(`@${nonMutuals[0]} is not a mutual follower. You can only mention students who follow you back.`)
+        setIsSubmittingComment(false)
         return
       }
     }
@@ -1890,9 +2476,9 @@ export default function CommunityPage() {
       author_display_name: authorHandle,
       author_avatar: authorAvatar,
       is_anonymous: false,
-      is_verified: isAdmin,
-      is_officer: isAdmin,
-      officer_title: isAdmin ? 'PSITS Administrator' : undefined,
+      is_verified: Boolean(isAdmin || user?.isOfficer || user?.isVerified),
+      is_officer: Boolean(isAdmin || user?.isOfficer),
+      officer_title: isAdmin ? 'PSITS Administrator' : (user?.officerTitle || 'PSITS Officer'),
       parent_id: replyingParent?.id,
       reply_to_handle: replyingParent?.author,
       is_edited: false,
@@ -1900,7 +2486,7 @@ export default function CommunityPage() {
     }
 
     // 1. Instantly append comment (0ms perceived latency)
-    setComments(prev => [...prev, optimisticComment])
+    setComments(prev => deduplicateComments([...prev, optimisticComment]))
     if (replyingParent?.id) {
       setCollapsedReplyIds(prev => {
         if (prev.has(replyingParent.id)) {
@@ -1945,9 +2531,14 @@ export default function CommunityPage() {
       .then(res => {
         if (res.success && res.comment) {
           // Reconcile temporary optimistic comment with permanent server comment
-          setComments(prev =>
-            prev.map(c => (c.$id === tempCommentId ? res.comment! : c))
-          )
+          setComments(prev => {
+            if (prev.some(c => c.$id === res.comment!.$id)) {
+              return prev.filter(c => c.$id !== tempCommentId)
+            }
+            return deduplicateComments(
+              prev.map(c => (c.$id === tempCommentId ? res.comment! : c))
+            )
+          })
         } else {
           // Rollback on server error
           setComments(prev => prev.filter(c => c.$id !== tempCommentId))
@@ -1982,6 +2573,9 @@ export default function CommunityPage() {
             : prev
         )
         alert('Network error while posting comment.')
+      })
+      .finally(() => {
+        setIsSubmittingComment(false)
       })
   }
 
@@ -2160,7 +2754,6 @@ export default function CommunityPage() {
           </div>
           <div className="flex-1 min-w-0 text-xs sm:text-[13px] leading-relaxed">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-slate-400 dark:text-white/40 italic text-[11px]">[deleted]</span>
               <span className="text-[10px] text-slate-400 dark:text-white/30">{formatRelativeTime(c.$createdAt)}</span>
             </div>
             <p className="italic text-slate-400 dark:text-white/40 text-xs mt-0.5 select-none font-sans">
@@ -2426,28 +3019,59 @@ export default function CommunityPage() {
           </button>
         </div>
 
-        {/* Search Input */}
-        <div className="relative w-full md:w-64 shrink-0">
-          <Search
-            size={13}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/30"
-          />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search feed & notes..."
-            className="w-full bg-surface border border-black/[0.08] dark:border-white/10 rounded-full pl-8 pr-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none focus:border-gold transition-colors"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-            >
-              <X size={12} />
-            </button>
+        {/* Minimalist Live Presence Status + Search Input */}
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0 justify-between md:justify-end">
+          {displayOnlineMembers.length > 0 && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface border border-black/[0.06] dark:border-white/[0.08] shadow-2xs shrink-0">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-[11px] font-mono font-medium text-slate-600 dark:text-white/70">
+                <strong className="text-slate-900 dark:text-white font-semibold">{displayOnlineMembers.length}</strong> active
+              </span>
+              <div className="flex items-center -space-x-1.5 overflow-hidden pl-0.5">
+                {displayOnlineMembers.slice(0, 4).map((m) => (
+                  <Link
+                    key={m.key}
+                    href={m.isGuest ? '#' : `/community/${m.handle.replace(/^@/, '')}`}
+                    title={`${m.name} (@${m.handle.replace(/^@/, '')}) · Active now`}
+                    className="relative inline-block w-4.5 h-4.5 rounded-full ring-1 ring-white dark:ring-[#0c1017] overflow-hidden bg-slate-800 hover:scale-110 transition-transform shrink-0"
+                  >
+                    {m.avatar && !m.avatar.startsWith('preset:') ? (
+                      <Image src={m.avatar} alt={m.name} width={18} height={18} className="w-full h-full object-cover" />
+                    ) : (
+                      renderAvatarIcon(m.avatar, m.name, 'w-2 h-2 text-gold')
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </div>
           )}
+
+          {/* Search Input */}
+          <div className="relative w-full md:w-60 shrink-0">
+            <Search
+              size={13}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/30"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search feed & notes..."
+              className="w-full bg-surface border border-black/[0.08] dark:border-white/10 rounded-full pl-8 pr-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none focus:border-gold transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -2467,6 +3091,8 @@ export default function CommunityPage() {
               </button>
             </div>
           )}
+
+
 
           {/* Threads Compact Create Post Box */}
           <div className="rounded-2xl border border-black/[0.05] dark:border-white/[0.06] bg-white/80 dark:bg-[#0c1017]/80 backdrop-blur-xl p-2.5 sm:p-3.5 flex items-center gap-2.5 sm:gap-3 shadow-xs dark:shadow-none">
@@ -2619,6 +3245,72 @@ export default function CommunityPage() {
               </button>
             </div>
           </div>
+
+          {/* Active Thread Banner (Public or Member-Joined) */}
+          {currentActiveThread && !isCurrentThreadPrivateLocked && (
+            <div className="rounded-2xl border border-black/[0.06] dark:border-white/[0.08] bg-surface p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {currentActiveThread.is_private ? (
+                    <Lock className="w-4 h-4 text-amber-500 shrink-0" />
+                  ) : (
+                    <Hash className="w-4 h-4 text-gold shrink-0" />
+                  )}
+                  <h2 className="font-display font-bold text-base text-slate-900 dark:text-white truncate">
+                    #{currentActiveThread.title}
+                  </h2>
+                  {isHostOfThread(currentActiveThread, user?.email, userProfile?.username) && (
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-gold/15 text-gold border border-gold/30 shrink-0">
+                      Host
+                    </span>
+                  )}
+                </div>
+                {currentActiveThread.description && (
+                  <p className="text-xs text-slate-500 dark:text-white/60 line-clamp-2">
+                    {currentActiveThread.description}
+                  </p>
+                )}
+                <div className="text-[11px] font-mono text-slate-400">
+                  👥 {getThreadMemberCount(currentActiveThread)} joined · Hosted by {currentActiveThread.creator_display_name}
+                </div>
+              </div>
+
+              {isHostOfThread(currentActiveThread, user?.email, userProfile?.username) && (
+                <div className="shrink-0 self-start sm:self-center">
+                  {confirmDeleteThreadId === currentActiveThread.$id ? (
+                    <div className="inline-flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-xl animate-in fade-in">
+                      <span className="text-red-500 text-xs font-semibold">Delete thread?</span>
+                      <button
+                        type="button"
+                        disabled={deletingThreadId === currentActiveThread.$id}
+                        onClick={() => handleDeleteThread(currentActiveThread)}
+                        className="px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {deletingThreadId === currentActiveThread.$id ? 'Deleting...' : 'Yes, Delete'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteThreadId(null)}
+                        className="px-1.5 py-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white text-xs cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteThreadId(currentActiveThread.$id)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-500/20 text-red-500 hover:bg-red-500/10 text-xs font-medium transition-colors cursor-pointer"
+                      title="Delete your discussion thread"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Thread</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ─── Community Feed ─── */}
           {isCurrentThreadPrivateLocked && currentActiveThread ? (
@@ -2858,6 +3550,9 @@ export default function CommunityPage() {
                               >
                                 {post.author_display_name.startsWith('@') ? post.author_display_name.slice(1) : post.author_display_name}
                               </Link>
+                              {(post.is_officer || post.is_verified) && (
+                                <InstagramVerifiedBadge className="w-3.5 h-3.5 inline-block shrink-0" />
+                              )}
                               {post.tags?.[0] && (
                                   <button
                                     type="button"
@@ -2872,8 +3567,20 @@ export default function CommunityPage() {
                                 </button>
                               )}
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-slate-400 dark:text-white/40 font-mono pt-0.5">
+                            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 dark:text-white/40 font-mono pt-0.5">
                               <span title={new Date(post.$createdAt).toLocaleString()}>{formatRelativeTime(post.$createdAt)}</span>
+                              {!isAuthor && postHandle && !myFollowingSet.has(postHandle) && (
+                                <>
+                                  <span className="text-slate-300 dark:text-white/20 select-none">·</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleFollowAuthor(postHandle, post.author_display_name, post.author_avatar)}
+                                    className="font-sans font-semibold text-gold hover:text-amber-400 dark:text-gold dark:hover:text-amber-300 transition-colors cursor-pointer text-[11px]"
+                                  >
+                                    {myFollowerSet.has(postHandle) ? 'Follow back' : 'Follow'}
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -3248,9 +3955,49 @@ export default function CommunityPage() {
                           {/* Member Status / Action Button */}
                           <div className="shrink-0 flex items-center">
                             {isHost ? (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
-                                Host
-                              </span>
+                              confirmDeleteThreadId === ct.$id ? (
+                                <div className="inline-flex items-center gap-1 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded-md animate-in fade-in">
+                                  <span className="text-[9px] text-red-500 font-bold">Delete?</span>
+                                  <button
+                                    type="button"
+                                    disabled={deletingThreadId === ct.$id}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleDeleteThread(ct)
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-red-500 text-white text-[9px] font-bold hover:bg-red-600 disabled:opacity-50 cursor-pointer"
+                                  >
+                                    {deletingThreadId === ct.$id ? '...' : 'Yes'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setConfirmDeleteThreadId(null)
+                                    }}
+                                    className="text-[9px] text-slate-400 hover:text-slate-600 dark:hover:text-white px-0.5 cursor-pointer"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
+                                    Host
+                                  </span>
+                                  <button
+                                    type="button"
+                                    title="Delete thread"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setConfirmDeleteThreadId(ct.$id)
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )
                             ) : isMember ? (
                               <button
                                 type="button"
@@ -3321,6 +4068,51 @@ export default function CommunityPage() {
               <span>Start Discussion</span>
             </button>
 
+          </div>
+
+          {/* ─── Realtime Active Status (Minimalist Card) ─── */}
+          <div className="rounded-2xl border border-black/[0.06] dark:border-white/[0.08] bg-surface p-3.5 flex items-center justify-between gap-2 shadow-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-xs font-semibold text-slate-900 dark:text-white">Active Now</span>
+              <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md">
+                {displayOnlineMembers.length}
+              </span>
+            </div>
+            <div className="flex items-center -space-x-1.5 overflow-hidden shrink-0">
+              {displayOnlineMembers.slice(0, 5).map((member) => {
+                const cleanH = member.handle.replace(/^@/, '')
+                return (
+                  <Link
+                    key={member.key}
+                    href={member.isGuest ? '#' : `/community/${cleanH}`}
+                    title={`${member.name} (@${cleanH}) · Active now`}
+                    className="relative w-6 h-6 rounded-full ring-2 ring-white dark:ring-[#0c1017] overflow-hidden bg-slate-900 hover:scale-110 transition-transform cursor-pointer shrink-0"
+                  >
+                    {member.avatar && !member.avatar.startsWith('preset:') ? (
+                      <Image
+                        src={member.avatar}
+                        alt={member.name}
+                        width={24}
+                        height={24}
+                        className="w-full h-full object-cover"
+                        unoptimized={Boolean(member.avatar.startsWith('data:') || member.avatar.includes('appwrite'))}
+                      />
+                    ) : (
+                      renderAvatarIcon(member.avatar, member.name, 'w-3 h-3 text-gold')
+                    )}
+                  </Link>
+                )
+              })}
+              {displayOnlineMembers.length > 5 && (
+                <span className="w-6 h-6 rounded-full bg-black/5 dark:bg-white/10 ring-2 ring-white dark:ring-[#0c1017] flex items-center justify-center text-[9px] font-mono font-bold text-slate-500 dark:text-white/60">
+                  +{displayOnlineMembers.length - 5}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Notifications Card (Strictly for Authenticated Users - Hidden for Guests) */}
@@ -3507,6 +4299,51 @@ export default function CommunityPage() {
         initialStep={onboardingInitialStep}
         initialAuthMode={onboardingAuthMode}
       />
+
+      {/* ─── Premium Realtime Notification Center Modal & In-App Toast ─── */}
+      <NotificationModal
+        isOpen={isNotifModalOpen}
+        onClose={() => setIsNotifModalOpen(false)}
+        notifications={notifications}
+        unreadCount={unreadNotifCount}
+        onMarkAsRead={handleMarkNotifAsRead}
+        onMarkAllAsRead={handleMarkAllNotifsAsRead}
+        onOpenPost={handleOpenNotificationPost}
+      />
+
+      {/* ─── Realtime In-App Notification Toast (Facebook/IG Style) ─── */}
+      <AnimatePresence>
+        {liveToastNotif && (
+          <motion.div
+            initial={{ opacity: 0, y: -24, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -24, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => {
+              if (liveToastNotif.post_id) {
+                handleOpenNotificationPost(liveToastNotif.post_id)
+              }
+              setLiveToastNotif(null)
+            }}
+            className="fixed top-18 left-1/2 -translate-x-1/2 z-[140] w-[90%] max-w-sm rounded-2xl bg-white/95 dark:bg-[#0c1017]/95 backdrop-blur-xl border border-gold/40 shadow-2xl p-3 flex items-center gap-3 cursor-pointer ring-1 ring-gold/20"
+          >
+            <div className="w-9 h-9 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center shrink-0 overflow-hidden text-gold font-bold text-xs">
+              {liveToastNotif.actor_avatar && !liveToastNotif.actor_avatar.startsWith('preset:') ? (
+                <Image src={liveToastNotif.actor_avatar} alt="Actor" width={36} height={36} className="w-full h-full object-cover" />
+              ) : (
+                <span>{liveToastNotif.actor_name.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-slate-800 dark:text-slate-200 line-clamp-1 leading-snug">
+                <span className="font-bold text-slate-900 dark:text-white">{liveToastNotif.actor_name}</span>{' '}
+                <span className="text-slate-600 dark:text-slate-300">{liveToastNotif.summary}</span>
+              </div>
+              <div className="text-[10px] text-gold font-mono font-semibold">Tap to view live discussion</div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
 
 
@@ -3776,6 +4613,38 @@ export default function CommunityPage() {
               className="hidden"
             />
 
+            {/* Expandable Emoji Picker Tray */}
+            {isEmojiPickerOpen && (
+              <div className="px-4 sm:px-5 py-2.5 border-t border-black/[0.06] dark:border-white/[0.06] bg-black/[0.02] dark:bg-white/[0.02] animate-in fade-in duration-150 shrink-0">
+                <div className="flex items-center justify-between pb-1.5 text-[11px] font-medium text-slate-500 dark:text-white/50">
+                  <span>Pick an emoji</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEmojiPickerOpen(false)}
+                    className="text-[10px] text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto scrollbar-thin">
+                  {[
+                    '😊', '😂', '🔥', '❤️', '👍', '🚀', '💡', '👏', '🎉', '💯',
+                    '✨', '🙌', '👀', '😎', '💀', '🙏', '💻', '🎓', '⚡', '🤩',
+                    '😍', '🥳', '🤔', '💪', '🤝', '☕', '📚', '🎯', '🏆', '🌟'
+                  ].map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => handleInsertPostEmoji(emoji)}
+                      className="text-base p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-transform cursor-pointer select-none"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Instagram/Threads-Style Bottom Media Bar */}
             <div className="flex items-center justify-between px-4 sm:px-5 py-2.5 border-t border-black/[0.06] dark:border-white/[0.06] bg-black/[0.01] dark:bg-white/[0.01] shrink-0">
               <div className="flex items-center gap-1 sm:gap-1.5">
@@ -3819,6 +4688,20 @@ export default function CommunityPage() {
                 >
                   <Code2 className="w-4 h-4 text-violet-400" />
                   <span className="hidden sm:inline">Code</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEmojiPickerOpen(prev => !prev)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer text-xs font-medium ${
+                    isEmojiPickerOpen
+                      ? 'bg-gold/15 text-gold'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-white/60 dark:hover:text-gold hover:bg-black/5 dark:hover:bg-white/[0.04]'
+                  }`}
+                  title="Insert Emoji"
+                >
+                  <Smile className="w-4 h-4 text-amber-500" />
+                  <span className="hidden sm:inline">Emoji</span>
                 </button>
 
                 <div className="h-4 w-px bg-black/10 dark:bg-white/10 mx-1" />
@@ -4455,6 +5338,24 @@ export default function CommunityPage() {
                 </div>
               )}
 
+              {/* Quick Emoji Bar for Comments */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+                <span className="text-[10px] text-slate-400 font-medium shrink-0 flex items-center gap-1">
+                  <Smile className="w-3.5 h-3.5 text-gold shrink-0" />
+                </span>
+                {['😊', '😂', '🔥', '❤️', '👍', '🚀', '💡', '👏', '🎉', '💯', '✨', '🙌', '👀', '😎', '💀', '🙏'].map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => handleInsertCommentEmoji(emoji)}
+                    className="text-sm px-1.5 py-0.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-transform cursor-pointer select-none shrink-0"
+                    title={`Insert ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-slate-900 flex items-center justify-center ring-1 ring-black/10 dark:ring-white/10">
                   {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
@@ -4485,31 +5386,33 @@ export default function CommunityPage() {
                     type="text"
                     value={newCommentText}
                     onChange={handleCommentInputChange}
-                    onKeyDown={e => e.key === 'Enter' && handleAddComment()}
+                    onKeyDown={e => e.key === 'Enter' && !isSubmittingComment && handleAddComment()}
                     onFocus={() => {
                       if (!user) {
                         setOnboardingInitialStep(1)
                         setIsOnboardingOpen(true)
                       }
                     }}
-                    readOnly={!user}
+                    readOnly={!user || isSubmittingComment}
                     placeholder={user ? (replyingToComment ? `Reply to @${replyingToComment.author}...` : 'Add a comment... (Type @ to mention mutuals)') : 'Sign in to join discussion & comment...'}
                     className="w-full bg-transparent text-xs sm:text-[13px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none font-sans cursor-pointer sm:cursor-text"
                   />
                   <button
                     type="button"
-                    disabled={Boolean(user) && !newCommentText.trim()}
+                    disabled={isSubmittingComment || (Boolean(user) && !newCommentText.trim())}
                     onClick={() => {
                       if (!user) {
                         setOnboardingInitialStep(1)
                         setIsOnboardingOpen(true)
                         return
                       }
-                      handleAddComment()
+                      if (!isSubmittingComment) {
+                        handleAddComment()
+                      }
                     }}
                     className="text-xs font-bold text-gold hover:text-gold-muted disabled:opacity-20 disabled:cursor-not-allowed transition-opacity cursor-pointer pl-3 shrink-0"
                   >
-                    {user ? 'Post' : 'Sign In'}
+                    {isSubmittingComment ? 'Posting...' : user ? 'Post' : 'Sign In'}
                   </button>
                 </div>
               </div>
