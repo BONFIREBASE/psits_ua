@@ -52,6 +52,7 @@ import {
   AlertCircle,
   Bold,
   List,
+  Flag,
 } from 'lucide-react'
 import { appwrite, appwriteStorage, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
@@ -2848,9 +2849,72 @@ export default function CommunityPage() {
                                 }}
                               />
                               <div className="absolute right-0 top-full mt-1.5 w-48 rounded-2xl bg-white dark:bg-[#161b22] border border-black/[0.08] dark:border-white/[0.12] shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                                {/* Delete Post with Minimalist Inline Confirmation (Author or Admin) */}
+                                {/* 1. Share Post */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveMenuPostId(null)
+                                    handleSharePost(post)
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
+                                >
+                                  <Share2 className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>Share post</span>
+                                </button>
+
+                                {/* 2. Copy Link */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveMenuPostId(null)
+                                    if (typeof window !== 'undefined') {
+                                      const url = `${window.location.origin}/community?post=${post.$id}`
+                                      navigator.clipboard.writeText(url)
+                                    }
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
+                                >
+                                  <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>Copy link</span>
+                                </button>
+
+                                {/* 3. Bookmark / Save Post */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveMenuPostId(null)
+                                    handleToggleSavePost(post.$id)
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
+                                >
+                                  <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'text-gold fill-gold' : 'text-slate-400'}`} />
+                                  <span>{isSaved ? 'Remove bookmark' : 'Bookmark post'}</span>
+                                </button>
+
+                                {/* 4. Edit Post (Author Only) */}
+                                {isAuthor && (
+                                  <>
+                                    <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuPostId(null)
+                                        setConfirmDeletePostId(null)
+                                        setEditingPost(post)
+                                        setEditPostContent(post.content)
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5 text-slate-400" />
+                                      <span>Edit post</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                {/* 5. Delete Post with Minimalist Inline Confirmation (Author or Admin) */}
                                 {(isAuthor || isAdmin) && (
                                   <>
+                                    {!isAuthor && <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />}
                                     {confirmDeletePostId === post.$id ? (
                                       <div className="flex items-center justify-between gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 mx-1.5 my-1 rounded-lg animate-in fade-in duration-150">
                                         <span className="text-red-500 text-[11px] font-medium">Confirm delete?</span>
@@ -2882,27 +2946,33 @@ export default function CommunityPage() {
                                         <span>Delete post</span>
                                       </button>
                                     )}
-
-                                    {/* Edit Post (Author Only) */}
-                                    {isAuthor && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setActiveMenuPostId(null)
-                                          setConfirmDeletePostId(null)
-                                          setEditingPost(post)
-                                          setEditPostContent(post.content)
-                                        }}
-                                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
-                                      >
-                                        <Pencil className="w-3.5 h-3.5 text-slate-400" />
-                                        <span>Edit post</span>
-                                      </button>
-                                    )}
                                   </>
                                 )}
 
-                                {/* Admin Takedown */}
+                                {/* 6. Report Post (Only for non-authors) */}
+                                {!isAuthor && (
+                                  <>
+                                    <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuPostId(null)
+                                        if (!user) {
+                                          setOnboardingInitialStep(1)
+                                          setIsOnboardingOpen(true)
+                                          return
+                                        }
+                                        alert('Thank you for reporting. PSITS moderators have been alerted.')
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer"
+                                    >
+                                      <Flag className="w-3.5 h-3.5 text-amber-500" />
+                                      <span>Report post</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                {/* 7. Admin Moderator Takedown */}
                                 {isAdmin && (
                                   <>
                                     <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />
