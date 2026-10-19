@@ -86,7 +86,7 @@ import { compressImageToWebP } from '@/lib/image-compress'
 import { ID } from 'appwrite'
 import ScrollReveal from '@/components/ScrollReveal'
 import CommunityOnboardingModal, { type CommunityUserProfile } from '@/components/CommunityOnboardingModal'
-import { SharePostModal } from '@/components/SharePostModal'
+
 import { CommentsListSkeleton } from '@/components/PublicSkeletonPreloader'
 import { motion } from 'framer-motion'
 import { Tabs, TabsList, TabsTrigger } from '@/components/motion/tabs'
@@ -428,9 +428,8 @@ export default function CommunityPage() {
   const [savedPostIds, setSavedPostIds] = useState<string[]>([])
   const [userLikedPosts, setUserLikedPosts] = useState<string[]>([])
 
-  // Share Post Modal & Deep Link State
-  const [shareModalPost, setShareModalPost] = useState<CommunityPostItem | null>(null)
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  // Share Post Clipboard Toast & Deep Link State
+  const [shareCopiedToast, setShareCopiedToast] = useState(false)
   const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null)
 
   // Context Menu, Edit Post, and Profile Preview State
@@ -535,27 +534,33 @@ export default function CommunityPage() {
     const cleanSnippet = post.content
       ? post.content.replace(/[#*`_~]/g, '').trim().slice(0, 100)
       : 'Join the discussion on PSITS Community'
-    const shareTitle = `PSITS Community: ${authorName}`
-    const shareText = `Check out this post by ${authorName} on PSITS Community: "${cleanSnippet}"`
 
-    // Mobile check: invoke native device share sheet if supported
-    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-    if (isMobile && typeof navigator.share === 'function') {
+    const shareData = {
+      title: `PSITS Community: ${authorName}`,
+      text: `"${cleanSnippet}" — ${authorName}`,
+      url,
+    }
+
+    // Always attempt native device share sheet (Windows / macOS / Android / iOS)
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
-        await navigator.share({
-          title: shareTitle,
-          text: shareText,
-          url,
-        })
-        return
+        if (!navigator.canShare || navigator.canShare(shareData)) {
+          await navigator.share(shareData)
+          return
+        }
       } catch (err: unknown) {
         if ((err as Error)?.name === 'AbortError') return
       }
     }
 
-    // Desktop or fallback: open dedicated social share modal
-    setShareModalPost(post)
-    setIsShareModalOpen(true)
+    // Fallback: copy link to clipboard with toast indicator
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(url)
+        setShareCopiedToast(true)
+        setTimeout(() => setShareCopiedToast(false), 2200)
+      } catch {}
+    }
   }
 
   const handleDeletePost = async (post: CommunityPostItem) => {
@@ -4626,15 +4631,15 @@ export default function CommunityPage() {
         </div>
       )}
 
-      {/* ─── Social Media Share Post Modal ─── */}
-      <SharePostModal
-        isOpen={isShareModalOpen}
-        onClose={() => {
-          setIsShareModalOpen(false)
-          setShareModalPost(null)
-        }}
-        post={shareModalPost}
-      />
+      {/* ─── Share Clipboard Toast ─── */}
+      {shareCopiedToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-slate-900 dark:bg-white/95 text-white dark:text-slate-900 text-xs font-semibold shadow-2xl backdrop-blur-xl border border-white/10 dark:border-black/10">
+            <Check className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
+            <span>Link copied to clipboard</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
