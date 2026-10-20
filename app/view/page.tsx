@@ -40,6 +40,12 @@ interface VoteStatus {
   vote: { id: string; submission_id: string; voted_at: string } | null;
   votingEnabled: boolean;
   votingMessage?: string;
+  config?: {
+    voting_enabled?: boolean;
+    voting_start_date?: string | null;
+    voting_end_date?: string | null;
+    allow_vote_change?: boolean;
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -419,6 +425,7 @@ function DesignCard({
   votingOpen,
   user,
   userVote,
+  allowVoteChange = false,
   onVote,
   onSignIn,
   isVoting,
@@ -430,6 +437,7 @@ function DesignCard({
   votingOpen: boolean;
   user: User | null;
   userVote: string | null;
+  allowVoteChange?: boolean;
   onVote: (submissionId: string) => void;
   onSignIn: () => void;
   isVoting: boolean;
@@ -441,6 +449,7 @@ function DesignCard({
 
   const handleVoteClick = () => {
     if (hasVotedForThis) return;
+    if (userVote && !allowVoteChange) return;
     setShowConfirm(true);
   };
 
@@ -532,9 +541,13 @@ function DesignCard({
               {isSigningIn ? "Signing In..." : "Sign In to Vote"}
             </button>
           ) : hasVotedForThis ? (
-            <div className="w-full py-2.5 px-3 rounded-xl bg-gold/15 dark:bg-gold/15 text-gold dark:text-gold text-xs text-center border border-gold/30 select-none font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5">
+            <div className="w-full py-2.5 px-3 rounded-xl bg-gold/15 dark:bg-gold/15 text-gold dark:text-gold text-xs text-center border border-gold/30 select-none font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(245,166,35,0.15)]">
               <CheckCircle2 className="w-3.5 h-3.5" />
               You Voted This
+            </div>
+          ) : userVote && !allowVoteChange ? (
+            <div className="w-full py-2.5 px-3 rounded-xl bg-canvas-theme/60 dark:bg-canvas-theme/60 text-muted-foreground-theme/40 text-xs text-center border border-border-theme/40 select-none font-mono">
+              Vote Cast (Final)
             </div>
           ) : showConfirm ? (
             // Inline confirmation
@@ -891,7 +904,9 @@ export default function ViewGalleryPage() {
             {votingEnded
               ? "Voting has ended. Thank you to all BSINFO students who participated!"
               : votingOpen
-                ? "Cast your vote for your favorite design! Voting closes Saturday, October 24, 2026 at 11:59 PM PHT."
+                ? voteStatus?.vote?.submission_id
+                  ? "Thank you! Your official vote has been recorded. Each vote is final and cannot be modified."
+                  : "Cast your vote for your favorite design! Voting closes Saturday, October 24, 2026 at 11:59 PM PHT."
                 : "Browse the approved polo shirt designs submitted by BSINFO students."}
           </p>
 
@@ -970,6 +985,7 @@ export default function ViewGalleryPage() {
                     votingOpen={votingOpen}
                     user={user}
                     userVote={voteStatus?.vote?.submission_id || null}
+                    allowVoteChange={voteStatus?.config?.allow_vote_change || false}
                     onVote={handleVote}
                     onSignIn={handleGoogleSignIn}
                     isVoting={isVoting}
