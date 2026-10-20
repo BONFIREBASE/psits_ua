@@ -420,7 +420,9 @@ function DesignCard({
   user,
   userVote,
   onVote,
+  onSignIn,
   isVoting,
+  isSigningIn,
 }: {
   entry: ApprovedEntry;
   index: number;
@@ -429,7 +431,9 @@ function DesignCard({
   user: User | null;
   userVote: string | null;
   onVote: (submissionId: string) => void;
+  onSignIn: () => void;
   isVoting: boolean;
+  isSigningIn?: boolean;
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -514,13 +518,19 @@ function DesignCard({
               Voting opens Oct 9, 12:00 PM
             </div>
           ) : !user ? (
-            <Link
-              href="/submission"
-              className="w-full py-2.5 px-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-canvas-theme/80 dark:bg-canvas-theme hover:bg-surface-theme dark:hover:bg-surface-theme text-muted-foreground-theme hover:text-foreground-theme transition-colors border border-border-theme flex items-center justify-center gap-1.5"
+            <button
+              type="button"
+              onClick={onSignIn}
+              disabled={isSigningIn}
+              className="w-full py-2.5 px-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-canvas-theme/80 dark:bg-canvas-theme hover:bg-surface-theme dark:hover:bg-surface-theme text-muted-foreground-theme hover:text-foreground-theme transition-colors border border-border-theme flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              <LogIn className="w-3.5 h-3.5" />
-              Sign In to Vote
-            </Link>
+              {isSigningIn ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <LogIn className="w-3.5 h-3.5" />
+              )}
+              {isSigningIn ? "Signing In..." : "Sign In to Vote"}
+            </button>
           ) : hasVotedForThis ? (
             <div className="w-full py-2.5 px-3 rounded-xl bg-gold/15 dark:bg-gold/15 text-gold dark:text-gold text-xs text-center border border-gold/30 select-none font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -608,6 +618,39 @@ export default function ViewGalleryPage() {
   // Auth State
   const [user, setUser] = useState<User | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  // Direct Google OAuth Sign-in returning to /view
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsSigningIn(true);
+      const redirectUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/view`
+          : "";
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          queryParams: {
+            hd: "antiquespride.edu.ph",
+          },
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) {
+        setVoteMessage({ type: "error", text: error.message });
+        setIsSigningIn(false);
+      }
+    } catch (err) {
+      setVoteMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to sign in with Google.",
+      });
+      setIsSigningIn(false);
+    }
+  };
 
   // Voting State
   const [voteStatus, setVoteStatus] = useState<VoteStatus | null>(null);
@@ -752,6 +795,17 @@ export default function ViewGalleryPage() {
             const statusData = JSON.parse(statusText);
             setVoteStatus(statusData);
           }
+        }
+
+        // Refresh approved designs to update vote count tally
+        try {
+          const entriesRes = await fetch("/api/submissions/polo/approved");
+          if (entriesRes.ok) {
+            const entriesData = await entriesRes.json();
+            if (entriesData.entries) setEntries(entriesData.entries);
+          }
+        } catch {
+          // Non-critical background update
         }
 
         // Auto-hide success message after 5 seconds
@@ -917,7 +971,9 @@ export default function ViewGalleryPage() {
                     user={user}
                     userVote={voteStatus?.vote?.submission_id || null}
                     onVote={handleVote}
+                    onSignIn={handleGoogleSignIn}
                     isVoting={isVoting}
+                    isSigningIn={isSigningIn}
                   />
                 ))}
               </div>
