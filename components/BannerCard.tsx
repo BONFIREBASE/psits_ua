@@ -30,8 +30,8 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
       onClick={onClick}
       className={`relative w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden border transition-all duration-500 group select-none ${
         isActive
-          ? 'border-black/15 dark:border-white/20 bg-[#070A11] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] dark:shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] ring-1 ring-black/5 dark:ring-white/10'
-          : 'border-black/10 dark:border-white/15 bg-[#0a0e17] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.15)] dark:shadow-[0_15px_40px_-10px_rgba(0,0,0,0.85)] hover:border-gold/40 cursor-pointer'
+          ? 'border-black/10 dark:border-white/20 bg-white dark:bg-[#070A11] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] ring-1 ring-black/5 dark:ring-white/10'
+          : 'border-black/10 dark:border-white/15 bg-slate-100 dark:bg-[#0a0e17] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.06)] dark:shadow-[0_15px_40px_-10px_rgba(0,0,0,0.85)] hover:border-gold/40 cursor-pointer'
       }`}
     >
       {/* ─── Luminous Top Rim Highlight (Defines card edge in 3D space) ─── */}
@@ -45,7 +45,7 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
 
       {/* ─── Thumbnail Image Canvas (Edge-to-Edge Full Fit) ─── */}
       {banner.image_url && !hasError ? (
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-[#070A11]">
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-slate-100 dark:bg-[#070A11]">
           {/* Skeleton & Shimmer Layer (Smoothly fades out once image finishes loading) */}
           <div
             className={`absolute inset-0 transition-opacity duration-700 ease-out z-10 ${
@@ -57,7 +57,7 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
 
             {/* Diagonal shimmer sweep */}
             <div className="absolute inset-0 overflow-hidden">
-              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.07] to-transparent animate-banner-shimmer" />
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-black/[0.04] dark:via-white/[0.07] to-transparent animate-banner-shimmer" />
             </div>
           </div>
 
@@ -79,18 +79,18 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
         </div>
       ) : hasError ? (
         /* Modern Fallback for Broken/Failed Image */
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-[#0c121e] via-[#090d16] to-[#05070c] flex items-center justify-center">
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-slate-100 via-slate-200/50 to-slate-100 dark:from-[#0c121e] dark:via-[#090d16] dark:to-[#05070c] flex items-center justify-center">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gold/[0.04] rounded-full blur-[100px]" />
           <div className="flex flex-col items-center gap-2 opacity-35">
-            <ImageOff size={32} className="text-white" />
-            <span className="text-[11px] font-mono uppercase tracking-widest text-white/70">
+            <ImageOff size={32} className="text-slate-800 dark:text-white" />
+            <span className="text-[11px] font-mono uppercase tracking-widest text-slate-700 dark:text-white/70">
               Preview Unavailable
             </span>
           </div>
         </div>
       ) : (
         /* Text-only fallback background */
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-[#0c121e] via-[#090d16] to-[#05070c]" />
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-slate-100 via-slate-200/50 to-slate-100 dark:from-[#0c121e] dark:via-[#090d16] dark:to-[#05070c]" />
       )}
 
       {/* ─── Creator Info Button ─── */}

@@ -96,7 +96,7 @@ import ScrollReveal from '@/components/ScrollReveal'
 import CommunityOnboardingModal, { type CommunityUserProfile } from '@/components/CommunityOnboardingModal'
 import NotificationModal from '@/components/NotificationModal'
 
-import { CommentsListSkeleton } from '@/components/PublicSkeletonPreloader'
+import { CommentsListSkeleton, CommunityFeedSkeleton } from '@/components/PublicSkeletonPreloader'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Tabs, TabsList, TabsTrigger } from '@/components/motion/tabs'
 import { NumberTicker } from '@/components/motion/number-ticker'
@@ -740,8 +740,17 @@ export default function CommunityPage() {
     let unsubscribe: (() => void) | undefined
     try {
       const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_COLLECTIONS.FOLLOWS}.documents`
-      unsubscribe = appwrite.subscribe(channel, () => {
-        void fetchFollows()
+      unsubscribe = appwrite.subscribe(channel, (response: { payload?: Record<string, unknown> }) => {
+        const p = response?.payload
+        if (p) {
+          const fHandle = String(p.follower_handle || '').toLowerCase().replace(/^@/, '').trim()
+          const tHandle = String(p.following_handle || '').toLowerCase().replace(/^@/, '').trim()
+          if (fHandle === myHandleNormalized || tHandle === myHandleNormalized) {
+            void fetchFollows()
+          }
+        } else {
+          void fetchFollows()
+        }
       })
     } catch (err) {
       console.warn('Realtime follows subscription error:', err)
@@ -1542,6 +1551,15 @@ export default function CommunityPage() {
         tosAccepted: Boolean(metadata.community_tos_accepted),
         tosAcceptedAt: typeof metadata.community_tos_accepted_at === 'string' ? metadata.community_tos_accepted_at : undefined,
       }
+      try {
+        const cachedLocal = localStorage.getItem(`psits_community_profile_${email}`)
+        if (cachedLocal) {
+          const parsed = JSON.parse(cachedLocal)
+          if (parsed && typeof parsed === 'object') {
+            Object.assign(initialProf, parsed)
+          }
+        }
+      } catch {}
       setUserProfile(initialProf)
 
       if (email.toLowerCase() === 'psits-ua@antiquespride.edu.ph' || email.toLowerCase().includes('admin')) {
@@ -2904,17 +2922,7 @@ export default function CommunityPage() {
 
   // ─── 4. Initial Auth Handshake Preloader (Zero UI Leakage) ───
   if (authLoading) {
-    return (
-      <div className="pt-28 sm:pt-36 pb-24 max-w-xl mx-auto px-4 text-center space-y-6">
-        <div className="w-16 h-16 mx-auto rounded-3xl bg-gold/15 border border-gold/30 flex items-center justify-center text-gold shadow-inner animate-pulse">
-          <Lock className="w-8 h-8 opacity-70" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-3.5 bg-black/[0.06] dark:bg-white/[0.08] rounded-full max-w-[180px] mx-auto animate-pulse" />
-          <div className="h-6 bg-black/[0.06] dark:bg-white/[0.08] rounded-xl max-w-xs mx-auto animate-pulse" />
-        </div>
-      </div>
-    )
+    return <CommunityFeedSkeleton />
   }
 
   return (
@@ -3550,9 +3558,6 @@ export default function CommunityPage() {
                               >
                                 {post.author_display_name.startsWith('@') ? post.author_display_name.slice(1) : post.author_display_name}
                               </Link>
-                              {(post.is_officer || post.is_verified) && (
-                                <InstagramVerifiedBadge className="w-3.5 h-3.5 inline-block shrink-0" />
-                              )}
                               {post.tags?.[0] && (
                                   <button
                                     type="button"
@@ -3569,15 +3574,24 @@ export default function CommunityPage() {
                             </div>
                             <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 dark:text-white/40 font-mono pt-0.5">
                               <span title={new Date(post.$createdAt).toLocaleString()}>{formatRelativeTime(post.$createdAt)}</span>
-                              {!isAuthor && postHandle && !myFollowingSet.has(postHandle) && (
+                              {!isAuthor && !post.is_anonymous && postHandle && (
                                 <>
                                   <span className="text-slate-300 dark:text-white/20 select-none">·</span>
                                   <button
                                     type="button"
                                     onClick={() => handleToggleFollowAuthor(postHandle, post.author_display_name, post.author_avatar)}
-                                    className="font-sans font-semibold text-gold hover:text-amber-400 dark:text-gold dark:hover:text-amber-300 transition-colors cursor-pointer text-[11px]"
+                                    className={`font-sans font-semibold transition-colors cursor-pointer text-[11px] ${
+                                      myFollowingSet.has(postHandle)
+                                        ? 'text-slate-400 hover:text-rose-500 dark:text-white/40 dark:hover:text-rose-400'
+                                        : 'text-gold hover:text-amber-400 dark:text-gold dark:hover:text-amber-300'
+                                    }`}
+                                    title={myFollowingSet.has(postHandle) ? 'Click to unfollow' : undefined}
                                   >
-                                    {myFollowerSet.has(postHandle) ? 'Follow back' : 'Follow'}
+                                    {myFollowingSet.has(postHandle)
+                                      ? 'Following'
+                                      : myFollowerSet.has(postHandle)
+                                      ? 'Follow back'
+                                      : 'Follow'}
                                   </button>
                                 </>
                               )}

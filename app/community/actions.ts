@@ -1609,15 +1609,15 @@ export async function getFollowListAction(
             Query.limit(100),
           ]),
         ])
-        viewerFollowingSet = new Set(vFollowingRes.documents.map(d => String(d.following_handle || '').toLowerCase()))
-        viewerFollowersSet = new Set(vFollowersRes.documents.map(d => String(d.follower_handle || '').toLowerCase()))
+        viewerFollowingSet = new Set(vFollowingRes.documents.map(d => String(d.following_handle || '').toLowerCase().replace(/^@/, '').trim()))
+        viewerFollowersSet = new Set(vFollowersRes.documents.map(d => String(d.follower_handle || '').toLowerCase().replace(/^@/, '').trim()))
       } catch {}
     }
 
     const users: FollowUserInfo[] = res.documents.map(doc => {
-      const handle = String((type === 'followers' ? doc.follower_handle : doc.following_handle) || 'student').toLowerCase()
+      const handle = String((type === 'followers' ? doc.follower_handle : doc.following_handle) || 'student').toLowerCase().replace(/^@/, '').trim()
       const rawName = (type === 'followers' ? doc.follower_name : doc.following_name) as string | undefined
-      const name = rawName || handle
+      const name = rawName ? rawName.replace(/^@/, '') : handle
       const avatar = String((type === 'followers' ? doc.follower_avatar : doc.following_avatar) || '')
 
       return {
@@ -1647,16 +1647,16 @@ export async function getMyFollowRelationshipsAction(
     const [followingRes, followersRes] = await Promise.all([
       databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.FOLLOWS, [
         Query.equal('follower_handle', viewer),
-        Query.limit(200),
+        Query.limit(2500),
       ]),
       databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.FOLLOWS, [
         Query.equal('following_handle', viewer),
-        Query.limit(200),
+        Query.limit(2500),
       ]),
     ])
 
-    const following = followingRes.documents.map(d => String(d.following_handle || '').toLowerCase()).filter(Boolean)
-    const followers = followersRes.documents.map(d => String(d.follower_handle || '').toLowerCase()).filter(Boolean)
+    const following = followingRes.documents.map(d => String(d.following_handle || '').toLowerCase().replace(/^@/, '').trim()).filter(Boolean)
+    const followers = followersRes.documents.map(d => String(d.follower_handle || '').toLowerCase().replace(/^@/, '').trim()).filter(Boolean)
 
     return { success: true, following, followers }
   } catch {
@@ -1687,11 +1687,12 @@ export async function getMutualFollowsAction(
     // Map of followed handles
     const followingMap = new Map<string, { handle: string; name: string }>()
     for (const doc of followingRes.documents) {
-      const h = String(doc.following_handle || '').toLowerCase().trim()
+      const h = String(doc.following_handle || '').toLowerCase().replace(/^@/, '').trim()
       if (h) {
+        const rawFollowingName = (doc.following_name as string) || (doc.following_handle as string) || h
         followingMap.set(h, {
           handle: h,
-          name: (doc.following_name as string) || (doc.following_handle as string) || h,
+          name: rawFollowingName.replace(/^@/, ''),
         })
       }
     }
@@ -1708,12 +1709,13 @@ export async function getMutualFollowsAction(
     const seen = new Set<string>()
 
     for (const doc of followersRes.documents) {
-      const followerHandle = String(doc.follower_handle || '').toLowerCase().trim()
+      const followerHandle = String(doc.follower_handle || '').toLowerCase().replace(/^@/, '').trim()
       if (followerHandle && followingMap.has(followerHandle) && !seen.has(followerHandle)) {
         seen.add(followerHandle)
+        const rawFollowerName = (doc.follower_name as string) || followerHandle
         mutuals.push({
           handle: followerHandle,
-          name: (doc.follower_name as string) || followerHandle,
+          name: rawFollowerName.replace(/^@/, ''),
           avatar: (doc.follower_avatar as string) || '',
         })
       }

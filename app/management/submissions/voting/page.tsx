@@ -102,7 +102,7 @@ const VOTE_CHART_COLORS = [
 function PieChart({ data }: { data: VotingAnalytics[] }) {
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground-theme text-xs font-mono">
+      <div className="flex items-center justify-center h-64 text-slate-500 dark:text-slate-400 text-xs font-mono">
         No voting data available
       </div>
     );
@@ -113,8 +113,8 @@ function PieChart({ data }: { data: VotingAnalytics[] }) {
 
   if (total === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground-theme text-xs font-mono gap-2">
-        <div className="w-12 h-12 rounded-full border-2 border-dashed border-border-theme flex items-center justify-center text-muted-foreground-theme">
+      <div className="flex flex-col items-center justify-center h-64 text-slate-500 dark:text-slate-400 text-xs font-mono gap-2">
+        <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 dark:text-slate-400">
           0
         </div>
         <p>No votes cast yet</p>
@@ -221,7 +221,7 @@ function ChartLegend({ data }: { data: VotingAnalytics[] }) {
 
   if (sortedData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground-theme text-xs font-mono">
+      <div className="flex items-center justify-center h-64 text-slate-500 dark:text-slate-400 text-xs font-mono">
         No designs available
       </div>
     );
@@ -234,25 +234,25 @@ function ChartLegend({ data }: { data: VotingAnalytics[] }) {
         return (
           <div
             key={item.id}
-            className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-canvas-theme/50 transition-colors border border-transparent hover:border-border-theme/40"
+            className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors border border-transparent hover:border-slate-200 dark:hover:border-white/10"
           >
             <div
               className="w-3.5 h-3.5 rounded-md shrink-0 shadow-xs"
               style={{ backgroundColor: color }}
             />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground-theme truncate">
+              <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                 {item.title || item.designer_name}
               </p>
-              <p className="text-[10px] text-muted-foreground-theme truncate">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                 {item.designer_name}
               </p>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-xs font-bold text-foreground-theme tabular-nums">
+              <p className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">
                 {item.vote_count} {item.vote_count === 1 ? "vote" : "votes"}
               </p>
-              <p className="text-[10px] text-muted-foreground-theme font-mono">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                 {(Number(item.vote_percentage) || 0).toFixed(1)}%
               </p>
             </div>
@@ -283,11 +283,31 @@ export default function VotingAnalyticsPage() {
   // Auth check
   useEffect(() => {
     async function checkAuth() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        setSessionToken(session.access_token);
+      // 1. Check management token from localStorage / sessionStorage
+      const mgmtToken =
+        typeof window !== "undefined"
+          ? localStorage.getItem("psits_mgmt_token") ||
+            sessionStorage.getItem("psits_mgmt_token")
+          : null;
+
+      if (mgmtToken) {
+        setSessionToken(mgmtToken);
+        return;
+      }
+
+      // 2. Fallback to Supabase auth session
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          setSessionToken(session.access_token);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.warn("Auth check error:", err);
+        setLoading(false);
       }
     }
     checkAuth();
@@ -295,12 +315,22 @@ export default function VotingAnalyticsPage() {
 
   // Fetch analytics data
   const fetchAnalytics = useCallback(async () => {
-    if (!sessionToken) return;
+    const token =
+      sessionToken ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("psits_mgmt_token") ||
+          sessionStorage.getItem("psits_mgmt_token")
+        : null);
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
       const res = await fetch("/api/submissions/polo/analytics", {
-        headers: { Authorization: `Bearer ${sessionToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
@@ -583,46 +613,46 @@ export default function VotingAnalyticsPage() {
         {/* Header Skeleton */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-2 flex-1">
-            <div className="h-8 w-48 bg-surface-theme animate-pulse rounded-lg" />
-            <div className="h-4 w-64 bg-surface-theme animate-pulse rounded-lg" />
+            <div className="h-8 w-48 bg-slate-200 dark:bg-white/[0.08] animate-pulse rounded-lg" />
+            <div className="h-4 w-64 bg-slate-200 dark:bg-white/[0.05] animate-pulse rounded-lg" />
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="h-10 w-24 bg-surface-theme animate-pulse rounded-lg" />
-            <div className="h-10 w-32 bg-surface-theme animate-pulse rounded-lg" />
-            <div className="h-10 w-24 bg-surface-theme animate-pulse rounded-lg" />
+            <div className="h-10 w-24 bg-slate-200 dark:bg-white/[0.05] animate-pulse rounded-lg" />
+            <div className="h-10 w-32 bg-slate-200 dark:bg-white/[0.05] animate-pulse rounded-lg" />
+            <div className="h-10 w-24 bg-slate-200 dark:bg-white/[0.05] animate-pulse rounded-lg" />
           </div>
         </div>
 
         {/* Status Banner Skeleton */}
-        <div className="h-16 bg-surface-theme animate-pulse rounded-xl" />
+        <div className="h-16 bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 animate-pulse rounded-xl" />
 
         {/* Summary Cards Skeleton */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-32 bg-surface-theme animate-pulse rounded-xl" />
+            <div key={i} className="h-32 bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 animate-pulse rounded-xl" />
           ))}
         </div>
 
         {/* Chart Skeletons */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-          <div className="h-96 bg-surface-theme animate-pulse rounded-xl" />
-          <div className="h-96 bg-surface-theme animate-pulse rounded-xl" />
+          <div className="h-96 bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 animate-pulse rounded-xl" />
+          <div className="h-96 bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 animate-pulse rounded-xl" />
         </div>
 
         {/* Top Designs Skeleton */}
         <div className="space-y-4">
-          <div className="h-6 w-32 bg-surface-theme animate-pulse rounded-lg" />
+          <div className="h-6 w-32 bg-slate-200 dark:bg-white/[0.08] animate-pulse rounded-lg" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-80 bg-surface-theme animate-pulse rounded-xl" />
+              <div key={i} className="h-80 bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 animate-pulse rounded-xl" />
             ))}
           </div>
         </div>
 
         {/* Table Skeleton */}
         <div className="space-y-4">
-          <div className="h-6 w-40 bg-surface-theme animate-pulse rounded-lg" />
-          <div className="h-64 bg-surface-theme animate-pulse rounded-xl" />
+          <div className="h-6 w-40 bg-slate-200 dark:bg-white/[0.08] animate-pulse rounded-lg" />
+          <div className="h-64 bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 animate-pulse rounded-xl" />
         </div>
       </div>
     );
@@ -631,8 +661,8 @@ export default function VotingAnalyticsPage() {
   if (!data) {
     return (
       <div className="p-8">
-        <div className="text-center text-muted-foreground-theme">
-          Failed to load analytics data
+        <div className="text-center text-slate-500 dark:text-slate-400 font-mono text-xs sm:text-sm">
+          Failed to load voting analytics data.
         </div>
       </div>
     );
@@ -650,15 +680,15 @@ export default function VotingAnalyticsPage() {
           <div className="flex items-center gap-3 mb-2">
             <Link
               href="/management/submissions"
-              className="text-muted-foreground-theme hover:text-foreground-theme transition-colors"
+              className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground-theme font-display">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-display">
               Voting Analytics
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-muted-foreground-theme">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             Monitor vote counts, view statistics, and manage voting settings
           </p>
         </div>
@@ -666,7 +696,7 @@ export default function VotingAnalyticsPage() {
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowConfigModal(true)}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-canvas-theme dark:bg-canvas-theme hover:bg-surface-theme dark:hover:bg-surface-theme text-foreground-theme border border-border-theme transition-colors text-xs sm:text-sm"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-white dark:bg-[#121929] hover:bg-slate-50 dark:hover:bg-white/[0.06] text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 transition-colors text-xs sm:text-sm cursor-pointer shadow-xs"
           >
             <Settings className="w-4 h-4" />
             <span className="hidden sm:inline">Settings</span>
@@ -674,7 +704,7 @@ export default function VotingAnalyticsPage() {
 
           <button
             onClick={handleExport}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] transition-colors text-xs sm:text-sm font-medium"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] transition-colors text-xs sm:text-sm font-medium cursor-pointer shadow-xs"
           >
             <Download className="w-4 h-4" />
             <span>PDF</span>
@@ -682,7 +712,7 @@ export default function VotingAnalyticsPage() {
 
           <button
             onClick={fetchAnalytics}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-canvas-theme dark:bg-canvas-theme hover:bg-surface-theme dark:hover:bg-surface-theme text-foreground-theme border border-border-theme transition-colors text-xs sm:text-sm"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-white dark:bg-[#121929] hover:bg-slate-50 dark:hover:bg-white/[0.06] text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 transition-colors text-xs sm:text-sm cursor-pointer shadow-xs"
           >
             <RefreshCw className="w-4 h-4" />
             <span className="hidden sm:inline">Refresh</span>
@@ -704,11 +734,11 @@ export default function VotingAnalyticsPage() {
               <XCircle className="w-5 h-5 text-orange-500 shrink-0" />
             )}
             <div>
-              <p className="text-sm font-medium text-foreground-theme">
-                Voting Status: <span className={data.config.voting_enabled ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"}>{votingStatus}</span>
+              <p className="text-sm font-medium text-slate-900 dark:text-white">
+                Voting Status: <span className={data.config.voting_enabled ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-orange-600 dark:text-orange-400 font-bold"}>{votingStatus}</span>
               </p>
               {data.config.voting_start_date && data.config.voting_end_date && (
-                <p className="text-xs text-muted-foreground-theme mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Period: {new Date(data.config.voting_start_date).toLocaleDateString()} - {new Date(data.config.voting_end_date).toLocaleDateString()}
                 </p>
               )}
@@ -717,7 +747,7 @@ export default function VotingAnalyticsPage() {
           <Link
             href="/view"
             target="_blank"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-theme dark:bg-surface-theme hover:bg-canvas-theme dark:hover:bg-canvas-theme text-foreground-theme border border-border-theme transition-colors text-xs whitespace-nowrap"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-[#121929] hover:bg-slate-50 dark:hover:bg-white/[0.06] text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 transition-colors text-xs whitespace-nowrap shadow-xs"
           >
             <Eye className="w-3.5 h-3.5" />
             View Gallery
@@ -727,62 +757,62 @@ export default function VotingAnalyticsPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-surface-theme dark:bg-surface-theme border border-border-theme rounded-xl p-5">
+        <div className="bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 rounded-xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <Users className="w-5 h-5 text-gold" />
-            <span className="text-xs text-muted-foreground-theme font-mono">TOTAL</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">TOTAL</span>
           </div>
-          <p className="text-2xl font-bold text-foreground-theme font-display">
+          <p className="text-2xl font-bold text-slate-900 dark:text-white font-display">
             {data.summary.total_votes}
           </p>
-          <p className="text-xs text-muted-foreground-theme mt-1">Votes Cast</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Votes Cast</p>
         </div>
 
-        <div className="bg-surface-theme dark:bg-surface-theme border border-border-theme rounded-xl p-5">
+        <div className="bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 rounded-xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <Palette className="w-5 h-5 text-blue-500" />
-            <span className="text-xs text-muted-foreground-theme font-mono">DESIGNS</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">DESIGNS</span>
           </div>
-          <p className="text-2xl font-bold text-foreground-theme font-display">
+          <p className="text-2xl font-bold text-slate-900 dark:text-white font-display">
             {data.summary.submissions_with_votes}/{data.summary.total_submissions}
           </p>
-          <p className="text-xs text-muted-foreground-theme mt-1">With Votes</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">With Votes</p>
         </div>
 
-        <div className="bg-surface-theme dark:bg-surface-theme border border-border-theme rounded-xl p-5">
+        <div className="bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 rounded-xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <Award className="w-5 h-5 text-emerald-500" />
-            <span className="text-xs text-muted-foreground-theme font-mono">HIGHEST</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">HIGHEST</span>
           </div>
-          <p className="text-2xl font-bold text-foreground-theme font-display">
+          <p className="text-2xl font-bold text-slate-900 dark:text-white font-display">
             {data.summary.highest_votes}
           </p>
-          <p className="text-xs text-muted-foreground-theme mt-1">Most Votes</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Most Votes</p>
         </div>
 
-        <div className="bg-surface-theme dark:bg-surface-theme border border-border-theme rounded-xl p-5">
+        <div className="bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 rounded-xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <TrendingUp className="w-5 h-5 text-purple-500" />
-            <span className="text-xs text-muted-foreground-theme font-mono">AVERAGE</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">AVERAGE</span>
           </div>
-          <p className="text-2xl font-bold text-foreground-theme font-display">
+          <p className="text-2xl font-bold text-slate-900 dark:text-white font-display">
             {(Number(data.summary.average_votes) || 0).toFixed(1)}
           </p>
-          <p className="text-xs text-muted-foreground-theme mt-1">Votes per Design</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Votes per Design</p>
         </div>
       </div>
 
       {/* Pie Chart and Legend */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-surface-theme border border-border-theme rounded-xl p-6">
-          <h2 className="text-lg font-bold text-foreground-theme font-display mb-4">
+        <div className="bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 rounded-xl p-6 shadow-xs">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white font-display mb-4">
             Vote Distribution
           </h2>
           <PieChart data={data.analytics} />
         </div>
 
-        <div className="bg-surface-theme border border-border-theme rounded-xl p-6">
-          <h2 className="text-lg font-bold text-foreground-theme font-display mb-4">
+        <div className="bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 rounded-xl p-6 shadow-xs">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white font-display mb-4">
             Designs Ranking
           </h2>
           <ChartLegend data={data.analytics} />
@@ -792,38 +822,38 @@ export default function VotingAnalyticsPage() {
       {/* Top 3 Designs */}
       {data.top_designs.length > 0 && (
         <div>
-          <h2 className="text-lg font-bold text-foreground-theme font-display mb-4">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white font-display mb-4">
             Top 3 Designs
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {data.top_designs.map((design) => (
               <div
                 key={design.id}
-                className="bg-surface-theme border border-border-theme rounded-xl overflow-hidden hover:border-gold/30 transition-all"
+                className="bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden hover:border-gold/40 transition-all shadow-xs"
               >
-                <div className="relative aspect-[3/4] bg-canvas-theme">
+                <div className="relative aspect-[3/4] bg-slate-100 dark:bg-black/20">
                   <ProgressiveImage
                     src={design.file_url}
                     alt={design.title || "Design"}
                     fill
                     className="object-cover"
                   />
-                  <div className="absolute top-2 left-2 bg-gold text-[#0D1117] px-3 py-1 rounded-full text-xs font-bold z-20">
+                  <div className="absolute top-2 left-2 bg-gold text-[#0D1117] px-3 py-1 rounded-full text-xs font-bold z-20 shadow-xs">
                     #{design.rank}
                   </div>
                 </div>
                 <div className="p-4">
-                  <h3 className="font-semibold text-foreground-theme text-sm mb-1">
+                  <h3 className="font-semibold text-slate-900 dark:text-white text-sm mb-1 truncate">
                     {design.title || "Untitled"}
                   </h3>
-                  <p className="text-xs text-muted-foreground-theme mb-3">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 truncate">
                     {design.designer_name}
                   </p>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-foreground-theme font-bold">
+                    <span className="text-slate-900 dark:text-white font-bold">
                       {design.vote_count} votes
                     </span>
-                    <span className="text-muted-foreground-theme">
+                    <span className="text-slate-500 dark:text-slate-400 font-mono">
                       {(Number(design.vote_percentage) || 0).toFixed(1)}%
                     </span>
                   </div>
@@ -835,24 +865,24 @@ export default function VotingAnalyticsPage() {
       )}
 
       {/* Voter List */}
-      <div className="bg-surface-theme border border-border-theme rounded-xl p-6">
-        <h2 className="text-lg font-bold text-foreground-theme font-display mb-4">
+      <div className="bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 rounded-xl p-6 shadow-xs">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white font-display mb-4">
           Voter Records ({data.voters.length})
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border-theme">
-                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground-theme uppercase">
+              <tr className="border-b border-slate-200 dark:border-white/10">
+                <th className="text-left py-3 px-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">
                   Voter
                 </th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground-theme uppercase">
+                <th className="text-left py-3 px-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">
                   Voted For
                 </th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground-theme uppercase">
+                <th className="text-left py-3 px-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">
                   Designer
                 </th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground-theme uppercase">
+                <th className="text-left py-3 px-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">
                   Date & Time
                 </th>
               </tr>
@@ -861,25 +891,25 @@ export default function VotingAnalyticsPage() {
               {data.voters.map((voter) => (
                 <tr
                   key={voter.id}
-                  className="border-b border-border-theme/50 hover:bg-canvas-theme/50 transition-colors"
+                  className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors"
                 >
                   <td className="py-3 px-4">
                     <div>
-                      <p className="text-foreground-theme font-medium text-xs">
+                      <p className="text-slate-900 dark:text-white font-medium text-xs">
                         {voter.student_name}
                       </p>
-                      <p className="text-muted-foreground-theme text-[11px] font-mono">
+                      <p className="text-slate-500 dark:text-slate-400 text-[11px] font-mono">
                         {voter.student_email}
                       </p>
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-foreground-theme text-xs">
+                  <td className="py-3 px-4 text-slate-900 dark:text-white text-xs">
                     {voter.polo_submissions?.title || "Untitled"}
                   </td>
-                  <td className="py-3 px-4 text-muted-foreground-theme text-xs">
+                  <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">
                     {voter.polo_submissions?.student_name}
                   </td>
-                  <td className="py-3 px-4 text-muted-foreground-theme text-xs font-mono">
+                  <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs font-mono">
                     {new Date(voter.voted_at).toLocaleString()}
                   </td>
                 </tr>
@@ -892,14 +922,14 @@ export default function VotingAnalyticsPage() {
       {/* Config Modal */}
       {showConfigModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-surface-theme border border-border-theme rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold text-foreground-theme font-display mb-4">
+          <div className="bg-white dark:bg-[#121929] border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-display mb-4">
               Voting Configuration
             </h3>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <label className="text-sm text-foreground-theme">
+                <label className="text-sm text-slate-900 dark:text-white">
                   Enable Voting
                 </label>
                 <button
@@ -909,8 +939,8 @@ export default function VotingAnalyticsPage() {
                       voting_enabled: !configForm.voting_enabled,
                     })
                   }
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    configForm.voting_enabled ? "bg-gold" : "bg-gray-300"
+                  className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${
+                    configForm.voting_enabled ? "bg-gold" : "bg-gray-300 dark:bg-white/20"
                   }`}
                 >
                   <span
@@ -922,7 +952,7 @@ export default function VotingAnalyticsPage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <label className="text-sm text-foreground-theme">
+                <label className="text-sm text-slate-900 dark:text-white">
                   Allow Vote Changes
                 </label>
                 <button
@@ -932,8 +962,8 @@ export default function VotingAnalyticsPage() {
                       allow_vote_change: !configForm.allow_vote_change,
                     })
                   }
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    configForm.allow_vote_change ? "bg-gold" : "bg-gray-300"
+                  className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${
+                    configForm.allow_vote_change ? "bg-gold" : "bg-gray-300 dark:bg-white/20"
                   }`}
                 >
                   <span
@@ -945,7 +975,7 @@ export default function VotingAnalyticsPage() {
               </div>
 
               <div>
-                <label className="text-sm text-foreground-theme block mb-2">
+                <label className="text-sm text-slate-900 dark:text-white block mb-2 font-medium">
                   Start Date
                 </label>
                 <input
@@ -965,12 +995,12 @@ export default function VotingAnalyticsPage() {
                         : null,
                     })
                   }
-                  className="w-full px-3 py-2 rounded-lg bg-canvas-theme border border-border-theme text-foreground-theme text-sm"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-sm"
                 />
               </div>
 
               <div>
-                <label className="text-sm text-foreground-theme block mb-2">
+                <label className="text-sm text-slate-900 dark:text-white block mb-2 font-medium">
                   End Date
                 </label>
                 <input
@@ -990,7 +1020,7 @@ export default function VotingAnalyticsPage() {
                         : null,
                     })
                   }
-                  className="w-full px-3 py-2 rounded-lg bg-canvas-theme border border-border-theme text-foreground-theme text-sm"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-sm"
                 />
               </div>
             </div>
@@ -999,14 +1029,14 @@ export default function VotingAnalyticsPage() {
               <button
                 onClick={() => setShowConfigModal(false)}
                 disabled={isSavingConfig}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-canvas-theme hover:bg-canvas-theme/80 text-foreground-theme text-sm font-medium transition-colors border border-border-theme disabled:opacity-50"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-900 dark:text-white text-sm font-medium transition-colors border border-slate-200 dark:border-white/10 disabled:opacity-50 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveConfig}
                 disabled={isSavingConfig}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-gold hover:bg-gold-light text-[#0D1117] text-sm font-bold transition-colors disabled:opacity-50"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gold hover:bg-gold-light text-[#0D1117] text-sm font-bold transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 {isSavingConfig ? "Saving..." : "Save Changes"}
               </button>

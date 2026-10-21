@@ -299,8 +299,31 @@ export default function StudentProfilePage() {
         const isVerified = Boolean(isOfficer || metadata.is_verified || metadata.community_tos_accepted)
         const yearSection = metadata.year_section || 'BSIT'
         setUser({ email, name, avatar, username, isOfficer, isVerified, yearSection })
+        const userProfileObj: CommunityUserProfile = {
+          email,
+          name,
+          username,
+          avatar,
+          yearSection,
+          bio: (metadata.bio as string) || '',
+          hobbies: (metadata.hobbies as string[]) || [],
+          github: (metadata.social_github || metadata.github as string) || '',
+          linkedin: (metadata.social_linkedin || metadata.linkedin as string) || '',
+          portfolio: (metadata.social_portfolio || metadata.portfolio as string) || '',
+          tosAccepted: Boolean(metadata.community_tos_accepted),
+          tosAcceptedAt: (metadata.community_tos_accepted_at as string) || '',
+        }
+        try {
+          const cachedLocal = localStorage.getItem(`psits_community_profile_${email}`)
+          if (cachedLocal) {
+            const parsedLocal = JSON.parse(cachedLocal)
+            Object.assign(userProfileObj, parsedLocal)
+          }
+        } catch {}
+        setUserProfile(userProfileObj)
       } else {
         setUser(null)
+        setUserProfile(null)
       }
     })
 
@@ -418,8 +441,8 @@ export default function StudentProfilePage() {
 
   // Profile Identity & Ownership
   const myHandle = useMemo(() => {
-    return (user?.username || user?.name || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
-  }, [user])
+    return (userProfile?.username || user?.username || user?.name || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
+  }, [userProfile?.username, user])
 
   const isOwnProfile = Boolean(myHandle && targetUsername && myHandle === targetUsername)
 
@@ -534,8 +557,17 @@ export default function StudentProfilePage() {
     let unsubscribe: (() => void) | undefined
     try {
       const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_COLLECTIONS.FOLLOWS}.documents`
-      unsubscribe = appwrite.subscribe(channel, () => {
-        loadFollowStats()
+      unsubscribe = appwrite.subscribe(channel, (response: { payload?: Record<string, unknown> }) => {
+        const p = response?.payload
+        if (p) {
+          const fHandle = String(p.follower_handle || '').toLowerCase().replace(/^@/, '').trim()
+          const tHandle = String(p.following_handle || '').toLowerCase().replace(/^@/, '').trim()
+          if (fHandle === targetUsername || tHandle === targetUsername || fHandle === myHandle || tHandle === myHandle) {
+            loadFollowStats()
+          }
+        } else {
+          loadFollowStats()
+        }
       })
     } catch (err) {
       console.warn('Realtime subscription error for follows:', err)
@@ -1084,9 +1116,6 @@ export default function StudentProfilePage() {
               <h1 className="font-display font-bold text-base sm:text-lg text-slate-900 dark:text-white tracking-tight">
                 {profileInfo.displayName}
               </h1>
-              {(profileInfo.isOfficer || profileInfo.isVerified) && (
-                <InstagramVerifiedBadge className="w-4 h-4 inline-block" />
-              )}
             </div>
             <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-white/40">
               <span>{profileInfo.handle}</span>
@@ -1371,9 +1400,6 @@ export default function StudentProfilePage() {
                             <span className="font-semibold text-xs sm:text-[13px] text-slate-900 dark:text-slate-100 truncate">
                               {post.author_display_name.startsWith('@') ? post.author_display_name.slice(1) : post.author_display_name}
                             </span>
-                            {(post.is_officer || post.is_verified) && (
-                              <InstagramVerifiedBadge className="w-3.5 h-3.5 inline-block shrink-0" />
-                            )}
                             {post.tags?.[0] && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono text-[10px] font-medium">
                                 <Hash className="w-2.5 h-2.5" />
@@ -1383,15 +1409,24 @@ export default function StudentProfilePage() {
                           </div>
                           <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 dark:text-white/40 font-mono pt-0.5">
                             <span title={new Date(post.$createdAt).toLocaleString()}>{formatRelativeTime(post.$createdAt)}</span>
-                            {!isOwnProfile && !followStats.isFollowing && (
+                            {!isOwnProfile && !post.is_anonymous && (
                               <>
                                 <span className="text-slate-300 dark:text-white/20 select-none">·</span>
                                 <button
                                   type="button"
                                   onClick={handleToggleFollow}
-                                  className="font-sans font-semibold text-gold hover:text-amber-400 dark:text-gold dark:hover:text-amber-300 transition-colors cursor-pointer text-[11px]"
+                                  className={`font-sans font-semibold transition-colors cursor-pointer text-[11px] ${
+                                    followStats.isFollowing
+                                      ? 'text-slate-400 hover:text-rose-500 dark:text-white/40 dark:hover:text-rose-400'
+                                      : 'text-gold hover:text-amber-400 dark:text-gold dark:hover:text-amber-300'
+                                  }`}
+                                  title={followStats.isFollowing ? 'Click to unfollow' : undefined}
                                 >
-                                  {followStats.isFollowedBy ? 'Follow back' : 'Follow'}
+                                  {followStats.isFollowing
+                                    ? 'Following'
+                                    : followStats.isFollowedBy
+                                    ? 'Follow back'
+                                    : 'Follow'}
                                 </button>
                               </>
                             )}

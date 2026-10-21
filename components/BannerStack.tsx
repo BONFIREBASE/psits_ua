@@ -19,33 +19,33 @@ export function BannerStackSkeleton({ className }: { className?: string }) {
       <div className="relative pt-6 sm:pt-14">
         <div className="relative w-full h-[145px] xs:h-[165px] sm:h-[260px] md:h-[340px] lg:h-[420px]">
           {/* Back Card 2 Skeleton */}
-          <div className="absolute inset-0 w-full h-full -top-[28px] sm:-top-[52px] scale-[0.92] opacity-40 blur-[1px] rounded-2xl sm:rounded-3xl border border-white/5 bg-[#0a0e17] z-10 pointer-events-none hidden md:block" />
+          <div className="absolute inset-0 w-full h-full -top-[28px] sm:-top-[52px] scale-[0.92] opacity-40 blur-[1px] rounded-2xl sm:rounded-3xl border border-black/5 dark:border-white/5 bg-slate-200/60 dark:bg-[#0a0e17] z-10 pointer-events-none hidden md:block" />
 
           {/* Back Card 1 Skeleton */}
-          <div className="absolute inset-0 w-full h-full -top-[14px] sm:-top-[28px] scale-[0.96] opacity-70 rounded-2xl sm:rounded-3xl border border-white/10 bg-[#0a0e17] z-20 pointer-events-none hidden sm:block" />
+          <div className="absolute inset-0 w-full h-full -top-[14px] sm:-top-[28px] scale-[0.96] opacity-70 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 bg-slate-100 dark:bg-[#0a0e17] z-20 pointer-events-none hidden sm:block" />
 
           {/* Front Active Card Skeleton */}
-          <div className="relative w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden border border-black/15 dark:border-white/15 bg-[#070A11] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] dark:shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] z-30">
+          <div className="relative w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden border border-black/10 dark:border-white/15 bg-white dark:bg-[#070A11] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.08)] dark:shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] z-30">
             {/* Luminous Top Rim Highlight */}
             <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-gold/60 to-transparent opacity-85" />
 
             {/* Shimmer sweep */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.05] to-transparent animate-banner-shimmer" />
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-black/[0.04] dark:via-white/[0.05] to-transparent animate-banner-shimmer" />
             </div>
 
             {/* Central ambient glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-60 bg-gold/[0.06] rounded-full blur-[90px] pointer-events-none" />
 
             {/* Bottom dock skeleton */}
-            <div className="absolute bottom-0 inset-x-0 z-20 px-3.5 sm:px-8 md:px-10 pb-3 sm:pb-5 pt-6 sm:pt-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col md:flex-row md:items-end justify-between gap-2.5 sm:gap-4">
+            <div className="absolute bottom-0 inset-x-0 z-20 px-3.5 sm:px-8 md:px-10 pb-3 sm:pb-5 pt-6 sm:pt-10 bg-gradient-to-t from-slate-100 via-slate-100/60 to-transparent dark:from-black/90 dark:via-black/40 dark:to-transparent flex flex-col md:flex-row md:items-end justify-between gap-2.5 sm:gap-4">
               <div className="space-y-2.5 flex-1 max-w-xl">
-                <div className="h-7 sm:h-9 w-3/4 bg-white/[0.08] rounded-xl animate-pulse" />
-                <div className="h-4 w-1/2 bg-white/[0.05] rounded-lg animate-pulse" />
+                <div className="h-7 sm:h-9 w-3/4 bg-slate-200 dark:bg-white/[0.08] rounded-xl animate-pulse" />
+                <div className="h-4 w-1/2 bg-slate-200/80 dark:bg-white/[0.05] rounded-lg animate-pulse" />
               </div>
               <div className="flex items-center gap-2.5">
                 <div className="h-10 w-32 bg-gold/20 rounded-xl animate-pulse" />
-                <div className="h-10 w-28 bg-white/[0.06] rounded-xl animate-pulse hidden sm:block" />
+                <div className="h-10 w-28 bg-slate-200 dark:bg-white/[0.06] rounded-xl animate-pulse hidden sm:block" />
               </div>
             </div>
           </div>
