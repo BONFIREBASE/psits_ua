@@ -243,101 +243,98 @@ function Lightbox({
   const entry = customEntry || entries[currentIndex];
 
   useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      if (!customEntry) {
-        if (e.key === "ArrowLeft") onPrev();
-        if (e.key === "ArrowRight") onNext();
-      }
     };
     window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose, onPrev, onNext, customEntry]);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [onClose]);
 
   if (!entry) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-5 md:p-6 lg:p-8 bg-slate-900/60 dark:bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
-      {/* Close */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-      >
-        <X className="w-5 h-5" />
-      </button>
-
-      {/* Prev */}
-      {!customEntry && entries.length > 1 && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onPrev();
-          }}
-          className="absolute left-3 sm:left-6 z-50 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-      )}
-
-      {/* Image + Info */}
+      {/* Split Modal Dialog Card */}
       <div
-        className="relative max-w-5xl w-full mx-4 flex flex-col items-center"
+        className="relative w-full max-w-5xl lg:max-w-6xl h-auto lg:h-[84vh] lg:max-h-[720px] lg:min-h-[500px] max-h-[92vh] sm:max-h-[88vh] flex flex-col lg:flex-row rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-[#0D1117] border border-black/10 dark:border-white/10 shadow-2xl backdrop-blur-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[75vh] rounded-2xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl">
-          <Image
-            src={entry.file_url}
-            alt={entry.title || "Design entry"}
-            fill
-            className="object-contain"
-            sizes="(max-width: 1024px) 95vw, 1024px"
-            unoptimized
-          />
+        {/* Left Side: Image Showcase Stage */}
+        <div className="relative flex-1 min-h-[340px] sm:min-h-[440px] lg:min-h-full bg-slate-100/90 dark:bg-black/60 flex items-center justify-center p-6 select-none overflow-hidden">
+          <div className="relative w-full h-full min-h-[300px] sm:min-h-[400px] lg:min-h-[480px]">
+            <Image
+              src={entry.file_url}
+              alt={entry.title || "Design entry"}
+              fill
+              className="object-contain drop-shadow-xl"
+              sizes="(max-width: 1024px) 100vw, 65vw"
+              priority
+              unoptimized
+            />
+          </div>
         </div>
 
-        <div className="mt-4 text-center max-w-xl">
-          {entry.title && (
-            <h3 className="text-lg sm:text-xl font-bold text-white font-display">
-              {entry.title}
-            </h3>
-          )}
-          <p className="text-sm text-white/70 mt-1">
-            {entry.student_name}
-            {entry.student_course_year && (
-              <span className="text-white/40">
-                {" "}
-                · {entry.student_course_year}
-              </span>
+        {/* Right Side: Details & Concept Sidebar */}
+        <div className="w-full lg:w-96 xl:w-[420px] shrink-0 flex flex-col justify-between border-t lg:border-t-0 lg:border-l border-black/10 dark:border-white/10 bg-white dark:bg-[#0D1117] max-h-[46vh] sm:max-h-[42vh] lg:max-h-full lg:h-full overflow-hidden">
+          {/* Header Row */}
+          <div className="p-4 sm:p-5 pb-3 border-b border-black/10 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.02] flex items-center justify-between gap-3 shrink-0">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:bg-gold/15 dark:text-gold border border-amber-500/30 dark:border-gold/30">
+              Design Preview
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close modal"
+              className="p-1.5 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-black/10 dark:bg-white/5 dark:hover:bg-white/15 dark:text-white/70 dark:hover:text-white dark:border-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Scrollable Information Body */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            <div>
+              <h3 className="font-display font-black text-lg sm:text-xl md:text-2xl text-slate-900 dark:text-white tracking-tight uppercase leading-snug">
+                {entry.title || "Untitled Design"}
+              </h3>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  {entry.student_name}
+                </span>
+                {entry.student_course_year && (
+                  <>
+                    <span className="text-slate-400 dark:text-slate-600">•</span>
+                    <span className="font-mono text-amber-600 dark:text-gold font-medium">
+                      {entry.student_course_year}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {entry.description && (
+              <div className="space-y-1.5 pt-3 border-t border-black/10 dark:border-white/10">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+                  Design Concept &amp; Rationale
+                </p>
+                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                  {entry.description}
+                </p>
+              </div>
             )}
-          </p>
-          {entry.description && (
-            <p className="text-xs sm:text-sm text-white/60 mt-2 leading-relaxed max-w-md mx-auto">
-              {entry.description}
-            </p>
-          )}
-          {!customEntry && entries.length > 0 && (
-            <p className="text-xs text-white/30 mt-2 font-mono">
-              {currentIndex + 1} / {entries.length}
-            </p>
-          )}
+          </div>
+
         </div>
       </div>
-
-      {/* Next */}
-      {!customEntry && entries.length > 1 && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onNext();
-          }}
-          className="absolute right-3 sm:right-6 z-50 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-        >
-          <ChevronRight className="w-6 h-6" />
-        </button>
-      )}
     </div>
   );
 }
@@ -637,6 +634,10 @@ export default function ViewGalleryPage() {
   const handleGoogleSignIn = async () => {
     try {
       setIsSigningIn(true);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("psits_auth_redirect", "/view");
+        localStorage.setItem("psits_auth_redirect", "/view");
+      }
       const redirectUrl =
         typeof window !== "undefined"
           ? `${window.location.origin}/view`
@@ -683,6 +684,10 @@ export default function ViewGalleryPage() {
         if (!isMounted) return;
 
         if (session?.user) {
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem("psits_auth_redirect");
+            localStorage.removeItem("psits_auth_redirect");
+          }
           const email = session.user.email?.toLowerCase() || "";
           if (email.endsWith(ALLOWED_DOMAIN)) {
             setUser(session.user);
