@@ -394,11 +394,12 @@ function CommunityOnboardingModalContent({
       }
 
       // Persist to Supabase User Metadata (Permanent Smart Identity Binding)
+      const safeAvatar = updatedData.avatar?.startsWith('data:') ? '' : (updatedData.avatar || '').slice(0, 1024)
       await supabase.auth.updateUser({
         data: {
           full_name: updatedData.name,
           community_username: updatedData.username,
-          community_avatar: updatedData.avatar,
+          community_avatar: safeAvatar,
           year_section: updatedData.yearSection,
           student_no: eligibilityResult?.studentNo || undefined,
           roster_full_name: eligibilityResult?.name || undefined,

@@ -868,24 +868,25 @@ export default function ViewGalleryPage() {
       <div className="relative z-10 pt-32 sm:pt-36 pb-28 w-full px-6">
         {/* Vote Message Toast */}
         {voteMessage && (
-          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4 animate-in slide-in-from-top duration-300">
+          <div className="fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-[140] max-w-md w-[92%] sm:w-full px-4 animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
             <div
-              className={`p-4 rounded-xl backdrop-blur-xl shadow-lg border ${voteMessage.type === "success"
-                  ? "bg-emerald-500/10 dark:bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
-                  : "bg-rose-500/10 dark:bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300"
+              className={`p-4 rounded-2xl backdrop-blur-2xl shadow-2xl border ${voteMessage.type === "success"
+                  ? "bg-emerald-950/90 dark:bg-emerald-950/90 border-emerald-500/40 text-emerald-200 shadow-emerald-950/40"
+                  : "bg-rose-950/90 dark:bg-rose-950/90 border-rose-500/40 text-rose-200 shadow-rose-950/40"
                 } flex items-start gap-3`}
             >
               {voteMessage.type === "success" ? (
-                <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5 text-emerald-400" />
               ) : (
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-rose-400" />
               )}
               <div className="flex-1">
-                <p className="text-sm font-medium">{voteMessage.text}</p>
+                <p className="text-sm font-medium leading-relaxed">{voteMessage.text}</p>
               </div>
               <button
                 onClick={() => setVoteMessage(null)}
-                className="text-current hover:opacity-70 transition-opacity"
+                className="text-current hover:opacity-70 transition-opacity p-1 rounded-lg"
+                aria-label="Close message"
               >
                 <X className="w-4 h-4" />
               </button>

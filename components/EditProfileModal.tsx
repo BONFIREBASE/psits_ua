@@ -156,11 +156,12 @@ export function EditProfileModal({
         tosAcceptedAt: currentProfile?.tosAcceptedAt || new Date().toISOString(),
       }
 
-      // 1. Persist to Supabase Auth user metadata
+      // 1. Persist to Supabase Auth user metadata (guard against oversized base64 strings bloating JWT)
+      const safeAvatar = updatedData.avatar?.startsWith('data:') ? '' : (updatedData.avatar || '').slice(0, 1024)
       await supabase.auth.updateUser({
         data: {
           full_name: updatedData.name,
-          community_avatar: updatedData.avatar,
+          community_avatar: safeAvatar,
           year_section: updatedData.yearSection,
           bio: updatedData.bio,
           social_github: updatedData.github,
