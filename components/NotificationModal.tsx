@@ -114,12 +114,12 @@ export default function NotificationModal({
       role="dialog"
       aria-modal="true"
       aria-label="Notifications"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="w-full sm:max-w-md max-h-[85vh] sm:max-h-[80vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-black/[0.08] dark:border-white/[0.08] bg-white dark:bg-[#0c1017] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-6 duration-200"
+        className="w-full sm:max-w-md max-h-[85vh] sm:max-h-[80vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-black/[0.08] dark:border-white/[0.08] bg-white dark:bg-[#0c1017] shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom,16px)] animate-in slide-in-from-bottom-6 duration-200"
       >
         {/* Mobile Pull Handle */}
         <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-white/20 mx-auto mt-3 mb-1 sm:hidden" />

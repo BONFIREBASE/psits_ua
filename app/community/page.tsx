@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -27,16 +28,15 @@ import {
   ShieldCheck,
   Bell,
   Clock,
-  Flame,
+  Home,
+  Compass,
   Bookmark,
   Check,
   Copy,
   FileCode,
   ImageIcon,
-  CheckCircle2,
   Plus,
   Users,
-  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Paperclip,
@@ -52,9 +52,10 @@ import {
   AlertCircle,
   Bold,
   List,
-  AtSign,
   Flag,
   Smile,
+  Menu,
+  EyeOff,
 } from 'lucide-react'
 import { appwrite, appwriteStorage, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
@@ -88,6 +89,7 @@ import {
   type CommunityThreadItem,
   type CommunityNotificationItem,
 } from './actions'
+import { normalizeCommunityHandle } from '@/lib/community-validation'
 import { supabase } from '@/lib/supabase'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { compressImageToWebP } from '@/lib/image-compress'
@@ -98,8 +100,8 @@ import NotificationModal from '@/components/NotificationModal'
 
 import { CommentsListSkeleton, CommunityFeedSkeleton } from '@/components/PublicSkeletonPreloader'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Tabs, TabsList, TabsTrigger } from '@/components/motion/tabs'
 import { NumberTicker } from '@/components/motion/number-ticker'
+import { PullToRefresh } from '@/components/motion/pull-to-refresh'
 
 const LOCAL_STORAGE_KEY = 'psits_community_cached_posts_v4'
 
@@ -397,6 +399,7 @@ function getAttachmentBadge(fileName: string) {
 }
 
 export default function CommunityPage() {
+  const router = useRouter()
   const [posts, setPosts] = useState<CommunityPostItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [selectedTag, setSelectedTag] = useState('All')
@@ -428,6 +431,8 @@ export default function CommunityPage() {
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const postTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
 
   // Modern Code Snippet Composer State
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false)
@@ -442,6 +447,19 @@ export default function CommunityPage() {
 
   // Threads & Start Discussion State
   const [customThreads, setCustomThreads] = useState<CommunityThreadItem[]>([])
+  const [isThreadsDropdownOpen, setIsThreadsDropdownOpen] = useState(false)
+  const threadsDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isThreadsDropdownOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (threadsDropdownRef.current && !threadsDropdownRef.current.contains(e.target as Node)) {
+        setIsThreadsDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isThreadsDropdownOpen])
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null)
   const [confirmDeleteThreadId, setConfirmDeleteThreadId] = useState<string | null>(null)
   const [isCreateThreadOpen, setIsCreateThreadOpen] = useState(false)
@@ -474,7 +492,7 @@ export default function CommunityPage() {
   }[]>([])
 
   // Feed Controls & Engagement State
-  const [sortBy, setSortBy] = useState<'latest' | 'popular' | 'discussed'>('latest')
+  const [sortBy] = useState<'latest' | 'popular' | 'discussed'>('latest')
   const [filterOnlyWithFiles, setFilterOnlyWithFiles] = useState(false)
   const [filterOnlyOfficers, setFilterOnlyOfficers] = useState(false)
   const [filterOnlySaved, setFilterOnlySaved] = useState(false)
@@ -482,9 +500,48 @@ export default function CommunityPage() {
   const [savedPostIds, setSavedPostIds] = useState<string[]>([])
   const [userLikedPosts, setUserLikedPosts] = useState<string[]>([])
 
+  // Mobile double-tap to like state
+  const [lastTap, setLastTap] = useState<{ id: string; time: number } | null>(null)
+  const [heartBurstPostId, setHeartBurstPostId] = useState<string | null>(null)
+
+  const handleDoubleTapPost = (post: CommunityPostItem) => {
+    const now = Date.now()
+    if (lastTap && lastTap.id === post.$id && now - lastTap.time < 350) {
+      try { navigator.vibrate?.([30, 40, 30]) } catch {}
+      if (!userLikedPosts.includes(post.$id)) {
+        handleReaction(post)
+      }
+      setHeartBurstPostId(post.$id)
+      setTimeout(() => {
+        setHeartBurstPostId(curr => (curr === post.$id ? null : curr))
+      }, 900)
+      setLastTap(null)
+    } else {
+      setLastTap({ id: post.$id, time: now })
+    }
+  }
+
   // Share Post Clipboard Toast & Deep Link State
   const [shareCopiedToast, setShareCopiedToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string>('Link copied to clipboard')
   const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null)
+
+  // Hidden Posts State (Persisted in localStorage; hidden from feed, visible on author profile)
+  const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
+
+  const handleHidePost = (postId: string) => {
+    try { navigator.vibrate?.([15]) } catch {}
+    setHiddenPostIds(prev => {
+      const updated = prev.includes(postId) ? prev : [...prev, postId]
+      try {
+        localStorage.setItem('psits_community_hidden_posts', JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+    setToastMessage("Post hidden from feed. You can still view it on author's profile.")
+    setShareCopiedToast(true)
+    setTimeout(() => setShareCopiedToast(false), 3000)
+  }
 
   // Context Menu, Edit Post, and Profile Preview State
   const [activeMenuPostId, setActiveMenuPostId] = useState<string | null>(null)
@@ -494,23 +551,50 @@ export default function CommunityPage() {
   const [editPostContent, setEditPostContent] = useState('')
   const [isSavingEdit, setIsSavingEdit] = useState(false)
 
-  // Minimalist Topic Slider Ref & Smooth Scroll Helper
-  const sliderRef = useRef<HTMLDivElement>(null)
-  const scrollSlider = (direction: 'left' | 'right') => {
-    if (sliderRef.current) {
-      const scrollAmount = direction === 'left' ? -220 : 220
-      sliderRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
-    }
-  }
-
-  // Hydration-Safe Client Preferences Initialization
+  // Hydration-Safe Client Preferences & Posts Initialization
   useEffect(() => {
     queueMicrotask(() => {
       try {
+        const cachedPosts = localStorage.getItem(LOCAL_STORAGE_KEY)
+        if (cachedPosts) {
+          const parsed = JSON.parse(cachedPosts)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPosts(parsed)
+            setLoading(false)
+          }
+        }
+        const cachedFollowing = localStorage.getItem('psits_community_my_following')
+        if (cachedFollowing) {
+          setMyFollowingSet(new Set(JSON.parse(cachedFollowing)))
+          setIsFollowsResolved(true)
+        }
+        const cachedFollowers = localStorage.getItem('psits_community_my_followers')
+        if (cachedFollowers) {
+          setMyFollowerSet(new Set(JSON.parse(cachedFollowers)))
+        }
+        const cachedMutuals = localStorage.getItem('psits_community_my_mutuals')
+        if (cachedMutuals) {
+          try {
+            const parsed = JSON.parse(cachedMutuals)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setMyMutuals(parsed)
+              setIsMutualsLoading(false)
+            }
+          } catch {}
+        }
         const cachedSaved = localStorage.getItem('psits_community_saved_posts')
         if (cachedSaved) setSavedPostIds(JSON.parse(cachedSaved))
         const cachedLiked = localStorage.getItem('psits_community_liked_posts')
         if (cachedLiked) setUserLikedPosts(JSON.parse(cachedLiked))
+        const cachedActive = localStorage.getItem('psits_community_active_handle')
+        if (cachedActive) setCachedActiveHandle(normalizeCommunityHandle(cachedActive))
+        const cachedHidden = localStorage.getItem('psits_community_hidden_posts')
+        if (cachedHidden) {
+          try {
+            const parsed = JSON.parse(cachedHidden)
+            if (Array.isArray(parsed)) setHiddenPostIds(parsed)
+          } catch {}
+        }
         setIsOffline(!navigator.onLine)
       } catch {}
     })
@@ -705,13 +789,25 @@ export default function CommunityPage() {
   const commentInputRef = useRef<HTMLInputElement>(null)
   const [collapsedReplyIds, setCollapsedReplyIds] = useState<Set<string>>(new Set())
 
-  // Follow System & Feed Relationships State
+  // Follow System & Feed Relationships State (Stale-While-Revalidate with localStorage for 0ms instant render)
   const [myFollowingSet, setMyFollowingSet] = useState<Set<string>>(new Set())
   const [myFollowerSet, setMyFollowerSet] = useState<Set<string>>(new Set())
+  const [isFollowsResolved, setIsFollowsResolved] = useState<boolean>(false)
+  const [cachedActiveHandle, setCachedActiveHandle] = useState<string>('')
+
+  // Sync active handle to localStorage safely in an effect (not during render pass)
+  useEffect(() => {
+    const live = normalizeCommunityHandle(userProfile?.username || user?.name || '')
+    if (live) {
+      try { localStorage.setItem('psits_community_active_handle', live) } catch {}
+    }
+  }, [userProfile?.username, user?.name])
 
   const myHandleNormalized = useMemo(() => {
-    return (userProfile?.username || user?.name || '').toLowerCase().replace(/[^a-z0-9_.]/g, '')
-  }, [userProfile?.username, user?.name])
+    const live = normalizeCommunityHandle(userProfile?.username || user?.name || '')
+    if (live) return live
+    return cachedActiveHandle
+  }, [userProfile?.username, user?.name, cachedActiveHandle])
 
   const loadFollowRelationships = useCallback(async () => {
     if (!myHandleNormalized) return
@@ -719,6 +815,13 @@ export default function CommunityPage() {
     if (res.success) {
       setMyFollowingSet(new Set(res.following))
       setMyFollowerSet(new Set(res.followers))
+      setIsFollowsResolved(true)
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('psits_community_my_following', JSON.stringify(res.following))
+          localStorage.setItem('psits_community_my_followers', JSON.stringify(res.followers))
+        } catch {}
+      }
     }
   }, [myHandleNormalized])
 
@@ -732,6 +835,13 @@ export default function CommunityPage() {
       if (!ignore && res.success) {
         setMyFollowingSet(new Set(res.following))
         setMyFollowerSet(new Set(res.followers))
+        setIsFollowsResolved(true)
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('psits_community_my_following', JSON.stringify(res.following))
+            localStorage.setItem('psits_community_my_followers', JSON.stringify(res.followers))
+          } catch {}
+        }
       }
     }
 
@@ -740,12 +850,19 @@ export default function CommunityPage() {
     let unsubscribe: (() => void) | undefined
     try {
       const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_COLLECTIONS.FOLLOWS}.documents`
-      unsubscribe = appwrite.subscribe(channel, (response: { payload?: Record<string, unknown> }) => {
+      unsubscribe = appwrite.subscribe(channel, (response: { events?: string[]; payload?: Record<string, unknown> }) => {
+        const events = response?.events || []
+        const isDelete = events.some(e => e.includes('.delete'))
+        if (isDelete) {
+          void fetchFollows()
+          return
+        }
+
         const p = response?.payload
         if (p) {
-          const fHandle = String(p.follower_handle || '').toLowerCase().replace(/^@/, '').trim()
-          const tHandle = String(p.following_handle || '').toLowerCase().replace(/^@/, '').trim()
-          if (fHandle === myHandleNormalized || tHandle === myHandleNormalized) {
+          const fHandle = normalizeCommunityHandle(String(p.follower_handle || ''))
+          const tHandle = normalizeCommunityHandle(String(p.following_handle || ''))
+          if (!fHandle || !tHandle || fHandle === myHandleNormalized || tHandle === myHandleNormalized) {
             void fetchFollows()
           }
         } else {
@@ -914,10 +1031,8 @@ export default function CommunityPage() {
       setIsOnboardingOpen(true)
       return
     }
-    if (!myHandleNormalized || !targetHandle) return
-
-    const cleanTarget = targetHandle.toLowerCase().replace(/[^a-z0-9_.]/g, '')
-    if (cleanTarget === myHandleNormalized) return
+    const cleanTarget = normalizeCommunityHandle(targetHandle)
+    if (!myHandleNormalized || !cleanTarget || cleanTarget === myHandleNormalized) return
 
     const isCurrentlyFollowing = myFollowingSet.has(cleanTarget)
     setMyFollowingSet(prev => {
@@ -926,6 +1041,18 @@ export default function CommunityPage() {
         next.delete(cleanTarget)
       } else {
         next.add(cleanTarget)
+      }
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('psits_community_my_following', JSON.stringify(Array.from(next)))
+          const cached = localStorage.getItem(`psits_community_follow_${cleanTarget}`)
+          if (cached) {
+            const parsed = JSON.parse(cached)
+            parsed.isFollowing = !isCurrentlyFollowing
+            parsed.followersCount = Math.max(0, (Number(parsed.followersCount) || 0) + (!isCurrentlyFollowing ? 1 : -1))
+            localStorage.setItem(`psits_community_follow_${cleanTarget}`, JSON.stringify(parsed))
+          }
+        } catch {}
       }
       return next
     })
@@ -941,6 +1068,21 @@ export default function CommunityPage() {
       })
       if (!res.success) {
         loadFollowRelationships()
+      } else {
+        setMyFollowingSet(prev => {
+          const next = new Set(prev)
+          if (res.isFollowing) {
+            next.add(cleanTarget)
+          } else {
+            next.delete(cleanTarget)
+          }
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('psits_community_my_following', JSON.stringify(Array.from(next)))
+            } catch {}
+          }
+          return next
+        })
       }
     } catch {
       loadFollowRelationships()
@@ -1058,24 +1200,59 @@ export default function CommunityPage() {
 
   // Mutual Followers & Comment Mentions State
   const [myMutuals, setMyMutuals] = useState<FollowUserInfo[]>([])
+  const [isMutualsLoading, setIsMutualsLoading] = useState<boolean>(true)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [mentionIndex, setMentionIndex] = useState<number>(-1)
   const [mentionError, setMentionError] = useState<string | null>(null)
 
-  // Fetch mutual follows for comment mentions
+  // Fetch mutual follows for comment mentions & Instagram-style active stories tray
   useEffect(() => {
-    const myHandle = userProfile?.username || user?.name
-    if (!myHandle) return
+    const handleToQuery = myHandleNormalized || userProfile?.username || user?.name
+    if (!handleToQuery) {
+      if (!user && !authLoading) setIsMutualsLoading(false)
+      return
+    }
     let isCancelled = false
-    getMutualFollowsAction(myHandle).then(res => {
-      if (!isCancelled && res.success) {
-        setMyMutuals(res.mutuals)
+    setIsMutualsLoading(true)
+    getMutualFollowsAction(handleToQuery).then(res => {
+      if (!isCancelled) {
+        if (res.success) {
+          setMyMutuals(res.mutuals)
+          try {
+            localStorage.setItem('psits_community_my_mutuals', JSON.stringify(res.mutuals))
+          } catch {}
+        }
+        setIsMutualsLoading(false)
       }
+    }).catch(() => {
+      if (!isCancelled) setIsMutualsLoading(false)
     })
     return () => {
       isCancelled = true
     }
-  }, [userProfile?.username, user?.name, activeCommentPost])
+  }, [myHandleNormalized, userProfile?.username, user?.name, myFollowingSet.size, myFollowerSet.size, activeCommentPost, user, authLoading])
+
+  // Real-time lookup set of online member handles
+  const onlineHandlesSet = useMemo(() => {
+    const set = new Set<string>()
+    for (const m of onlineMembers) {
+      if (m.handle) {
+        set.add(normalizeCommunityHandle(m.handle))
+      }
+    }
+    return set
+  }, [onlineMembers])
+
+  // Mutuals sorted with online friends first, then alphabetical
+  const displayMutuals = useMemo(() => {
+    return [...myMutuals].sort((a, b) => {
+      const aOnline = onlineHandlesSet.has(normalizeCommunityHandle(a.handle))
+      const bOnline = onlineHandlesSet.has(normalizeCommunityHandle(b.handle))
+      if (aOnline && !bOnline) return -1
+      if (!aOnline && bOnline) return 1
+      return (a.name || a.handle).localeCompare(b.name || b.handle)
+    })
+  }, [myMutuals, onlineHandlesSet])
 
   const filteredMutuals = useMemo(() => {
     if (mentionQuery === null) return []
@@ -1465,6 +1642,46 @@ export default function CommunityPage() {
       })
   }, [])
 
+  /* ─── Pull-to-Refresh Handler ─── */
+  const handlePullToRefresh = useCallback(async () => {
+    try { navigator.vibrate?.([15]) } catch {}
+    const handleToQuery = myHandleNormalized || userProfile?.username || user?.name
+    await Promise.allSettled([
+      new Promise<void>((resolve) => {
+        getCommunityFeedAction(selectedTag)
+          .then(res => {
+            if (res.success && res.posts) {
+              setPosts(res.posts)
+              setHasNewPosts(false)
+              try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(res.posts))
+              } catch {}
+            }
+          })
+          .catch(err => {
+            console.warn('Feed pull-to-refresh error:', err)
+          })
+          .finally(() => {
+            setLoading(false)
+            resolve()
+          })
+      }),
+      loadThreads(user?.email, handleToQuery),
+      handleToQuery
+        ? getMutualFollowsAction(handleToQuery)
+            .then(res => {
+              if (res.success && res.mutuals) {
+                setMyMutuals(res.mutuals)
+                try {
+                  localStorage.setItem('psits_community_my_mutuals', JSON.stringify(res.mutuals))
+                } catch {}
+              }
+            })
+            .catch(() => {})
+        : Promise.resolve(),
+    ])
+  }, [selectedTag, user?.email, myHandleNormalized, userProfile?.username, user?.name, loadThreads])
+
   /* ─── 2. Offline Detection Listeners ─── */
   useEffect(() => {
     const handleOnline = () => {
@@ -1512,15 +1729,20 @@ export default function CommunityPage() {
         })
       }
     }
+    const handleOpenNotifications = () => {
+      setIsNotifModalOpen(true)
+    }
     window.addEventListener('psits:open-profile', handleOpenProfile)
     window.addEventListener('psits:open-onboarding', handleOpenOnboarding)
     window.addEventListener('psits:filter-my-posts', handleFilterMyPosts)
     window.addEventListener('psits:open-post', handleOpenPostEvent)
+    window.addEventListener('psits:open-notifications', handleOpenNotifications)
     return () => {
       window.removeEventListener('psits:open-profile', handleOpenProfile)
       window.removeEventListener('psits:open-onboarding', handleOpenOnboarding)
       window.removeEventListener('psits:filter-my-posts', handleFilterMyPosts)
       window.removeEventListener('psits:open-post', handleOpenPostEvent)
+      window.removeEventListener('psits:open-notifications', handleOpenNotifications)
     }
   }, [posts])
 
@@ -1874,30 +2096,31 @@ export default function CommunityPage() {
     const unsubscribe = appwrite.subscribe(channel, (response: { events: string[]; payload: Record<string, unknown> }) => {
       const events = response.events || []
       const payload = response.payload
-      const targetPostId = String(payload.post_id || '')
-
-      if (targetPostId !== activeCommentPostId) return
-
       const commentId = String(payload.$id || '')
       const commentStatus = String(payload.status || 'active')
 
-      // Case A: Comment Deleted
+      // Case A: Comment Deleted (Appwrite .delete events contain only $id and omit document attributes like post_id)
       if (events.some(e => e.includes('.delete')) || commentStatus === 'deleted') {
-        setComments(prev =>
-          prev.map(c =>
-            c.$id === commentId
-              ? {
-                  ...c,
-                  status: 'deleted',
-                  content: 'This comment has been deleted',
-                  author_display_name: 'Kasubay',
-                  author_avatar: '',
-                }
-              : c
+        if (commentId) {
+          setComments(prev =>
+            prev.map(c =>
+              c.$id === commentId
+                ? {
+                    ...c,
+                    status: 'deleted',
+                    content: 'This comment has been deleted',
+                    author_display_name: 'Kasubay',
+                    author_avatar: '',
+                  }
+                : c
+            )
           )
-        )
+        }
         return
       }
+
+      const targetPostId = String(payload.post_id || '')
+      if (targetPostId && targetPostId !== activeCommentPostId) return
 
       // Case B: Comment Edited
       if (events.some(e => e.includes('.update'))) {
@@ -1982,7 +2205,7 @@ export default function CommunityPage() {
 
       // Auto-compress photos to lightweight WebP before uploading
       if (file.type.startsWith('image/')) {
-        uploadFile = await compressImageToWebP(file, { maxWidth: 1920, quality: 0.8 })
+        uploadFile = await compressImageToWebP(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.82 })
       }
 
       // Upload directly to Appwrite Singapore Bucket (0 MB server load!)
@@ -2621,55 +2844,14 @@ export default function CommunityPage() {
     }
   }
 
-  // Notification sidebar items strictly scoped to the authenticated student (never shared)
-  const userNotifications = useMemo(() => {
-    if (!user) return []
-    const myEmail = (user.email || '').toLowerCase().trim()
-    const myName = (userProfile?.name || user.name || '').toLowerCase().trim()
-    const myUsername = (userProfile?.username || '').replace(/^@/, '').toLowerCase().trim()
-
-    return posts
-      .map(p => {
-        const authorDisplay = (p.author_display_name || '').toLowerCase().trim()
-        const authorEmail = (p.author_student_no || '').toLowerCase().trim()
-        const isAuthor =
-          (myEmail && authorEmail === myEmail) ||
-          (myUsername && authorDisplay.includes(myUsername)) ||
-          (myName && authorDisplay === myName)
-
-        // 1. Mention alert: someone else tagged this user's handle
-        if (!isAuthor && myUsername && p.content.toLowerCase().includes(`@${myUsername}`)) {
-          return {
-            post: p,
-            type: 'mention' as const,
-            title: `${p.author_display_name} mentioned you`,
-            time: p.$createdAt,
-          }
-        }
-
-        // 2. Activity / engagement alert on user's own post
-        if (isAuthor && (p.comments_count > 0 || p.likes_count > 0)) {
-          const summary =
-            p.comments_count > 0
-              ? `${p.comments_count} ${p.comments_count === 1 ? 'reply' : 'replies'} on your discussion`
-              : `${p.likes_count} upvotes on your discussion`
-          return {
-            post: p,
-            type: 'activity' as const,
-            title: summary,
-            time: p.$createdAt,
-          }
-        }
-
-        return null
-      })
-      .filter((n): n is NonNullable<typeof n> => n !== null)
-      .slice(0, 5)
-  }, [posts, user, userProfile])
-
   // Filtered & Sorted post results based on search input, category, tags, and quick-filters
   const filteredPosts = useMemo(() => {
     let list = posts.filter(post => {
+      // 0. Hidden Posts Filter (User hid this post from their feed)
+      if (hiddenPostIds.includes(post.$id)) {
+        return false
+      }
+
       // 1. Search Query Filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
@@ -2728,7 +2910,7 @@ export default function CommunityPage() {
     }
 
     return list
-  }, [posts, searchQuery, filterOnlyWithFiles, filterOnlyOfficers, filterOnlySaved, filterOnlyMyPosts, savedPostIds, sortBy, user, userProfile])
+  }, [posts, searchQuery, filterOnlyWithFiles, filterOnlyOfficers, filterOnlySaved, filterOnlyMyPosts, savedPostIds, hiddenPostIds, sortBy, user, userProfile])
 
   // Comments Tree Memos (Hierarchical nesting of comments & replies)
   const topLevelComments = useMemo(() => {
@@ -2926,7 +3108,8 @@ export default function CommunityPage() {
   }
 
   return (
-    <div className="pt-20 sm:pt-24 pb-20 max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
+    <>
+      <div className="pt-3 sm:pt-24 pb-20 max-w-6xl mx-auto px-4 sm:px-6 space-y-3 sm:space-y-5 overflow-x-hidden">
       {/* ─── Sticky Offline Resilience Banner ─── */}
       {isOffline && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[92%] bg-gold text-slate-950 font-semibold px-4 py-2 rounded-full shadow-2xl text-xs flex items-center justify-center gap-2 border border-gold/40 animate-pulse">
@@ -2935,151 +3118,249 @@ export default function CommunityPage() {
         </div>
       )}
 
-      {/* ─── Dedicated Thread Switcher & Search Bar ─── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-black/[0.06] dark:border-white/[0.08]">
-        {/* Minimalist Thread Slider */}
-        <div className="relative flex items-center min-w-0 max-w-full">
+      {/* ─── Native Embedded Header & Instagram-Style Thread Selector ─── */}
+      <div className="flex items-center justify-between pt-1 pb-0.5">
+        {/* Left: Mobile Hamburger Navigation Toggle */}
+        <button
+          type="button"
+          onClick={() => {
+            try { navigator.vibrate?.([15]) } catch {}
+            window.dispatchEvent(new CustomEvent('psits:toggle-menu'))
+          }}
+          className="md:hidden w-10 h-10 flex items-center justify-start text-gold hover:opacity-80 active:scale-95 transition-all cursor-pointer select-none"
+          aria-label="Toggle navigation menu"
+        >
+          <Menu size={22} />
+        </button>
+
+        {/* Center (Mobile) / Left (Desktop): Instagram-Style Dropdown */}
+        <div className="relative flex justify-center md:justify-start flex-1 md:flex-initial" ref={threadsDropdownRef}>
           <button
             type="button"
-            onClick={() => scrollSlider('left')}
-            className="hidden sm:flex items-center justify-center w-7 h-7 rounded-full bg-surface hover:bg-surface-subtle text-slate-500 hover:text-slate-900 dark:hover:text-white border border-black/[0.08] dark:border-white/10 shadow-xs mr-1.5 shrink-0 transition-all cursor-pointer opacity-80 hover:opacity-100"
-            aria-label="Scroll threads left"
+            onClick={() => {
+              try { navigator.vibrate?.([15]) } catch {}
+              setIsThreadsDropdownOpen(prev => !prev)
+            }}
+            className="flex items-center gap-1 font-display font-bold text-lg sm:text-2xl text-slate-900 dark:text-white hover:opacity-80 active:scale-98 transition-all cursor-pointer select-none py-1 px-2 rounded-xl"
+            aria-expanded={isThreadsDropdownOpen}
+            aria-haspopup="true"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </button>
-
-          <div
-            ref={sliderRef}
-            className="flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-smooth py-1 px-0.5"
-          >
-            {/* "All Threads" Root Pill */}
-            <button
-              type="button"
-              onClick={() => setSelectedTag('All')}
-              className={`relative isolate px-3.5 py-1.5 rounded-full text-xs font-medium tracking-tight transition-colors cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 active:scale-[0.98] ${
-                selectedTag === 'All'
-                  ? 'text-slate-950 font-bold'
-                  : 'bg-surface hover:bg-surface-subtle text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-black/[0.06] dark:border-white/[0.08] hover:border-gold/30'
+            <span className="tracking-tight">
+              {selectedTag === 'All' ? 'Community' : `#${selectedTag}`}
+            </span>
+            <ChevronDown
+              size={17}
+              className={`text-slate-400 dark:text-slate-500 transition-transform duration-200 ${
+                isThreadsDropdownOpen ? 'rotate-180 text-gold' : ''
               }`}
-            >
-              {selectedTag === 'All' && (
-                <motion.span
-                  layoutId="active-category-pill"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                  className="absolute inset-0 bg-gold rounded-full shadow-xs -z-10"
-                />
-              )}
-              <Layers className={`w-3.5 h-3.5 ${selectedTag === 'All' ? 'text-slate-950' : 'text-gold'}`} />
-              <span>All Threads</span>
-            </button>
-
-            {/* Dynamic Community Threads */}
-            {customThreads.map((ct) => {
-              const isSelected = selectedTag === ct.title || selectedTag === ct.slug
-              return (
-                <button
-                  key={ct.$id}
-                  type="button"
-                  onClick={() => setSelectedTag(ct.title)}
-                  className={`relative isolate px-3.5 py-1.5 rounded-full text-xs font-medium tracking-tight transition-colors cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 active:scale-[0.98] ${
-                    isSelected
-                      ? 'text-slate-950 font-bold'
-                      : 'bg-surface hover:bg-surface-subtle text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-black/[0.06] dark:border-white/[0.08] hover:border-gold/30'
-                  }`}
-                  title={ct.is_private ? `Private Thread (Invited Only)` : `Public Thread in #${ct.title}`}
-                >
-                  {isSelected && (
-                    <motion.span
-                      layoutId="active-category-pill"
-                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                      className="absolute inset-0 bg-gold rounded-full shadow-xs -z-10"
-                    />
-                  )}
-                  {ct.is_private ? (
-                    <Lock className={`w-3 h-3 ${isSelected ? 'text-slate-950' : 'text-amber-500'}`} />
-                  ) : (
-                    <Hash className={`w-3 h-3 ${isSelected ? 'text-slate-950' : 'text-slate-400'}`} />
-                  )}
-                  <span className="max-w-[130px] sm:max-w-none truncate">{ct.title}</span>
-                </button>
-              )
-            })}
-
-            {/* Direct New Thread Creation Trigger */}
-            <button
-              type="button"
-              onClick={handleOpenCreateThread}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold bg-gold/15 hover:bg-gold/25 text-amber-700 dark:text-amber-300 border border-gold/30 hover:border-gold transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 active:scale-95 shadow-2xs"
-              title="Start a new discussion thread"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Thread</span>
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => scrollSlider('right')}
-            className="hidden sm:flex items-center justify-center w-7 h-7 rounded-full bg-surface hover:bg-surface-subtle text-slate-500 hover:text-slate-900 dark:hover:text-white border border-black/[0.08] dark:border-white/10 shadow-xs ml-1.5 shrink-0 transition-all cursor-pointer opacity-80 hover:opacity-100"
-            aria-label="Scroll threads right"
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
+            />
           </button>
+
+          {/* Instagram-Style Dropdown Menu */}
+          <AnimatePresence>
+            {isThreadsDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+                className="absolute left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 top-full mt-2 w-64 rounded-2xl bg-white/95 dark:bg-[#0c1017]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-1.5 space-y-1 z-50 overflow-hidden"
+              >
+                {/* Default Community Feed (All Threads) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTag('All')
+                    reloadFeed('All')
+                    setIsThreadsDropdownOpen(false)
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                    selectedTag === 'All'
+                      ? 'bg-gold/15 text-gold font-bold'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Layers size={14} className={selectedTag === 'All' ? 'text-gold' : 'text-slate-400'} />
+                    <span>Community (All)</span>
+                  </div>
+                  {selectedTag === 'All' && <Check size={14} className="text-gold" />}
+                </button>
+
+                {/* Custom Discussion Threads */}
+                {customThreads.length > 0 && (
+                  <div className="max-h-56 overflow-y-auto space-y-0.5 scrollbar-thin py-0.5 border-t border-black/[0.04] dark:border-white/[0.06]">
+                    {customThreads.map(ct => {
+                      const isSelected = selectedTag === ct.title || selectedTag === ct.slug
+                      return (
+                        <button
+                          key={ct.$id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTag(ct.title)
+                            reloadFeed(ct.title)
+                            setIsThreadsDropdownOpen(false)
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-gold/15 text-gold font-bold'
+                              : 'text-slate-700 dark:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 font-medium'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {ct.is_private ? (
+                              <Lock size={12} className="text-amber-500 shrink-0" />
+                            ) : (
+                              <Hash size={12} className="text-slate-400 shrink-0" />
+                            )}
+                            <span className="truncate">{ct.title}</span>
+                          </div>
+                          {isSelected && <Check size={14} className="text-gold shrink-0" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* + New Discussion Thread */}
+                <div className="pt-1 border-t border-black/[0.04] dark:border-white/[0.06]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsThreadsDropdownOpen(false)
+                      handleOpenCreateThread()
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-gold hover:bg-gold/10 transition-colors cursor-pointer"
+                  >
+                    <Plus size={14} className="stroke-[2.5]" />
+                    <span>New Thread</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Minimalist Live Presence Status + Search Input */}
-        <div className="flex items-center gap-2 w-full md:w-auto shrink-0 justify-between md:justify-end">
-          {displayOnlineMembers.length > 0 && (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface border border-black/[0.06] dark:border-white/[0.08] shadow-2xs shrink-0">
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              <span className="text-[11px] font-mono font-medium text-slate-600 dark:text-white/70">
-                <strong className="text-slate-900 dark:text-white font-semibold">{displayOnlineMembers.length}</strong> active
-              </span>
-              <div className="flex items-center -space-x-1.5 overflow-hidden pl-0.5">
-                {displayOnlineMembers.slice(0, 4).map((m) => (
-                  <Link
-                    key={m.key}
-                    href={m.isGuest ? '#' : `/community/${m.handle.replace(/^@/, '')}`}
-                    title={`${m.name} (@${m.handle.replace(/^@/, '')}) · Active now`}
-                    className="relative inline-block w-4.5 h-4.5 rounded-full ring-1 ring-white dark:ring-[#0c1017] overflow-hidden bg-slate-800 hover:scale-110 transition-transform shrink-0"
-                  >
-                    {m.avatar && !m.avatar.startsWith('preset:') ? (
-                      <Image src={m.avatar} alt={m.name} width={18} height={18} className="w-full h-full object-cover" />
-                    ) : (
-                      renderAvatarIcon(m.avatar, m.name, 'w-2 h-2 text-gold')
-                    )}
-                  </Link>
-                ))}
-              </div>
-            </div>
+        {/* Right: Mobile Notification Bell */}
+        <button
+          type="button"
+          onClick={() => {
+            try { navigator.vibrate?.([15]) } catch {}
+            setIsNotifModalOpen(true)
+          }}
+          className="md:hidden w-10 h-10 flex items-center justify-end relative text-slate-700 dark:text-slate-200 hover:text-gold transition-colors cursor-pointer select-none"
+          aria-label="Notifications"
+        >
+          <Bell size={20} />
+          {unreadNotifCount > 0 && (
+            <span className="absolute top-2 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#07090e]" />
           )}
+        </button>
+      </div>
 
-          {/* Search Input */}
-          <div className="relative w-full md:w-60 shrink-0">
-            <Search
-              size={13}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/30"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search feed & notes..."
-              className="w-full bg-surface border border-black/[0.08] dark:border-white/10 rounded-full pl-8 pr-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none focus:border-gold transition-colors"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
+      {/* ─── Pull To Refresh Feed Scroller (Directly Above Round Profiles Only) ─── */}
+      <PullToRefresh
+        onRefresh={handlePullToRefresh}
+        disabled={isNotifModalOpen || isCreateOpen || Boolean(activeCommentPost) || isOnboardingOpen || isSearchModalOpen || Boolean(editingPost) || isCreateThreadOpen || Boolean(isDeletingPostId)}
+        className="w-full bg-transparent overflow-visible"
+        contentClassName="overflow-visible space-y-3 sm:space-y-5"
+      >
+      {/* ─── Instagram-Style Mutuals Stories Tray (Minimalist Active Status Badge) ─── */}
+      <div className="pb-2.5 pt-0.5 border-b border-black/[0.04] dark:border-white/[0.06] overflow-hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex items-center gap-3.5 sm:gap-4.5 overflow-x-auto no-scrollbar scroll-smooth py-1">
+          {/* 1. Current User ("Your story") */}
+          <Link
+            href={user ? `/community/${myHandleNormalized || ''}` : '#'}
+            onClick={(e) => {
+              if (!user) {
+                e.preventDefault()
+                setOnboardingInitialStep(1)
+                setIsOnboardingOpen(true)
+              }
+            }}
+            className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer select-none"
+            title={user ? 'Your Profile' : 'Sign in to join community'}
+          >
+            <div className="relative">
+              <div className="w-14 h-14 sm:w-15 sm:h-15 rounded-full overflow-hidden bg-slate-800 border border-black/[0.08] dark:border-white/10 transition-transform duration-200 group-hover:scale-105 flex items-center justify-center">
+                {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
+                  <Image
+                    src={userProfile.avatar}
+                    alt="You"
+                    width={60}
+                    height={60}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  renderAvatarIcon(userProfile?.avatar, userProfile?.name || user?.name || 'You', 'w-6 h-6 text-gold')
+                )}
+              </div>
+              {user && (
+                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#07090e]" />
+              )}
+            </div>
+            <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate w-14 sm:w-15 text-center">
+              Your story
+            </span>
+          </Link>
+
+          {/* Skeleton Preloader for Mutuals Tray */}
+          {user && isMutualsLoading && displayMutuals.length === 0 ? (
+            <>
+              {[1, 2, 3, 4, 5].map((idx) => (
+                <div key={idx} className="flex flex-col items-center gap-1 shrink-0 select-none animate-pulse">
+                  <div className="w-14 h-14 sm:w-15 sm:h-15 rounded-full bg-black/5 dark:bg-white/10 border border-black/[0.04] dark:border-white/[0.06]" />
+                  <div className="w-10 h-2 rounded-full bg-black/5 dark:bg-white/10 mt-1" />
+                </div>
+              ))}
+            </>
+          ) : (
+            <>
+              {/* 2. Mutual Followers Tray: Active Badge (No ring) */}
+              {displayMutuals.map((m) => {
+                const isOnline = onlineHandlesSet.has(normalizeCommunityHandle(m.handle))
+                const cleanHandle = (m.handle || '').replace(/^@/, '')
+
+                return (
+                  <Link
+                    key={m.handle}
+                    href={`/community/${cleanHandle}`}
+                    className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer select-none"
+                    title={`${m.name} (@${cleanHandle}) · ${isOnline ? 'Active now' : 'Offline'}`}
+                  >
+                    <div className="relative">
+                      <div className="w-14 h-14 sm:w-15 sm:h-15 rounded-full overflow-hidden bg-slate-800 border border-black/[0.08] dark:border-white/10 transition-transform duration-200 group-hover:scale-105 flex items-center justify-center">
+                        {m.avatar && !m.avatar.startsWith('preset:') ? (
+                          <Image
+                            src={m.avatar}
+                            alt={m.name}
+                            width={60}
+                            height={60}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          renderAvatarIcon(m.avatar, m.name, 'w-6 h-6 text-gold')
+                        )}
+                      </div>
+                      {isOnline && (
+                        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#07090e]" />
+                      )}
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate w-14 sm:w-15 text-center lowercase">
+                      {cleanHandle}
+                    </span>
+                  </Link>
+                )
+              })}
+
+              {/* Empty State: Logged-in user has no mutuals yet */}
+              {user && displayMutuals.length === 0 && (
+                <div className="flex items-center gap-2 px-2 py-2 text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                  <span>Follow classmates who follow you back to see their live active status here</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -3102,157 +3383,9 @@ export default function CommunityPage() {
 
 
 
-          {/* Threads Compact Create Post Box */}
-          <div className="rounded-2xl border border-black/[0.05] dark:border-white/[0.06] bg-white/80 dark:bg-[#0c1017]/80 backdrop-blur-xl p-2.5 sm:p-3.5 flex items-center gap-2.5 sm:gap-3 shadow-xs dark:shadow-none">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-surface-subtle border border-gold/30 flex items-center justify-center shrink-0 ring-1 ring-gold/20 overflow-hidden text-gold font-bold text-xs">
-              {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
-                <Image src={userProfile.avatar} alt="Avatar" width={36} height={36} className="w-full h-full object-cover" />
-              ) : (
-                renderAvatarIcon(userProfile?.avatar, userProfile?.name || user?.name)
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (!user) {
-                  setOnboardingInitialStep(1)
-                  setIsOnboardingOpen(true)
-                  return
-                }
-                setSelectedPostTag(selectedTag === 'All' ? 'general' : selectedTag)
-                setIsCreateOpen(true)
-              }}
-              className="flex-1 bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.07] border border-black/[0.06] dark:border-white/[0.08] text-left px-3.5 py-2 rounded-xl text-slate-400 dark:text-white/40 text-xs sm:text-[13px] transition-colors cursor-pointer truncate"
-            >
-              {selectedTag === 'All' ? 'Start a discussion in #general...' : `Post to #${selectedTag}...`}
-            </button>
-            <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!user) {
-                    setOnboardingInitialStep(1)
-                    setIsOnboardingOpen(true)
-                    return
-                  }
-                  setSelectedPostTag(selectedTag === 'All' ? 'general' : selectedTag)
-                  setIsCreateOpen(true)
-                  setTimeout(() => fileInputRef.current?.click(), 100)
-                }}
-                className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-gold hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                title="Attach Module or Image"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!user) {
-                    setOnboardingInitialStep(1)
-                    setIsOnboardingOpen(true)
-                    return
-                  }
-                  setSelectedPostTag(selectedTag === 'All' ? 'general' : selectedTag)
-                  setIsCreateOpen(true)
-                  setIsCodeModalOpen(true)
-                }}
-                className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-gold hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                title="Share Code Snippet"
-              >
-                <Code2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
 
-          {/* Feed Sort & Quick Filters Toolbar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 text-xs py-1">
-            {/* Sort Modes (beUI animated spring tabs) */}
-            <Tabs
-              value={sortBy}
-              onValueChange={(v) => setSortBy(v as 'latest' | 'popular' | 'discussed')}
-              variant="pill"
-              className="w-full sm:w-auto"
-            >
-              <TabsList className="w-full sm:w-auto flex items-center justify-between p-1 bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08] rounded-xl shrink-0">
-                <TabsTrigger
-                  value="latest"
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 sm:py-1 text-[10px] sm:text-[11px]"
-                >
-                  <Clock className="w-3 h-3 shrink-0" />
-                  <span>Latest</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="popular"
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 sm:py-1 text-[10px] sm:text-[11px]"
-                >
-                  <Flame className="w-3 h-3 shrink-0" />
-                  <span>Trending</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="discussed"
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 sm:py-1 text-[10px] sm:text-[11px]"
-                >
-                  <MessageSquare className="w-3 h-3 shrink-0" />
-                  <span>Active</span>
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
 
-            {/* Quick Filter Toggles (Smooth horizontal scroll on mobile) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 w-full sm:w-auto -mx-1 px-1 sm:mx-0 sm:px-0">
-              <button
-                type="button"
-                onClick={() => setFilterOnlyWithFiles(!filterOnlyWithFiles)}
-                className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
-                  filterOnlyWithFiles
-                    ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
-                    : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <FileText className="w-3 h-3 shrink-0" />
-                <span>Modules Only</span>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => setFilterOnlyOfficers(!filterOnlyOfficers)}
-                className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
-                  filterOnlyOfficers
-                    ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
-                    : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Sparkles className="w-3 h-3 shrink-0" />
-                <span>Officers</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFilterOnlySaved(!filterOnlySaved)}
-                className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
-                  filterOnlySaved
-                    ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
-                    : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Bookmark className="w-3 h-3 shrink-0" />
-                <span>Saved ({savedPostIds.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFilterOnlyMyPosts(!filterOnlyMyPosts)}
-                className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg border font-mono text-[10px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
-                  filterOnlyMyPosts
-                    ? 'bg-gold/15 border-gold text-gold font-bold shadow-sm'
-                    : 'bg-surface border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <User className="w-3 h-3 shrink-0" />
-                <span>My Posts</span>
-              </button>
-            </div>
-          </div>
 
           {/* Active Thread Banner (Public or Member-Joined) */}
           {currentActiveThread && !isCurrentThreadPrivateLocked && (
@@ -3364,17 +3497,26 @@ export default function CommunityPage() {
           ) : loading && posts.length === 0 ? (
             <div className="space-y-4">
               {[1, 2, 3].map(n => (
-                <div key={n} className="rounded-2xl border border-black/[0.06] dark:border-white/[0.08] bg-surface p-6 space-y-4 animate-pulse">
+                <div
+                  key={n}
+                  className="rounded-2xl border border-black/[0.05] dark:border-white/[0.06] p-4 sm:p-5 space-y-3.5 bg-white/80 dark:bg-[#0c1017]/80 backdrop-blur-xl animate-pulse"
+                >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-surface-subtle" />
+                    <div className="w-9 h-9 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
                     <div className="space-y-1.5 flex-1">
-                      <div className="w-32 h-3 bg-surface-subtle rounded-md" />
-                      <div className="w-20 h-2 bg-surface-subtle/70 rounded-md" />
+                      <div className="w-28 h-3.5 bg-black/[0.08] dark:bg-white/[0.1] rounded-md" />
+                      <div className="w-16 h-2.5 bg-black/[0.04] dark:bg-white/[0.06] rounded-md" />
                     </div>
                   </div>
                   <div className="space-y-2 pt-1">
-                    <div className="w-full h-3 bg-surface-subtle rounded-md" />
-                    <div className="w-3/4 h-3 bg-surface-subtle rounded-md" />
+                    <div className="w-full h-3 bg-black/[0.06] dark:bg-white/[0.08] rounded-md" />
+                    <div className="w-4/5 h-3 bg-black/[0.06] dark:bg-white/[0.08] rounded-md" />
+                    <div className="w-3/5 h-3 bg-black/[0.04] dark:bg-white/[0.06] rounded-md" />
+                  </div>
+                  <div className="pt-2 flex items-center gap-4">
+                    <div className="w-12 h-6 rounded-full bg-black/[0.04] dark:bg-white/[0.06]" />
+                    <div className="w-12 h-6 rounded-full bg-black/[0.04] dark:bg-white/[0.06]" />
+                    <div className="w-12 h-6 rounded-full bg-black/[0.04] dark:bg-white/[0.06]" />
                   </div>
                 </div>
               ))}
@@ -3499,8 +3641,8 @@ export default function CommunityPage() {
               {filteredPosts.map((post, idx) => {
                 const isLiked = userLikedPosts.includes(post.$id)
                 const isSaved = savedPostIds.includes(post.$id)
-                const myHandle = (userProfile?.username || user?.name || '').toLowerCase().replace(/[^a-z0-9_.]/g, '')
-                const postHandle = (post.author_display_name || '').toLowerCase().replace(/[^a-z0-9_.]/g, '')
+                const myHandle = normalizeCommunityHandle(userProfile?.username || user?.name || '')
+                const postHandle = normalizeCommunityHandle(post.author_display_name || '')
                 const isAuthor = Boolean(
                   (user?.email && post.author_student_no && post.author_student_no.toLowerCase() === user.email.toLowerCase()) ||
                   (myHandle && postHandle && myHandle === postHandle)
@@ -3511,7 +3653,12 @@ export default function CommunityPage() {
                   <ScrollReveal key={post.$id} delay={(idx % 3) * 0.04}>
                     <article
                       id={`post-${post.$id}`}
-                      className={`relative rounded-2xl border transition-all duration-300 p-3.5 sm:p-5 space-y-3 bg-white/80 dark:bg-[#0c1017]/80 backdrop-blur-xl shadow-xs dark:shadow-none ${
+                      onClick={(e) => {
+                        const target = e.target as HTMLElement
+                        if (target.closest('button, a, input, textarea, pre, code')) return
+                        handleDoubleTapPost(post)
+                      }}
+                      className={`relative rounded-2xl border transition-all duration-300 p-3.5 sm:p-5 space-y-3 bg-white/80 dark:bg-[#0c1017]/80 backdrop-blur-xl shadow-xs dark:shadow-none select-none sm:select-auto ${
                         isHighlighted
                           ? 'border-gold ring-2 ring-gold/60 shadow-xl shadow-gold/20 scale-[1.008]'
                           : 'border-black/[0.05] dark:border-white/[0.06] hover:border-black/10 dark:hover:border-white/[0.12]'
@@ -3519,6 +3666,15 @@ export default function CommunityPage() {
                         activeMenuPostId === post.$id ? 'z-40' : 'z-0'
                       }`}
                     >
+                      {/* Instagram Double-Tap Heart Burst Animation */}
+                      {heartBurstPostId === post.$id && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+                          <div className="animate-in zoom-in-50 fade-in duration-200">
+                            <Heart className="w-20 h-20 fill-rose-500 text-rose-500 drop-shadow-2xl animate-out fade-out zoom-out-125 duration-300 delay-500" />
+                          </div>
+                        </div>
+                      )}
+
                       {/* Threads/Instagram Compact Post Header */}
                       <div className="flex items-center justify-between gap-2.5">
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -3574,7 +3730,7 @@ export default function CommunityPage() {
                             </div>
                             <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 dark:text-white/40 font-mono pt-0.5">
                               <span title={new Date(post.$createdAt).toLocaleString()}>{formatRelativeTime(post.$createdAt)}</span>
-                              {!isAuthor && !post.is_anonymous && postHandle && (
+                              {!isAuthor && !post.is_anonymous && postHandle && (isFollowsResolved || !authLoading) && (
                                 <>
                                   <span className="text-slate-300 dark:text-white/20 select-none">·</span>
                                   <button
@@ -3623,52 +3779,10 @@ export default function CommunityPage() {
                                 }}
                               />
                               <div className="absolute right-0 top-full mt-1.5 w-48 rounded-2xl bg-white dark:bg-[#161b22] border border-black/[0.08] dark:border-white/[0.12] shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                                {/* 1. Share Post */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveMenuPostId(null)
-                                    handleSharePost(post)
-                                  }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
-                                >
-                                  <Share2 className="w-3.5 h-3.5 text-slate-400" />
-                                  <span>Share post</span>
-                                </button>
-
-                                {/* 2. Copy Link */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveMenuPostId(null)
-                                    if (typeof window !== 'undefined') {
-                                      const url = `${window.location.origin}/community?post=${post.$id}`
-                                      navigator.clipboard.writeText(url)
-                                    }
-                                  }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
-                                >
-                                  <Copy className="w-3.5 h-3.5 text-slate-400" />
-                                  <span>Copy link</span>
-                                </button>
-
-                                {/* 3. Bookmark / Save Post */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveMenuPostId(null)
-                                    handleToggleSavePost(post.$id)
-                                  }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
-                                >
-                                  <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'text-gold fill-gold' : 'text-slate-400'}`} />
-                                  <span>{isSaved ? 'Remove bookmark' : 'Bookmark post'}</span>
-                                </button>
-
-                                {/* 4. Edit Post (Author Only) */}
-                                {isAuthor && (
+                                {isAuthor ? (
                                   <>
-                                    <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />
+                                    {/* ─── Host POV: ONLY Edit Post & Delete Post ─── */}
+                                    {/* 1. Edit Post */}
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -3677,18 +3791,13 @@ export default function CommunityPage() {
                                         setEditingPost(post)
                                         setEditPostContent(post.content)
                                       }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer font-medium"
                                     >
                                       <Pencil className="w-3.5 h-3.5 text-slate-400" />
                                       <span>Edit post</span>
                                     </button>
-                                  </>
-                                )}
 
-                                {/* 5. Delete Post with Minimalist Inline Confirmation (Author or Admin) */}
-                                {(isAuthor || isAdmin) && (
-                                  <>
-                                    {!isAuthor && <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />}
+                                    {/* 2. Delete Post */}
                                     {confirmDeletePostId === post.$id ? (
                                       <div className="flex items-center justify-between gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 mx-1.5 my-1 rounded-lg animate-in fade-in duration-150">
                                         <span className="text-red-500 text-[11px] font-medium">Confirm delete?</span>
@@ -3721,12 +3830,29 @@ export default function CommunityPage() {
                                       </button>
                                     )}
                                   </>
-                                )}
-
-                                {/* 6. Report Post (Only for non-authors) */}
-                                {!isAuthor && (
+                                ) : (
                                   <>
-                                    <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />
+                                    {/* ─── Someone Else's Post: Copy Link, Report Post, Hide Post ─── */}
+                                    {/* 1. Copy Link */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuPostId(null)
+                                        if (typeof window !== 'undefined') {
+                                          const url = `${window.location.origin}/community?post=${post.$id}`
+                                          navigator.clipboard.writeText(url)
+                                          setToastMessage('Link copied to clipboard')
+                                          setShareCopiedToast(true)
+                                          setTimeout(() => setShareCopiedToast(false), 2500)
+                                        }
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer font-medium"
+                                    >
+                                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                      <span>Copy link</span>
+                                    </button>
+
+                                    {/* 2. Report Post */}
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -3736,32 +3862,47 @@ export default function CommunityPage() {
                                           setIsOnboardingOpen(true)
                                           return
                                         }
-                                        alert('Thank you for reporting. PSITS moderators have been alerted.')
+                                        setToastMessage('Thank you for reporting. PSITS moderators have been alerted.')
+                                        setShareCopiedToast(true)
+                                        setTimeout(() => setShareCopiedToast(false), 3000)
                                       }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer"
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer font-medium"
                                     >
                                       <Flag className="w-3.5 h-3.5 text-amber-500" />
                                       <span>Report post</span>
                                     </button>
-                                  </>
-                                )}
 
-                                {/* 7. Admin Moderator Takedown */}
-                                {isAdmin && (
-                                  <>
-                                    <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />
+                                    {/* 3. Hide Post */}
                                     <button
                                       type="button"
                                       onClick={() => {
                                         setActiveMenuPostId(null)
-                                        setConfirmDeletePostId(null)
-                                        setTakedownTarget(post)
+                                        handleHidePost(post.$id)
                                       }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-amber-500 hover:bg-amber-500/10 transition-colors text-left cursor-pointer"
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer font-medium"
                                     >
-                                      <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
-                                      <span>Moderator takedown</span>
+                                      <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                                      <span>Hide post</span>
                                     </button>
+
+                                    {/* Admin Moderator Takedown */}
+                                    {isAdmin && (
+                                      <>
+                                        <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveMenuPostId(null)
+                                            setConfirmDeletePostId(null)
+                                            setTakedownTarget(post)
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-amber-500 hover:bg-amber-500/10 transition-colors text-left cursor-pointer font-medium"
+                                        >
+                                          <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+                                          <span>Moderator takedown</span>
+                                        </button>
+                                      </>
+                                    )}
                                   </>
                                 )}
                               </div>
@@ -4129,30 +4270,25 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          {/* Notifications Card (Strictly for Authenticated Users - Hidden for Guests) */}
-          {user && (
-            <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-5 space-y-3.5 shadow-sm dark:shadow-none text-xs">
-              <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
-                <div className="flex items-center gap-2 font-display font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-white">
-                  <Bell className="w-4 h-4 text-gold" />
-                  <span>Notifications</span>
+          {/* Host Thread Join Requests (Only displayed if there are active pending requests) */}
+          {user && hostedThreadRequests.length > 0 && (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-3 shadow-sm text-xs">
+              <div className="flex items-center justify-between pb-1.5 border-b border-amber-500/15">
+                <div className="flex items-center gap-2 font-display font-bold text-xs uppercase tracking-wider text-amber-500">
+                  <UserPlus className="w-4 h-4" />
+                  <span>Circle Requests</span>
                 </div>
-                {(hostedThreadRequests.length > 0 || userNotifications.length > 0) && (
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
-                    {hostedThreadRequests.length + userNotifications.length}
-                  </span>
-                )}
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-500">
+                  {hostedThreadRequests.length}
+                </span>
               </div>
-
-              {/* Personal Notification Stream */}
               <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5 scrollbar-thin">
-                {/* Host Thread Join Requests (High Priority Alerts) */}
-                {hostedThreadRequests.length > 0 && hostedThreadRequests.map(item => {
+                {hostedThreadRequests.map(item => {
                   const isProcessing = processingRequestId === `${item.thread.$id}-${item.requesterStr}`
                   return (
                     <div
                       key={`join-req-${item.thread.$id}-${item.requesterStr}`}
-                      className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2 animate-in fade-in"
+                      className="p-2.5 rounded-xl bg-surface border border-black/[0.06] dark:border-white/[0.08] text-xs space-y-2"
                     >
                       <div className="flex items-start justify-between gap-1 text-[11px]">
                         <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white min-w-0">
@@ -4162,11 +4298,7 @@ export default function CommunityPage() {
                             <span className="font-mono text-amber-500">#{item.thread.title}</span>
                           </span>
                         </div>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 font-bold">
-                          Request
-                        </span>
                       </div>
-
                       <div className="flex items-center gap-1.5 pt-0.5">
                         <button
                           type="button"
@@ -4190,48 +4322,6 @@ export default function CommunityPage() {
                     </div>
                   )
                 })}
-
-                {/* Personal Mentions & Post Activity Alerts */}
-                {userNotifications.length > 0 && userNotifications.map(item => (
-                  <div
-                    key={`notif-${item.post.$id}`}
-                    onClick={() => openComments(item.post)}
-                    className="group p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.04] hover:border-gold/30 transition-all cursor-pointer space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className={`font-semibold font-mono flex items-center gap-1 ${item.type === 'mention' ? 'text-gold' : 'text-emerald-500'}`}>
-                        {item.type === 'mention' ? (
-                          <>
-                            <AtSign className="w-3 h-3" />
-                            <span>Mentioned you</span>
-                          </>
-                        ) : (
-                          <>
-                            <MessageSquare className="w-3 h-3" />
-                            <span>{item.title}</span>
-                          </>
-                        )}
-                      </span>
-                      <span className="text-slate-400 font-mono text-[9px]">
-                        {new Date(item.time).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-700 dark:text-white/70 line-clamp-2 leading-relaxed group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
-                      {item.post.content}
-                    </p>
-                  </div>
-                ))}
-
-                {/* Clean empty fallback for authenticated user */}
-                {hostedThreadRequests.length === 0 && userNotifications.length === 0 && (
-                  <div className="py-5 text-center space-y-1">
-                    <div className="w-8 h-8 rounded-full bg-surface-subtle mx-auto flex items-center justify-center text-slate-400">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div className="text-[11px] font-semibold text-slate-700 dark:text-white/80">All caught up!</div>
-                    <p className="text-[10px] text-slate-400 leading-tight">No unread notifications.</p>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -4298,6 +4388,8 @@ export default function CommunityPage() {
           </div>
         </aside>
       </div>
+      </PullToRefresh>
+    </div>
 
       {/* ─── Premium iOS-Style Community Onboarding Modal ─── */}
       <CommunityOnboardingModal
@@ -4358,6 +4450,8 @@ export default function CommunityPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+
 
 
 
@@ -5096,12 +5190,15 @@ export default function CommunityPage() {
         </div>
       )}
 
-      {/* ─── Minimalist Instagram-Style Comments Modal ─── */}
+      {/* ─── Minimalist Instagram-Style Comments Modal / Mobile Bottom Sheet ─── */}
       {activeCommentPost && (
-        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-[28px] bg-white dark:bg-[#0c1017] border border-black/[0.08] dark:border-white/[0.1] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-6 animate-in fade-in duration-150">
+          <div className="w-full max-w-lg max-h-[90dvh] sm:max-h-[85vh] flex flex-col rounded-t-[32px] sm:rounded-[28px] bg-white dark:bg-[#0c1017] border-t sm:border border-black/[0.08] dark:border-white/[0.1] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200">
+            {/* Mobile Drag Handle Indicator */}
+            <div className="w-10 h-1 rounded-full bg-black/20 dark:bg-white/20 mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
+
             {/* Minimalist Top Header (Instagram Style: Centered "Comments", subtle X) */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0 bg-white dark:bg-[#0c1017]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0 bg-white dark:bg-[#0c1017]">
               <div className="w-7" />
               <h3 className="font-bold text-sm text-slate-900 dark:text-white tracking-tight">
                 Comments
@@ -5548,15 +5645,223 @@ export default function CommunityPage() {
         </div>
       )}
 
-      {/* ─── Share Clipboard Toast ─── */}
+      {/* ─── Share Clipboard / Action Toast ─── */}
       {shareCopiedToast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-slate-900 dark:bg-white/95 text-white dark:text-slate-900 text-xs font-semibold shadow-2xl backdrop-blur-xl border border-white/10 dark:border-black/10">
             <Check className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
-            <span>Link copied to clipboard</span>
+            <span>{toastMessage}</span>
           </div>
         </div>
       )}
-    </div>
+      {/* ─── Ultra-Minimalist Native Mobile Navigation Bar (Pure Icons / Instagram Style) ─── */}
+      <nav
+        aria-label="Mobile Navigation"
+        className={`sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-2xl border-t border-black/[0.06] dark:border-white/[0.08] px-3 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-2px_12px_rgba(0,0,0,0.3)] transition-all ${
+          isNotifModalOpen || isCreateOpen || activeCommentPost || isOnboardingOpen ? 'hidden' : 'block'
+        }`}
+      >
+        <div className="flex items-center justify-around h-13 max-w-sm mx-auto">
+          {/* 1. Home / Feed Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              try { navigator.vibrate?.([15]) } catch {}
+              if (window.scrollY > 200) {
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              } else {
+                setSelectedTag('All')
+                setSearchQuery('')
+                setFilterOnlyOfficers(false)
+                setFilterOnlySaved(false)
+                setFilterOnlyMyPosts(false)
+                reloadFeed('All')
+              }
+            }}
+            className="flex items-center justify-center flex-1 h-full active:scale-90 transition-transform cursor-pointer"
+            aria-label="Home Feed"
+          >
+            <Home
+              className={`w-5.5 h-5.5 transition-colors ${
+                selectedTag === 'All' && !searchQuery && !filterOnlySaved && !filterOnlyMyPosts
+                  ? 'text-slate-900 dark:text-white stroke-[2.4]'
+                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 stroke-[1.8]'
+              }`}
+            />
+          </button>
+
+          {/* 2. Explore / Topics Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              try { navigator.vibrate?.([15]) } catch {}
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+              setIsThreadsDropdownOpen(prev => !prev)
+            }}
+            className="flex items-center justify-center flex-1 h-full active:scale-90 transition-transform cursor-pointer"
+            aria-label="Explore Topics & Threads"
+          >
+            <Compass
+              className={`w-5.5 h-5.5 transition-colors ${
+                selectedTag !== 'All'
+                  ? 'text-gold stroke-[2.4]'
+                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 stroke-[1.8]'
+              }`}
+            />
+          </button>
+
+          {/* 3. Instagram-Style Create [+] Tab */}
+          <div className="flex items-center justify-center flex-1 h-full">
+            <button
+              type="button"
+              onClick={() => {
+                try { navigator.vibrate?.([20]) } catch {}
+                if (!user) {
+                  setIsOnboardingOpen(true)
+                } else {
+                  setIsCreateOpen(true)
+                }
+              }}
+              className="flex items-center justify-center w-7.5 h-7.5 rounded-lg border-[1.75px] border-slate-800 dark:border-white/80 hover:border-gold hover:text-gold text-slate-900 dark:text-white transition-all active:scale-85 cursor-pointer"
+              aria-label="Create Post"
+            >
+              <Plus className="w-4.5 h-4.5 stroke-[2.8]" />
+            </button>
+          </div>
+
+          {/* 4. Search Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              try { navigator.vibrate?.([15]) } catch {}
+              setIsSearchModalOpen(true)
+            }}
+            className="flex items-center justify-center flex-1 h-full active:scale-90 transition-transform cursor-pointer"
+            aria-label="Search Feed"
+          >
+            <Search
+              className={`w-5.5 h-5.5 transition-colors ${
+                Boolean(searchQuery)
+                  ? 'text-gold stroke-[2.4]'
+                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 stroke-[1.8]'
+              }`}
+            />
+          </button>
+
+          {/* 5. Real User Profile Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              try { navigator.vibrate?.([15]) } catch {}
+              if (!user) {
+                setIsOnboardingOpen(true)
+              } else {
+                const handle = userProfile?.username 
+                  ? userProfile.username.replace(/^@/, '') 
+                  : user.name.toLowerCase().replace(/[^a-z0-9_.]/g, '') || 'student'
+                router.push(`/community/${handle}`)
+              }
+            }}
+            className="flex items-center justify-center flex-1 h-full active:scale-90 transition-transform cursor-pointer"
+            aria-label="My Profile"
+          >
+            {(() => {
+              const avatarUrl = userProfile?.avatar || user?.avatar || ''
+              const isPreset = avatarUrl.startsWith('preset:')
+              const hasRealPhoto = avatarUrl && !isPreset
+
+              if (hasRealPhoto) {
+                return (
+                  <div className="w-6 h-6 rounded-full overflow-hidden ring-1.5 ring-slate-400 dark:ring-slate-500 hover:ring-gold transition-all">
+                    <Image
+                      src={avatarUrl}
+                      alt={userProfile?.name || user?.name || 'Profile'}
+                      width={24}
+                      height={24}
+                      className="w-full h-full object-cover"
+                      unoptimized={avatarUrl.startsWith('data:') || avatarUrl.includes('appwrite')}
+                    />
+                  </div>
+                )
+              }
+
+              if (isPreset) {
+                return (
+                  <div className="w-6 h-6 rounded-full overflow-hidden ring-1.5 ring-slate-400 dark:ring-slate-500 flex items-center justify-center bg-slate-800">
+                    {renderAvatarIcon(avatarUrl, userProfile?.name || user?.name || 'User', 'w-3 h-3 text-gold')}
+                  </div>
+                )
+              }
+
+              if (user) {
+                const initial = (userProfile?.name || user.name || 'U').charAt(0).toUpperCase()
+                return (
+                  <div className="w-6 h-6 rounded-full bg-gold/15 text-gold font-bold text-[10px] flex items-center justify-center ring-1 ring-gold/40">
+                    {initial}
+                  </div>
+                )
+              }
+
+              return <User className="w-5.5 h-5.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 stroke-[1.8]" />
+            })()}
+          </button>
+        </div>
+      </nav>
+
+      {/* ─── Instagram-Style Search Modal ─── */}
+      <AnimatePresence>
+        {isSearchModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-md p-4 sm:p-6 animate-fade-in">
+            <div className="w-full max-w-lg bg-white dark:bg-[#0c1017] rounded-3xl border border-black/10 dark:border-white/10 shadow-2xl overflow-hidden p-4 space-y-3 mt-14 sm:mt-24">
+              <div className="flex items-center justify-between gap-2 border-b border-black/[0.06] dark:border-white/[0.08] pb-3">
+                <div className="flex items-center gap-2 flex-1">
+                  <Search size={16} className="text-gold shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    autoFocus
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search posts, topics, authors..."
+                    className="w-full bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSearchModalOpen(false)}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-full bg-gold text-slate-950 hover:opacity-90 transition-opacity cursor-pointer shrink-0"
+                >
+                  Done
+                </button>
+              </div>
+              <div className="text-[11px] text-slate-400 flex items-center justify-between">
+                <span>Filtering feed live</span>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('')
+                      setIsSearchModalOpen(false)
+                    }}
+                    className="text-rose-500 hover:underline cursor-pointer font-medium"
+                  >
+                    Clear Filter
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

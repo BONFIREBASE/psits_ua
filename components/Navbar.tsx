@@ -16,6 +16,7 @@ import {
   markAllNotificationsAsReadAction,
   type CommunityNotificationItem,
 } from '@/app/community/actions'
+import { normalizeCommunityHandle } from '@/lib/community-validation'
 
 const links = [
   { href: '/', label: 'Home' },
@@ -106,10 +107,13 @@ export default function Navbar() {
     return () => window.removeEventListener('psits:profile-updated', handleProfileUpdate)
   }, [isCommunity])
 
-  const myHandleNormalized = (communityUser?.username || communityUser?.name || '')
-    .toLowerCase()
-    .replace(/^@/, '')
-    .replace(/[^a-z0-9_.]/g, '')
+  useEffect(() => {
+    const handleToggleMenu = () => setOpen(prev => !prev)
+    window.addEventListener('psits:toggle-menu', handleToggleMenu)
+    return () => window.removeEventListener('psits:toggle-menu', handleToggleMenu)
+  }, [])
+
+  const myHandleNormalized = normalizeCommunityHandle(communityUser?.username || communityUser?.name || '')
 
   useEffect(() => {
     if (!myHandleNormalized) return
@@ -135,7 +139,7 @@ export default function Navbar() {
       unsubscribe = appwrite.subscribe(channel, (response: { events: string[]; payload: Record<string, unknown> }) => {
         const events = response.events || []
         const payload = response.payload
-        const recipientHandle = String(payload.recipient_handle || '').toLowerCase().replace(/^@/, '').trim()
+        const recipientHandle = normalizeCommunityHandle(String(payload.recipient_handle || ''))
         const recipientEmail = String(payload.recipient_email || '').toLowerCase().trim()
         const myEmail = (communityUser?.email || '').toLowerCase().trim()
 
@@ -277,7 +281,9 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-[130] flex justify-center pointer-events-none px-4 pt-3 sm:pt-4">
+      <header className={`top-0 left-0 right-0 z-[130] justify-center pointer-events-none ${
+        isCommunity ? 'hidden md:flex fixed px-4 pt-4' : 'flex fixed px-4 pt-3 sm:pt-4'
+      }`}>
         <motion.nav
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -285,15 +291,11 @@ export default function Navbar() {
           className={`
             pointer-events-auto
             relative flex items-center justify-between
-            w-full max-w-3xl
-            h-12 sm:h-14
-            px-3 sm:px-4
-            rounded-full
-            border
-            transition-all duration-500 ease-out
-            ${scrolled
-              ? 'bg-white/85 dark:bg-[#0D1117]/85 backdrop-blur-xl border-black/[0.08] dark:border-white/[0.12] shadow-[0_12px_36px_rgba(0,0,0,0.08)] dark:shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.18),0_12px_36px_rgba(0,0,0,0.6),0_0_20px_rgba(245,166,35,0.06)]'
-              : 'bg-white/70 dark:bg-[#0D1117]/60 backdrop-blur-md border-black/[0.06] dark:border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.12),0_4px_24px_rgba(0,0,0,0.3)]'
+            transition-all duration-300 ease-out
+            w-full max-w-3xl h-12 sm:h-14 px-3 sm:px-4 rounded-full border ${
+              scrolled
+                ? 'bg-white/85 dark:bg-[#0D1117]/85 backdrop-blur-xl border-black/[0.08] dark:border-white/[0.12] shadow-[0_12px_36px_rgba(0,0,0,0.08)] dark:shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.18),0_12px_36px_rgba(0,0,0,0.6),0_0_20px_rgba(245,166,35,0.06)]'
+                : 'bg-white/70 dark:bg-[#0D1117]/60 backdrop-blur-md border-black/[0.06] dark:border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.12),0_4px_24px_rgba(0,0,0,0.3)]'
             }
           `}
         >
@@ -303,30 +305,97 @@ export default function Navbar() {
             className="absolute inset-x-8 top-0 h-[1px] bg-gradient-to-r from-transparent via-black/10 dark:via-white/20 to-transparent pointer-events-none rounded-full"
           />
 
-          {/* Brand Logo */}
-          <Link
-            href="/"
-            className="group flex items-center gap-2 shrink-0 pl-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 rounded-full"
-            aria-label="PSITS-UA Home"
-          >
-            <motion.div
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          {/* Mobile Community Header Left: Hamburger Toggle | Desktop / Other Pages: Brand Logo */}
+          {isCommunity ? (
+            <>
+              {/* Mobile Left: Hamburger Menu */}
+              <button
+                type="button"
+                onClick={() => setOpen(!open)}
+                className="md:hidden p-2 -ml-1.5 rounded-full text-gold hover:bg-black/5 dark:hover:bg-white/[0.08] transition-colors cursor-pointer select-none"
+                aria-label="Toggle menu"
+                aria-expanded={open}
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {open ? (
+                    <motion.div
+                      key="close"
+                      initial={{ rotate: -90, opacity: 0 }}
+                      animate={{ rotate: 0, opacity: 1 }}
+                      exit={{ rotate: 90, opacity: 0 }}
+                      transition={{ duration: 0.16 }}
+                    >
+                      <X size={20} />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="menu"
+                      initial={{ rotate: 90, opacity: 0 }}
+                      animate={{ rotate: 0, opacity: 1 }}
+                      exit={{ rotate: -90, opacity: 0 }}
+                      transition={{ duration: 0.16 }}
+                    >
+                      <Menu size={20} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </button>
+
+              {/* Mobile Center: "Community" Title */}
+              <div className="md:hidden absolute left-1/2 -translate-x-1/2 font-display font-bold text-[15px] sm:text-base tracking-tight text-slate-900 dark:text-white select-none pointer-events-none">
+                Community
+              </div>
+
+              {/* Desktop Brand Logo */}
+              <Link
+                href="/"
+                className="hidden md:flex items-center gap-2 shrink-0 pl-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 rounded-full group"
+                aria-label="PSITS-UA Home"
+              >
+                <motion.div
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                >
+                  <Image
+                    src="/assets/logo/PSITS logo.png"
+                    alt="PSITS-UA"
+                    width={28}
+                    height={28}
+                    className="object-contain"
+                    priority
+                  />
+                </motion.div>
+                <span className="font-display font-bold text-[14px] sm:text-[15px] tracking-tight text-slate-900 dark:text-white select-none">
+                  PSITS<span className="text-gold">-U</span><span className="text-[#E63946]">A</span>
+                </span>
+              </Link>
+            </>
+          ) : (
+            <Link
+              href="/"
+              className="group flex items-center gap-2 shrink-0 pl-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 rounded-full"
+              aria-label="PSITS-UA Home"
             >
-              <Image
-                src="/assets/logo/PSITS logo.png"
-                alt="PSITS-UA"
-                width={28}
-                height={28}
-                className="object-contain"
-                priority
-              />
-            </motion.div>
-            <span className="font-display font-bold text-[14px] sm:text-[15px] tracking-tight text-slate-900 dark:text-white select-none">
-              PSITS<span className="text-gold">-U</span><span className="text-[#E63946]">A</span>
-            </span>
-          </Link>
+              <motion.div
+                whileHover={{ scale: 1.06 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              >
+                <Image
+                  src="/assets/logo/PSITS logo.png"
+                  alt="PSITS-UA"
+                  width={28}
+                  height={28}
+                  className="object-contain"
+                  priority
+                />
+              </motion.div>
+              <span className="font-display font-bold text-[14px] sm:text-[15px] tracking-tight text-slate-900 dark:text-white select-none">
+                PSITS<span className="text-gold">-U</span><span className="text-[#E63946]">A</span>
+              </span>
+            </Link>
+          )}
 
           {/* Desktop Nav Links & Theme Toggle */}
           <div className="hidden md:flex items-center gap-1.5">
@@ -667,17 +736,18 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile Right Controls: Notification Bell + Profile + Menu Toggle */}
+          {/* Mobile Right Controls */}
           <div className="flex items-center gap-1.5 md:hidden">
-            {isCommunity && communityUser && (
+            {isCommunity ? (
+              /* On Community Mobile: Only the Notification Bell */
               <div className="relative" ref={mobileNotifDropdownRef}>
                 <button
                   type="button"
                   onClick={() => {
-                    setProfileMenuOpen(false)
+                    window.dispatchEvent(new CustomEvent('psits:open-notifications'))
                     setNotifDropdownOpen(prev => !prev)
                   }}
-                  className={`relative w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                  className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                     notifDropdownOpen
                       ? 'bg-gold/20 text-gold ring-1 ring-gold/40'
                       : 'text-slate-600 dark:text-slate-300 hover:text-gold hover:bg-black/5 dark:hover:bg-white/5'
@@ -685,11 +755,9 @@ export default function Navbar() {
                   title="Notifications"
                   aria-label="Notifications"
                 >
-                  <Bell size={15} />
+                  <Bell size={18} />
                   {unreadNotifCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-rose-500 text-white font-mono text-[8px] font-bold flex items-center justify-center shadow-xs">
-                      {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
-                    </span>
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#07090e]" />
                   )}
                 </button>
 
@@ -768,190 +836,50 @@ export default function Navbar() {
                   )}
                 </AnimatePresence>
               </div>
-            )}
-            {isCommunity ? (
-              <div className="relative" ref={mobileProfileMenuRef}>
-                {communityUser ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setProfileMenuOpen(prev => !prev)}
-                      className="w-7 h-7 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold font-bold text-xs overflow-hidden cursor-pointer"
-                      title="Student Profile"
-                      aria-expanded={profileMenuOpen}
-                    >
-                      {communityUser.avatar && !communityUser.avatar.startsWith('preset:') ? (
-                        <Image src={communityUser.avatar} alt="Avatar" width={28} height={28} className="w-full h-full object-cover" />
-                      ) : (
-                        <span>{communityUser.name.charAt(0).toUpperCase()}</span>
-                      )}
-                    </button>
-
-                    <AnimatePresence>
-                      {profileMenuOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                          transition={{ duration: 0.15 }}
-                          className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-2.5 space-y-1.5 z-50 backdrop-blur-xl"
-                        >
-                          {/* Student Details Header (Clickable Link to Profile) */}
-                          <Link
-                            href={`/community/${(communityUser.username || communityUser.name || 'kasubay').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')}`}
-                            onClick={() => setProfileMenuOpen(false)}
-                            className="p-2.5 rounded-xl bg-surface-subtle hover:bg-gold/10 border border-black/[0.04] dark:border-white/[0.06] hover:border-gold/30 flex items-center gap-2.5 transition-all cursor-pointer group"
-                            title="View your public profile"
-                          >
-                            <div className="relative shrink-0 w-8 h-8">
-                              <div className="w-8 h-8 rounded-full bg-gold/15 border border-gold/40 flex items-center justify-center text-gold font-bold text-xs shrink-0 overflow-hidden">
-                                {communityUser.avatar && !communityUser.avatar.startsWith('preset:') ? (
-                                  <Image
-                                    src={communityUser.avatar}
-                                    alt="Avatar"
-                                    width={32}
-                                    height={32}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span>{communityUser.name.charAt(0).toUpperCase()}</span>
-                                )}
-                              </div>
-                              {communityUser.isVerified && (
-                                <div className="absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-white dark:ring-[#161b22] bg-white dark:bg-[#161b22] flex items-center justify-center pointer-events-none shadow-sm">
-                                  <InstagramVerifiedBadge className="w-3 h-3" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-gold transition-colors truncate">
-                                {communityUser.name}
-                              </div>
-                              <div className="text-[10px] font-mono text-gold truncate">
-                                {communityUser.username
-                                  ? (communityUser.username.startsWith('@') ? communityUser.username : `@${communityUser.username}`)
-                                  : '@kasubay'}
-                              </div>
-                            </div>
-                          </Link>
-
-                          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface-subtle border border-black/[0.04] dark:border-white/[0.06]">
-                            <div className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-white/80">
-                              {resolvedTheme === 'dark' ? <Moon size={13} className="text-gold" /> : <Sun size={13} className="text-gold" />}
-                              <span>Appearance</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => toggleTheme()}
-                              className="px-2.5 py-1 rounded-lg bg-surface border border-black/[0.08] dark:border-white/10 hover:border-gold/40 text-[10px] font-mono font-semibold text-slate-800 dark:text-slate-200 hover:text-gold transition-all cursor-pointer shadow-xs capitalize"
-                            >
-                              {resolvedTheme} mode
-                            </button>
-                          </div>
-
-                          <div className="w-full h-[1px] bg-black/[0.06] dark:bg-white/[0.06] my-1" />
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProfileMenuOpen(false)
-                              window.dispatchEvent(new CustomEvent('psits:open-profile'))
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gold/15 text-slate-700 dark:text-white/80 hover:text-gold transition-colors text-xs font-medium text-left cursor-pointer"
-                          >
-                            <User size={14} className="text-gold" />
-                            <span>Edit Student Profile</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProfileMenuOpen(false)
-                              window.dispatchEvent(new CustomEvent('psits:filter-my-posts'))
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gold/15 text-slate-700 dark:text-white/80 hover:text-gold transition-colors text-xs font-medium text-left cursor-pointer"
-                          >
-                            <FileText size={14} className="text-gold" />
-                            <span>View My Posts</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProfileMenuOpen(false)
-                              window.dispatchEvent(new CustomEvent('psits:open-onboarding'))
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gold/15 text-slate-700 dark:text-white/80 hover:text-gold transition-colors text-xs font-medium text-left cursor-pointer"
-                          >
-                            <Settings size={14} className="text-gold" />
-                            <span>Tour & Community Guide</span>
-                          </button>
-
-                          <div className="w-full h-[1px] bg-black/[0.06] dark:bg-white/[0.06] my-1" />
-
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setProfileMenuOpen(false)
-                              await supabase.auth.signOut()
-                              setCommunityUser(null)
-                              window.dispatchEvent(new CustomEvent('psits:profile-updated'))
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-rose-500/15 text-rose-500 transition-colors text-xs font-medium text-left cursor-pointer"
-                          >
-                            <LogOut size={14} />
-                            <span>Disconnect Account</span>
-                          </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </>
-                ) : (
-                  <ThemeToggle size={18} />
-                )}
-              </div>
             ) : (
-              <ThemeToggle size={18} />
+              <>
+                <ThemeToggle size={18} />
+                <button
+                  type="button"
+                  onClick={() => setOpen(!open)}
+                  className="
+                    p-2 rounded-full
+                    text-gold hover:bg-black/5 dark:hover:bg-white/[0.08]
+                    transition-colors duration-200
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60
+                    cursor-pointer select-none
+                  "
+                  aria-label="Toggle menu"
+                  aria-expanded={open}
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    {open ? (
+                      <motion.div
+                        key="close"
+                        initial={{ rotate: -90, opacity: 0 }}
+                        animate={{ rotate: 0, opacity: 1 }}
+                        exit={{ rotate: 90, opacity: 0 }}
+                        transition={{ duration: 0.16 }}
+                        className="pointer-events-none"
+                      >
+                        <X size={20} />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="menu"
+                        initial={{ rotate: 90, opacity: 0 }}
+                        animate={{ rotate: 0, opacity: 1 }}
+                        exit={{ rotate: -90, opacity: 0 }}
+                        transition={{ duration: 0.16 }}
+                        className="pointer-events-none"
+                      >
+                        <Menu size={20} />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </button>
+              </>
             )}
-            <button
-              type="button"
-              onClick={() => setOpen(!open)}
-              className="
-                p-2 rounded-full
-                text-gold hover:bg-black/5 dark:hover:bg-white/[0.08]
-                transition-colors duration-200
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60
-                cursor-pointer select-none
-              "
-              aria-label="Toggle menu"
-              aria-expanded={open}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {open ? (
-                  <motion.div
-                    key="close"
-                    initial={{ rotate: -90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: 90, opacity: 0 }}
-                    transition={{ duration: 0.16 }}
-                    className="pointer-events-none"
-                  >
-                    <X size={20} />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="menu"
-                    initial={{ rotate: 90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: -90, opacity: 0 }}
-                    transition={{ duration: 0.16 }}
-                    className="pointer-events-none"
-                  >
-                    <Menu size={20} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </button>
           </div>
         </motion.nav>
       </header>

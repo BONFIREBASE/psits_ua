@@ -32,10 +32,12 @@ import {
   Flag,
   Link2,
   Smile,
+  EyeOff,
+  Eye,
 } from 'lucide-react'
 import { appwrite, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, appwriteStorage, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
-  getCommunityFeedAction,
+  getAuthorPostsAction,
   deleteOwnCommunityPostAction,
   editCommunityPostAction,
   togglePostReactionAction,
@@ -50,10 +52,12 @@ import {
   type FollowUserInfo,
   type StudentProfileData,
 } from '../actions'
+import { normalizeCommunityHandle } from '@/lib/community-validation'
 import { ProfileShareModal } from '@/components/ProfileShareModal'
 import { EditProfileModal } from '@/components/EditProfileModal'
 import { supabase } from '@/lib/supabase'
 import { NumberTicker } from '@/components/motion/number-ticker'
+import { PullToRefresh } from '@/components/motion/pull-to-refresh'
 
 import { CommentsListSkeleton } from '@/components/PublicSkeletonPreloader'
 import { type CommunityUserProfile } from '@/components/CommunityOnboardingModal'
@@ -179,11 +183,11 @@ export default function StudentProfilePage() {
   const params = useParams()
   const rawParam = params?.username as string | undefined
   const targetUsername = useMemo(() => {
-    return decodeURIComponent(rawParam || '').replace(/^@/, '').toLowerCase().trim()
+    return normalizeCommunityHandle(decodeURIComponent(rawParam || ''))
   }, [rawParam])
 
   const [posts, setPosts] = useState<CommunityPostItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState<boolean>(true)
   const [user, setUser] = useState<{
     email: string
     name: string
@@ -200,6 +204,7 @@ export default function StudentProfilePage() {
 
   // Engagement & Action state
   const [savedPostIds, setSavedPostIds] = useState<string[]>([])
+  const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
   const [userLikedPosts, setUserLikedPosts] = useState<string[]>([])
   const [activeMenuPostId, setActiveMenuPostId] = useState<string | null>(null)
   const [confirmDeletePostId, setConfirmDeletePostId] = useState<string | null>(null)
@@ -209,13 +214,20 @@ export default function StudentProfilePage() {
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts')
 
-  // Follow System state
-  const [followStats, setFollowStats] = useState({
+  // Follow System state (Stale-While-Revalidate with localStorage for 0ms instant render)
+  const [followStats, setFollowStats] = useState<{
+    followersCount: number
+    followingCount: number
+    isFollowing: boolean
+    isFollowedBy: boolean
+  }>({
     followersCount: 0,
     followingCount: 0,
     isFollowing: false,
     isFollowedBy: false,
   })
+  const [isFollowStatsResolved, setIsFollowStatsResolved] = useState<boolean>(false)
+  const [cachedHandle, setCachedHandle] = useState<string>('')
   const [isFollowLoading, setIsFollowLoading] = useState(false)
   const [isProfileShareModalOpen, setIsProfileShareModalOpen] = useState(false)
   const [followModal, setFollowModal] = useState<{
@@ -327,21 +339,15 @@ export default function StudentProfilePage() {
       }
     })
 
-    // 2. Hydrate cached state asynchronously without blocking initial render
+    // 2. Hydrate cached preferences asynchronously without blocking initial render
     queueMicrotask(() => {
       try {
-        const cached = localStorage.getItem('psits_community_cached_posts_v4')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setPosts(parsed)
-            setLoading(false)
-          }
-        }
         const cachedSaved = localStorage.getItem('psits_community_saved_posts')
         if (cachedSaved) setSavedPostIds(JSON.parse(cachedSaved))
         const cachedLiked = localStorage.getItem('psits_community_liked_posts')
         if (cachedLiked) setUserLikedPosts(JSON.parse(cachedLiked))
+        const cachedActive = localStorage.getItem('psits_community_active_handle')
+        if (cachedActive) setCachedHandle(normalizeCommunityHandle(cachedActive))
       } catch {}
     })
 
@@ -397,15 +403,64 @@ export default function StudentProfilePage() {
     }
   }, [targetUsername, fetchProfile])
 
+  // Hydrate cached follow stats & profile posts from localStorage safely on client mount (avoids SSR hydration mismatch)
+  useEffect(() => {
+    if (!targetUsername) return
+    queueMicrotask(() => {
+      try {
+        const cachedFollow = localStorage.getItem(`psits_community_follow_${targetUsername}`)
+        if (cachedFollow) {
+          const parsedFollow = JSON.parse(cachedFollow)
+          setFollowStats({
+            followersCount: Number(parsedFollow.followersCount) || 0,
+            followingCount: Number(parsedFollow.followingCount) || 0,
+            isFollowing: Boolean(parsedFollow.isFollowing),
+            isFollowedBy: Boolean(parsedFollow.isFollowedBy),
+          })
+          setIsFollowStatsResolved(true)
+        } else {
+          const cachedMyFollowing = localStorage.getItem('psits_community_my_following')
+          if (cachedMyFollowing) {
+            const list = JSON.parse(cachedMyFollowing)
+            if (Array.isArray(list)) {
+              setFollowStats(prev => ({
+                ...prev,
+                isFollowing: list.includes(targetUsername),
+              }))
+              setIsFollowStatsResolved(true)
+            }
+          }
+        }
+
+        const cached = localStorage.getItem(`psits_community_profile_posts_${targetUsername}`)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPosts(parsed)
+            setLoading(false)
+          }
+        }
+        const cachedHidden = localStorage.getItem('psits_community_hidden_posts')
+        if (cachedHidden) {
+          try {
+            const parsed = JSON.parse(cachedHidden)
+            if (Array.isArray(parsed)) setHiddenPostIds(parsed)
+          } catch {}
+        }
+      } catch {}
+    })
+  }, [targetUsername])
 
   useEffect(() => {
     let ignore = false
-    getCommunityFeedAction()
+    if (!targetUsername) return
+
+    getAuthorPostsAction(targetUsername)
       .then(res => {
         if (!ignore && res.success && res.posts) {
           setPosts(res.posts)
           try {
-            localStorage.setItem('psits_community_cached_posts_v4', JSON.stringify(res.posts))
+            localStorage.setItem(`psits_community_profile_posts_${targetUsername}`, JSON.stringify(res.posts))
           } catch {}
         }
       })
@@ -418,13 +473,13 @@ export default function StudentProfilePage() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [targetUsername])
 
   // Filter posts by this username
   const authorPosts = useMemo(() => {
     if (!targetUsername) return []
     return posts.filter(p => {
-      const pHandle = (p.author_display_name || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
+      const pHandle = normalizeCommunityHandle(p.author_display_name || '')
       return pHandle === targetUsername
     })
   }, [posts, targetUsername])
@@ -439,10 +494,20 @@ export default function StudentProfilePage() {
     return activeTab === 'posts' ? authorPosts : savedPosts
   }, [activeTab, authorPosts, savedPosts])
 
+  // Sync active handle to localStorage safely in an effect (not during render pass)
+  useEffect(() => {
+    const live = normalizeCommunityHandle(userProfile?.username || user?.username || user?.name || '')
+    if (live) {
+      try { localStorage.setItem('psits_community_active_handle', live) } catch {}
+    }
+  }, [userProfile?.username, user])
+
   // Profile Identity & Ownership
   const myHandle = useMemo(() => {
-    return (userProfile?.username || user?.username || user?.name || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
-  }, [userProfile?.username, user])
+    const live = normalizeCommunityHandle(userProfile?.username || user?.username || user?.name || '')
+    if (live) return live
+    return cachedHandle
+  }, [userProfile?.username, user, cachedHandle])
 
   const isOwnProfile = Boolean(myHandle && targetUsername && myHandle === targetUsername)
 
@@ -530,26 +595,63 @@ export default function StudentProfilePage() {
     if (!targetUsername) return
     const res = await getFollowStatsAction(targetUsername, myHandle)
     if (res.success) {
-      setFollowStats({
+      const newStats = {
         followersCount: res.followersCount,
         followingCount: res.followingCount,
         isFollowing: res.isFollowing,
         isFollowedBy: res.isFollowedBy,
-      })
+      }
+      setFollowStats(newStats)
+      setIsFollowStatsResolved(true)
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`psits_community_follow_${targetUsername}`, JSON.stringify(newStats))
+        } catch {}
+      }
     }
   }, [targetUsername, myHandle])
+
+  /* ─── Pull-to-Refresh Handler ─── */
+  const handlePullToRefresh = useCallback(async () => {
+    try { navigator.vibrate?.([15]) } catch {}
+    if (!targetUsername) return
+
+    await Promise.allSettled([
+      fetchProfile(),
+      loadFollowStats(),
+      getAuthorPostsAction(targetUsername)
+        .then(res => {
+          if (res.success && res.posts) {
+            setPosts(res.posts)
+            try {
+              localStorage.setItem(`psits_community_profile_posts_${targetUsername}`, JSON.stringify(res.posts))
+            } catch {}
+          }
+        })
+        .catch(err => {
+          console.error('Failed to reload profile posts:', err)
+        }),
+    ])
+  }, [targetUsername, fetchProfile, loadFollowStats])
 
   useEffect(() => {
     let isMounted = true
     if (targetUsername) {
       getFollowStatsAction(targetUsername, myHandle).then(res => {
         if (isMounted && res.success) {
-          setFollowStats({
+          const newStats = {
             followersCount: res.followersCount,
             followingCount: res.followingCount,
             isFollowing: res.isFollowing,
             isFollowedBy: res.isFollowedBy,
-          })
+          }
+          setFollowStats(newStats)
+          setIsFollowStatsResolved(true)
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(`psits_community_follow_${targetUsername}`, JSON.stringify(newStats))
+            } catch {}
+          }
         }
       })
     }
@@ -557,12 +659,19 @@ export default function StudentProfilePage() {
     let unsubscribe: (() => void) | undefined
     try {
       const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_COLLECTIONS.FOLLOWS}.documents`
-      unsubscribe = appwrite.subscribe(channel, (response: { payload?: Record<string, unknown> }) => {
+      unsubscribe = appwrite.subscribe(channel, (response: { events?: string[]; payload?: Record<string, unknown> }) => {
+        const events = response?.events || []
+        const isDelete = events.some(e => e.includes('.delete'))
+        if (isDelete) {
+          loadFollowStats()
+          return
+        }
+
         const p = response?.payload
         if (p) {
-          const fHandle = String(p.follower_handle || '').toLowerCase().replace(/^@/, '').trim()
-          const tHandle = String(p.following_handle || '').toLowerCase().replace(/^@/, '').trim()
-          if (fHandle === targetUsername || tHandle === targetUsername || fHandle === myHandle || tHandle === myHandle) {
+          const fHandle = normalizeCommunityHandle(String(p.follower_handle || ''))
+          const tHandle = normalizeCommunityHandle(String(p.following_handle || ''))
+          if (!fHandle || !tHandle || fHandle === targetUsername || tHandle === targetUsername || fHandle === myHandle || tHandle === myHandle) {
             loadFollowStats()
           }
         } else {
@@ -686,11 +795,18 @@ export default function StudentProfilePage() {
     const nextFollowing = !followStats.isFollowing
 
     // Optimistic update
-    setFollowStats(prev => ({
-      ...prev,
+    const updatedStats = {
+      ...followStats,
       isFollowing: nextFollowing,
-      followersCount: Math.max(0, prev.followersCount + (nextFollowing ? 1 : -1)),
-    }))
+      followersCount: Math.max(0, followStats.followersCount + (nextFollowing ? 1 : -1)),
+    }
+    setFollowStats(updatedStats)
+    setIsFollowStatsResolved(true)
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`psits_community_follow_${targetUsername}`, JSON.stringify(updatedStats))
+      } catch {}
+    }
 
     try {
       const res = await toggleFollowAction({
@@ -702,6 +818,18 @@ export default function StudentProfilePage() {
         followingAvatar: profileInfo.avatar,
       })
       if (!res.success) {
+        loadFollowStats()
+      } else {
+        const confirmedStats = {
+          ...updatedStats,
+          isFollowing: res.isFollowing,
+        }
+        setFollowStats(confirmedStats)
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(`psits_community_follow_${targetUsername}`, JSON.stringify(confirmedStats))
+          } catch {}
+        }
         loadFollowStats()
       }
     } catch {
@@ -738,11 +866,11 @@ export default function StudentProfilePage() {
       return
     }
 
-    const cleanTarget = targetUserHandle.toLowerCase().replace(/^@/, '').trim()
+    const cleanTarget = normalizeCommunityHandle(targetUserHandle)
     setFollowModal(prev => ({
       ...prev,
       users: prev.users.map(u => {
-        if (u.handle.toLowerCase() === cleanTarget) {
+        if (normalizeCommunityHandle(u.handle) === cleanTarget) {
           return { ...u, isFollowing: !u.isFollowing }
         }
         return u
@@ -750,7 +878,7 @@ export default function StudentProfilePage() {
     }))
 
     try {
-      await toggleFollowAction({
+      const res = await toggleFollowAction({
         followerHandle: myHandle,
         followingHandle: cleanTarget,
         followerName: user.name,
@@ -758,6 +886,17 @@ export default function StudentProfilePage() {
         followingName: targetUserName,
         followingAvatar: targetUserAvatar,
       })
+      if (res.success) {
+        setFollowModal(prev => ({
+          ...prev,
+          users: prev.users.map(u => {
+            if (normalizeCommunityHandle(u.handle) === cleanTarget) {
+              return { ...u, isFollowing: res.isFollowing }
+            }
+            return u
+          }),
+        }))
+      }
       loadFollowStats()
     } catch {
       openFollowList(followModal.type)
@@ -801,6 +940,22 @@ export default function StudentProfilePage() {
   }
 
   const [shareCopiedToast, setShareCopiedToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string>('Link copied to clipboard')
+
+  const handleToggleHidePost = (postId: string) => {
+    try { navigator.vibrate?.([15]) } catch {}
+    const isCurrentlyHidden = hiddenPostIds.includes(postId)
+    setHiddenPostIds(prev => {
+      const updated = isCurrentlyHidden ? prev.filter(id => id !== postId) : [...prev, postId]
+      try {
+        localStorage.setItem('psits_community_hidden_posts', JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+    setToastMessage(isCurrentlyHidden ? 'Post unhidden from feed.' : "Post hidden from feed. Visible on author's profile.")
+    setShareCopiedToast(true)
+    setTimeout(() => setShareCopiedToast(false), 3000)
+  }
 
   const handleSharePost = async (post: CommunityPostItem) => {
     const url = typeof window !== 'undefined' ? `${window.location.origin}/community?post=${post.$id}` : ''
@@ -1027,10 +1182,24 @@ export default function StudentProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#07090e] text-slate-900 dark:text-slate-100 pb-24 pt-20 sm:pt-24 overflow-x-hidden">
-      <main className="max-w-xl mx-auto px-4 space-y-5">
+    <div className="min-h-screen bg-white dark:bg-[#07090e] text-slate-900 dark:text-slate-100 overflow-x-hidden">
+      <main className="max-w-xl mx-auto px-4 pb-24 pt-2 sm:pt-4">
+        {/* ─── Pull To Refresh Profile Scroller (Directly Above The Name Only) ─── */}
+        <PullToRefresh
+          onRefresh={handlePullToRefresh}
+          disabled={
+            isProfileShareModalOpen ||
+            isEditProfileOpen ||
+            Boolean(activeCommentPost) ||
+            Boolean(editingPost) ||
+            Boolean(confirmDeletePostId) ||
+            followModal.open
+          }
+          className="w-full bg-transparent overflow-visible"
+          contentClassName="overflow-visible space-y-4 sm:space-y-5"
+        >
         {/* Top Header Navigation Strip (In-flow to prevent mobile avatar cutoff) */}
-        <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06]">
+        <div className="flex items-center justify-between pb-2.5 sm:pb-3 border-b border-black/[0.06] dark:border-white/[0.06]">
           <Link
             href="/community"
             className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-white/70 hover:text-gold transition-colors py-1.5 px-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
@@ -1054,7 +1223,42 @@ export default function StudentProfilePage() {
         </div>
 
         {/* Instagram Profile Hero (Seamless & Natural) */}
-        <section className="pt-1 pb-1 space-y-4">
+        {!isFollowStatsResolved || (loading && !fetchedProfile && authorPosts.length === 0) ? (
+          <section className="pt-1 pb-1 space-y-4 animate-pulse">
+            <div className="flex items-center gap-5 sm:gap-7">
+              <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+              <div className="flex-1 grid grid-cols-3 gap-1 sm:gap-2 text-center">
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="w-8 h-5 rounded bg-black/[0.08] dark:bg-white/[0.1]" />
+                  <div className="w-10 h-2.5 rounded bg-black/[0.04] dark:bg-white/[0.06]" />
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="w-8 h-5 rounded bg-black/[0.08] dark:bg-white/[0.1]" />
+                  <div className="w-14 h-2.5 rounded bg-black/[0.04] dark:bg-white/[0.06]" />
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="w-8 h-5 rounded bg-black/[0.08] dark:bg-white/[0.1]" />
+                  <div className="w-14 h-2.5 rounded bg-black/[0.04] dark:bg-white/[0.06]" />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="w-36 h-4 rounded bg-black/[0.08] dark:bg-white/[0.1]" />
+              <div className="w-20 h-3 rounded bg-black/[0.04] dark:bg-white/[0.06]" />
+              <div className="w-56 h-3 rounded bg-black/[0.04] dark:bg-white/[0.06]" />
+            </div>
+            {/* Follow & Share Button Skeleton */}
+            <div className="pt-2 flex items-center gap-2">
+              <div className="flex-1 h-[34px] rounded-lg bg-black/[0.06] dark:bg-white/[0.08] flex items-center justify-center">
+                <div className="w-16 h-3 rounded bg-black/10 dark:bg-white/10" />
+              </div>
+              <div className="w-[34px] h-[34px] rounded-lg bg-black/[0.06] dark:bg-white/[0.08] flex items-center justify-center">
+                <Share2 className="w-3.5 h-3.5 text-black/20 dark:text-white/20" />
+              </div>
+            </div>
+          </section>
+        ) : (
+          <section className="pt-1 pb-1 space-y-4">
           <div className="flex items-center gap-5 sm:gap-7">
             {/* 80px Circular Avatar with Overlaid Yellow Verified Badge */}
             <div className="relative shrink-0 w-20 h-20 sm:w-22 sm:h-22">
@@ -1257,6 +1461,7 @@ export default function StudentProfilePage() {
             </div>
           </div>
         </section>
+        )}
 
         {/* Minimalist Navigation Tabs (Clean Pills, No Severed Bars) */}
         <div className="border-t border-black/[0.06] dark:border-white/[0.08] pt-3 flex items-center justify-center gap-2">
@@ -1355,11 +1560,11 @@ export default function StudentProfilePage() {
                 const isLiked = userLikedPosts.includes(post.$id)
                 const isSaved = savedPostIds.includes(post.$id)
 
-                const myHandle = (user?.username || user?.name || '').toLowerCase().replace(/[^a-z0-9_.]/g, '')
-                const postHandle = (post.author_display_name || '').toLowerCase().replace(/[^a-z0-9_.]/g, '')
+                const postMyHandle = normalizeCommunityHandle(user?.username || user?.name || '')
+                const postHandle = normalizeCommunityHandle(post.author_display_name || '')
                 const isAuthor = Boolean(
                   (user?.email && post.author_student_no && post.author_student_no.toLowerCase() === user.email.toLowerCase()) ||
-                  (myHandle && postHandle && myHandle === postHandle)
+                  (postMyHandle && postHandle && postMyHandle === postHandle)
                 )
 
                 return (
@@ -1409,7 +1614,7 @@ export default function StudentProfilePage() {
                           </div>
                           <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 dark:text-white/40 font-mono pt-0.5">
                             <span title={new Date(post.$createdAt).toLocaleString()}>{formatRelativeTime(post.$createdAt)}</span>
-                            {!isOwnProfile && !post.is_anonymous && (
+                            {!isOwnProfile && !post.is_anonymous && isFollowStatsResolved && (
                               <>
                                 <span className="text-slate-300 dark:text-white/20 select-none">·</span>
                                 <button
@@ -1458,52 +1663,10 @@ export default function StudentProfilePage() {
                               }}
                             />
                             <div className="absolute right-0 top-full mt-1.5 w-48 rounded-2xl bg-white dark:bg-[#161b22] border border-black/[0.08] dark:border-white/[0.12] shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                              {/* 1. Share Post */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveMenuPostId(null)
-                                  handleSharePost(post)
-                                }}
-                                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
-                              >
-                                <Share2 className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Share post</span>
-                              </button>
-
-                              {/* 2. Copy Link */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveMenuPostId(null)
-                                  if (typeof window !== 'undefined') {
-                                    const url = `${window.location.origin}/community?post=${post.$id}`
-                                    navigator.clipboard.writeText(url)
-                                  }
-                                }}
-                                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
-                              >
-                                <Copy className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Copy link</span>
-                              </button>
-
-                              {/* 3. Bookmark / Save Post */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveMenuPostId(null)
-                                  handleToggleSavePost(post.$id)
-                                }}
-                                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
-                              >
-                                <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'text-gold fill-gold' : 'text-slate-400'}`} />
-                                <span>{isSaved ? 'Remove bookmark' : 'Bookmark post'}</span>
-                              </button>
-
-                              {/* 4. Edit Post (Author Only) */}
-                              {isAuthor && (
+                              {isAuthor ? (
                                 <>
-                                  <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />
+                                  {/* ─── Host POV: ONLY Edit Post & Delete Post ─── */}
+                                  {/* 1. Edit Post */}
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1512,18 +1675,13 @@ export default function StudentProfilePage() {
                                       setEditingPost(post)
                                       setEditPostContent(post.content)
                                     }}
-                                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
+                                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer font-medium"
                                   >
                                     <Pencil className="w-3.5 h-3.5 text-slate-400" />
                                     <span>Edit post</span>
                                   </button>
-                                </>
-                              )}
 
-                              {/* 5. Delete Post (Author or Admin) */}
-                              {(isAuthor || isAdmin) && (
-                                <>
-                                  {!isAuthor && <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />}
+                                  {/* 2. Delete Post */}
                                   {confirmDeletePostId === post.$id ? (
                                     <div className="flex items-center justify-between gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 mx-1.5 my-1 rounded-lg animate-in fade-in duration-150">
                                       <span className="text-red-500 text-[11px] font-medium">Confirm delete?</span>
@@ -1556,12 +1714,29 @@ export default function StudentProfilePage() {
                                     </button>
                                   )}
                                 </>
-                              )}
-
-                              {/* 6. Report Post (Non-Authors) */}
-                              {!isAuthor && (
+                              ) : (
                                 <>
-                                  <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />
+                                  {/* ─── Someone Else's Post: Copy Link, Report Post, Hide Post ─── */}
+                                  {/* 1. Copy Link */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuPostId(null)
+                                      if (typeof window !== 'undefined') {
+                                        const url = `${window.location.origin}/community?post=${post.$id}`
+                                        navigator.clipboard.writeText(url)
+                                        setToastMessage('Link copied to clipboard')
+                                        setShareCopiedToast(true)
+                                        setTimeout(() => setShareCopiedToast(false), 2500)
+                                      }
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer font-medium"
+                                  >
+                                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>Copy link</span>
+                                  </button>
+
+                                  {/* 2. Report Post */}
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1570,13 +1745,52 @@ export default function StudentProfilePage() {
                                         alert('Please connect your student account to report discussions.')
                                         return
                                       }
-                                      alert('Thank you for reporting. PSITS moderators have been alerted.')
+                                      setToastMessage('Thank you for reporting. PSITS moderators have been alerted.')
+                                      setShareCopiedToast(true)
+                                      setTimeout(() => setShareCopiedToast(false), 3000)
                                     }}
-                                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer"
+                                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer font-medium"
                                   >
                                     <Flag className="w-3.5 h-3.5 text-amber-500" />
                                     <span>Report post</span>
                                   </button>
+
+                                  {/* 3. Hide / Unhide Post */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuPostId(null)
+                                      handleToggleHidePost(post.$id)
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer font-medium"
+                                  >
+                                    {hiddenPostIds.includes(post.$id) ? (
+                                      <>
+                                        <Eye className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>Unhide from feed</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>Hide from feed</span>
+                                      </>
+                                    )}
+                                  </button>
+
+                                  {/* Admin Delete */}
+                                  {isAdmin && (
+                                    <>
+                                      <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.08]" />
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmDeletePostId(post.$id)}
+                                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-rose-500 hover:bg-rose-500/10 transition-colors text-left cursor-pointer font-medium"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                        <span>Delete post (Admin)</span>
+                                      </button>
+                                    </>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -1708,6 +1922,7 @@ export default function StudentProfilePage() {
             </div>
           )}
         </div>
+        </PullToRefresh>
       </main>
 
       {/* Edit Post Modal */}
@@ -1938,10 +2153,11 @@ export default function StudentProfilePage() {
                 </div>
               ) : (
                 comments.map(c => {
-                  const handle = c.author_display_name.startsWith('@') || c.author_display_name.startsWith('Anonymous')
-                    ? c.author_display_name
-                    : `@${c.author_display_name.toLowerCase().replace(/[^a-z0-9_.]/g, '')}`
-                  const cleanHandle = handle.replace(/^@/, '')
+                  const rawName = c.author_display_name || 'Kasubay'
+                  const handle = rawName.startsWith('@') || rawName.startsWith('Anonymous')
+                    ? rawName
+                    : `@${normalizeCommunityHandle(rawName)}`
+                  const cleanHandle = normalizeCommunityHandle(handle)
                   const isReplyingThis = replyingToComment?.id === (c.parent_id || c.$id)
                   return (
                     <div key={c.$id} className={`flex items-start gap-3 group transition-all duration-150 rounded-xl p-1 -m-1 ${isReplyingThis ? 'bg-gold/[0.05] ring-1 ring-gold/25' : ''}`}>
@@ -2168,12 +2384,12 @@ export default function StudentProfilePage() {
         </div>
       )}
 
-      {/* ─── Share Clipboard Toast ─── */}
+      {/* ─── Share Clipboard / Action Toast ─── */}
       {shareCopiedToast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-slate-900 dark:bg-white/95 text-white dark:text-slate-900 text-xs font-semibold shadow-2xl backdrop-blur-xl border border-white/10 dark:border-black/10">
             <Check className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
-            <span>Link copied to clipboard</span>
+            <span>{toastMessage}</span>
           </div>
         </div>
       )}

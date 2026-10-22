@@ -140,7 +140,11 @@ export function EditProfileModal({
       const updatedData: CommunityUserProfile = {
         email: user.email,
         name: displayName.trim() || user.name,
-        username: currentProfile?.username || (user.username ? `@${user.username}` : `@${user.name.toLowerCase().replace(/[^a-z0-9_]/g, '')}`),
+        username: currentProfile?.username
+          ? `@${currentProfile.username.replace(/^@+/, '').replace(/[^a-z0-9_.]/g, '')}`
+          : user.username
+          ? `@${user.username.replace(/^@+/, '').replace(/[^a-z0-9_.]/g, '')}`
+          : `@${user.name.toLowerCase().replace(/[^a-z0-9_.]/g, '')}`,
         avatar: avatarUrl,
         yearSection: yearSection.trim() || 'BSIT',
         bio: bio.trim(),

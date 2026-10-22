@@ -6,12 +6,68 @@ import { getCache, setCache, deleteCache } from '@/lib/ratelimit'
 import { validateSessionAction } from '@/lib/session'
 import { ID, Query, Models } from 'node-appwrite'
 import { supabaseAdmin } from '@/lib/supabase'
-import { detectProhibitedHandle } from '@/lib/community-validation'
+import { detectProhibitedHandle, normalizeCommunityHandle } from '@/lib/community-validation'
 import { officers as staticOfficers } from '@/data/officers'
 
 const FEED_CACHE_KEY = 'psits:community:feed:recent'
 const FEED_CACHE_TTL = 45
 const SUPER_ADMIN_EMAIL = 'psits-ua@antiquespride.edu.ph'
+
+// In-Memory Officer Handles Cache (5-Minute TTL for High Concurrency Protection)
+let cachedOfficerHandles: { handles: Set<string>; timestamp: number } | null = null
+const OFFICER_CACHE_TTL = 5 * 60 * 1000
+
+async function getCachedOfficerHandles(): Promise<Set<string>> {
+  const now = Date.now()
+  if (cachedOfficerHandles && now - cachedOfficerHandles.timestamp < OFFICER_CACHE_TTL) {
+    return cachedOfficerHandles.handles
+  }
+
+  const handles = new Set<string>()
+  try {
+    // 1. Static officers handles
+    for (const off of staticOfficers) {
+      const h = normalizeCommunityHandle(off.name)
+      if (h) handles.add(h)
+    }
+
+    // 2. Postgres officers table (fast indexed query)
+    const { data: dbOfficers } = await supabaseAdmin.from('officers').select('name, email')
+    if (dbOfficers) {
+      for (const off of dbOfficers) {
+        if (off.name) {
+          const h = normalizeCommunityHandle(off.name)
+          if (h) handles.add(h)
+        }
+      }
+    }
+
+    // 3. Supabase Auth users with officer role (cached once per 5 minutes)
+    const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+    usersData?.users.forEach(u => {
+      const meta = u.user_metadata || {}
+      const uHandle = normalizeCommunityHandle(String(meta.community_username || ''))
+      const isOff = Boolean(
+        meta.role === 'officer' ||
+        meta.role === 'admin' ||
+        (u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL)
+      )
+      if (isOff && uHandle) {
+        handles.add(uHandle)
+      }
+    })
+  } catch (err) {
+    console.warn('[getCachedOfficerHandles Error]:', err)
+  }
+
+  cachedOfficerHandles = { handles, timestamp: now }
+  return handles
+}
+
+// In-Memory Anti-Spam Submission Cooldowns (3-Second Guard)
+const postCooldownMap = new Map<string, number>()
+const commentCooldownMap = new Map<string, number>()
+const SUBMISSION_COOLDOWN_MS = 3000
 
 export interface CommunityPostItem {
   $id: string
@@ -138,12 +194,60 @@ function normalizeWords(str: string): string[] {
     .filter(Boolean)
 }
 
+interface StudentCandidateItem {
+  student_no: string
+  full_name: string
+  year_section?: string
+}
+
+function calculateStudentNameMatch(inputName: string, studentFullName: string): {
+  isMatch: boolean
+  matchedTokens: number
+  coverage: number
+  jaccard: number
+} {
+  if (!inputName || !studentFullName) return { isMatch: false, matchedTokens: 0, coverage: 0, jaccard: 0 }
+
+  const tokensA = normalizeWords(inputName).filter(t => t.length >= 2)
+  const tokensB = normalizeWords(studentFullName).filter(t => t.length >= 2)
+  if (tokensA.length === 0 || tokensB.length === 0) return { isMatch: false, matchedTokens: 0, coverage: 0, jaccard: 0 }
+
+  const setA = new Set(tokensA)
+  const setB = new Set(tokensB)
+  let matched = 0
+  for (const t of setA) {
+    if (setB.has(t)) matched++
+  }
+
+  const minTokens = Math.min(setA.size, setB.size)
+  const coverage = matched / minTokens
+  const jaccard = matched / new Set([...setA, ...setB]).size
+
+  // High-confidence matching criteria:
+  // 1. Must match at least 2 distinct tokens (e.g., first name + last name) and coverage >= 60% of shorter name
+  // 2. Or if a single-token name, must match exactly with jaccard >= 0.5
+  const isMatch = (matched >= 2 && coverage >= 0.6) || (minTokens === 1 && matched === 1 && jaccard >= 0.5)
+
+  return { isMatch, matchedTokens: matched, coverage, jaccard }
+}
+
 function matchStudentNameSimilarity(nameA?: string, nameB?: string): boolean {
   if (!nameA || !nameB) return false
-  const tokensA = normalizeWords(nameA).filter(t => t.length >= 2)
-  const tokensB = normalizeWords(nameB).filter(t => t.length >= 2)
-  if (tokensA.length === 0 || tokensB.length === 0) return false
-  return tokensA.some(t => tokensB.includes(t))
+  return calculateStudentNameMatch(nameA, nameB).isMatch
+}
+
+function findBestMatchingStudent<T extends StudentCandidateItem>(
+  inputName: string,
+  candidates: T[]
+): T | null {
+  if (!inputName || !candidates || candidates.length === 0) return null
+
+  const scored = candidates
+    .map(c => ({ candidate: c, ...calculateStudentNameMatch(inputName, c.full_name) }))
+    .filter(x => x.isMatch)
+    .sort((a, b) => b.matchedTokens - a.matchedTokens || b.coverage - a.coverage || b.jaccard - a.jaccard)
+
+  return scored[0]?.candidate || null
 }
 
 async function resolveOfficerStatus(email: string, name?: string): Promise<{ isOfficer: boolean; title: string; name?: string }> {
@@ -169,8 +273,8 @@ async function resolveOfficerStatus(email: string, name?: string): Promise<{ isO
         .in('student_no', possibleNos)
         .eq('is_active', true)
 
-      const matched = sDocs?.find(s => cleanName ? matchStudentNameSimilarity(cleanName, s.full_name) : true) || sDocs?.[0]
-      if (matched?.full_name && (!cleanName || matchStudentNameSimilarity(cleanName, matched.full_name))) {
+      const matched = sDocs && sDocs.length > 0 ? (cleanName ? findBestMatchingStudent(cleanName, sDocs) : sDocs[0]) : null
+      if (matched?.full_name) {
         studentFullName = formatStudentFullName(matched.full_name).toLowerCase().trim()
       }
     } catch {}
@@ -256,7 +360,7 @@ export async function autoResolveStudentEligibilityAction(params: {
 
     if (candidates && candidates.length > 0) {
       if (cleanGoogleName) {
-        studentMatch = candidates.find(c => matchStudentNameSimilarity(cleanGoogleName, c.full_name)) || null
+        studentMatch = findBestMatchingStudent(cleanGoogleName, candidates) || null
       } else {
         studentMatch = candidates[0]
       }
@@ -392,23 +496,12 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
     )
 
 
-    // Collect known officer handles from Supabase Auth
-    const officerHandles = new Set<string>()
-    try {
-      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-      usersData?.users.forEach(u => {
-        const meta = u.user_metadata || {}
-        const uHandle = String(meta.community_username || '').toLowerCase().replace(/^@/, '').trim()
-        const isOff = Boolean(meta.role === 'officer' || meta.role === 'admin' || (u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL))
-        if (isOff && uHandle) {
-          officerHandles.add(uHandle)
-        }
-      })
-    } catch {}
+    // Collect known officer handles from in-memory cache
+    const officerHandles = await getCachedOfficerHandles()
 
     const sanitizedPosts: CommunityPostItem[] = (res.documents as unknown as AppwritePostRecord[]).map(doc => {
       const isAnon = Boolean(doc.is_anonymous)
-      const cleanAuthor = String(doc.author_display_name || '').toLowerCase().replace(/^@/, '').trim()
+      const cleanAuthor = normalizeCommunityHandle(String(doc.author_display_name || ''))
       const isOff = !isAnon && (Boolean(doc.is_officer) || officerHandles.has(cleanAuthor))
       const isVer = isOff || Boolean(doc.is_verified)
       const offTitle = isOff ? String(doc.officer_title || 'PSITS Officer') : undefined
@@ -453,6 +546,78 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
     return { success: false, posts: [], fromCache: false, error: message }
   }
 }
+
+export async function getAuthorPostsAction(rawHandle: string): Promise<{
+  success: boolean
+  posts: CommunityPostItem[]
+  error?: string
+}> {
+  try {
+    const cleanHandle = normalizeCommunityHandle(rawHandle)
+    if (!cleanHandle) return { success: true, posts: [] }
+
+    const { databases } = createServerAppwriteClient()
+    const searchHandles = [`@${cleanHandle}`, cleanHandle, `@@${cleanHandle}`]
+
+    const res = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.POSTS,
+      [
+        Query.equal('author_display_name', searchHandles),
+        Query.equal('status', 'active'),
+        Query.orderDesc('$createdAt'),
+        Query.limit(100),
+      ]
+    )
+
+    // Collect known officer handles from in-memory cache
+    const officerHandles = await getCachedOfficerHandles()
+
+    const sanitizedPosts: CommunityPostItem[] = (res.documents as unknown as AppwritePostRecord[]).map(doc => {
+      const isAnon = Boolean(doc.is_anonymous)
+      const cleanAuthor = normalizeCommunityHandle(String(doc.author_display_name || ''))
+      const isOff = !isAnon && (Boolean(doc.is_officer) || officerHandles.has(cleanAuthor))
+      const isVer = isOff || Boolean(doc.is_verified)
+      const offTitle = isOff ? String(doc.officer_title || 'PSITS Officer') : undefined
+
+      return {
+        $id: doc.$id,
+        $createdAt: doc.$createdAt,
+        content: String(doc.content || ''),
+        author_student_no: undefined,
+        author_display_name: isAnon
+          ? 'Anonymous Kasubay'
+          : (String(doc.author_display_name || '').startsWith('@')
+            ? String(doc.author_display_name)
+            : `@${String(doc.author_display_name || 'kasubay').toLowerCase().replace(/[^a-z0-9_.]/g, '')}`),
+        author_avatar: isAnon ? '' : (doc.author_avatar ? String(doc.author_avatar) : ''),
+        author_year_section: isAnon ? 'BSIT Student' : (doc.author_year_section ? String(doc.author_year_section) : 'BSIT'),
+        is_anonymous: isAnon,
+        is_verified: isVer,
+        is_officer: isOff,
+        officer_title: offTitle,
+        attachments: Array.isArray(doc.attachments) ? doc.attachments.map(String) : [],
+        attachment_names: Array.isArray(doc.attachment_names) ? doc.attachment_names.map(String) : [],
+        attachment_types: Array.isArray(doc.attachment_types) ? doc.attachment_types.map(String) : [],
+        attachment_sizes: Array.isArray(doc.attachment_sizes) ? doc.attachment_sizes.map(String) : [],
+        likes_count: Number(doc.likes_count) || 0,
+        comments_count: Number(doc.comments_count) || 0,
+        tags: Array.isArray(doc.tags) ? doc.tags.map(String) : [],
+        is_locked: Boolean(doc.is_locked),
+        is_flagged: Boolean(doc.is_flagged),
+        flag_count: Number(doc.flag_count) || 0,
+        status: (doc.status as 'active' | 'hidden' | 'archived') || 'active',
+      }
+    })
+
+    return { success: true, posts: sanitizedPosts }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to load user posts.'
+    console.error('[Appwrite User Posts Error]:', err)
+    return { success: false, posts: [], error: message }
+  }
+}
+
 
 export async function getSingleCommunityPostAction(postId: string): Promise<{
   success: boolean
@@ -558,8 +723,8 @@ async function createNotificationRecord(params: {
   summary: string
 }): Promise<void> {
   try {
-    const actorHandleClean = (params.actorHandle || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
-    const recipientHandleClean = (params.recipientHandle || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
+    const actorHandleClean = normalizeCommunityHandle(params.actorHandle)
+    const recipientHandleClean = normalizeCommunityHandle(params.recipientHandle)
     const recipientEmailClean = (params.recipientEmail || '').toLowerCase().trim()
 
     // Do not notify self
@@ -630,6 +795,13 @@ export async function createCommunityPostAction(payload: {
       return { success: false, error: 'Institutional authentication required.' }
     }
 
+    const userKey = payload.userEmail.toLowerCase().trim()
+    const lastPostTime = postCooldownMap.get(userKey) || 0
+    if (Date.now() - lastPostTime < SUBMISSION_COOLDOWN_MS) {
+      return { success: false, error: 'Please wait a moment before sharing another post.' }
+    }
+    postCooldownMap.set(userKey, Date.now())
+
     const { databases } = createServerAppwriteClient()
     const [officerCheck, resolvedAvatar] = await Promise.all([
       resolveOfficerStatus(payload.userEmail, payload.userName),
@@ -678,14 +850,17 @@ export async function createCommunityPostAction(payload: {
     // Dispatch mention notifications non-blockingly
     void (async () => {
       try {
-        const mentions = Array.from(new Set(payload.content.match(/@([a-zA-Z0-9_.]+)/g) || [])).map(m => m.slice(1).toLowerCase())
+        const mentions = Array.from(new Set(payload.content.match(/@([a-zA-Z0-9_.]+)/g) || []))
+          .map(m => normalizeCommunityHandle(m))
+          .filter(Boolean)
+        const authorClean = normalizeCommunityHandle(payload.userName)
         const snippet = payload.content.trim().slice(0, 80)
         for (const mHandle of mentions) {
-          if (mHandle !== payload.userName.replace(/^@/, '').toLowerCase()) {
+          if (mHandle !== authorClean) {
             await createNotificationRecord({
               recipientHandle: mHandle,
               actorName: payload.isAnonymous ? 'Anonymous Kasubay' : payload.userName,
-              actorHandle: payload.isAnonymous ? 'anonymous' : payload.userName,
+              actorHandle: payload.isAnonymous ? 'anonymous' : authorClean,
               actorAvatar: payload.isAnonymous ? '' : resolvedAvatar,
               type: 'mention',
               postId: newDoc.$id,
@@ -1010,6 +1185,13 @@ export async function addCommentAction(params: {
       return { success: false, error: 'Content and valid user session required.' }
     }
 
+    const commentKey = userEmail.toLowerCase().trim()
+    const lastCommentTime = commentCooldownMap.get(commentKey) || 0
+    if (Date.now() - lastCommentTime < SUBMISSION_COOLDOWN_MS) {
+      return { success: false, error: 'Please wait a moment before sending another comment.' }
+    }
+    commentCooldownMap.set(commentKey, Date.now())
+
     const { databases } = createServerAppwriteClient()
     const [officerCheck, resolvedCommentAvatar] = await Promise.all([
       resolveOfficerStatus(userEmail, userName),
@@ -1069,10 +1251,11 @@ export async function addCommentAction(params: {
           postId
         )
         const targetAuthorEmail = String(postDoc.author_student_no || '')
-        const targetAuthorHandle = String(postDoc.author_display_name || '').replace(/^@/, '')
+        const targetAuthorHandle = normalizeCommunityHandle(String(postDoc.author_display_name || ''))
         const snippet = content.trim().slice(0, 80)
+        const cleanUserHandle = normalizeCommunityHandle(userName)
         const actorDisplay = isAnonymous ? 'Anonymous Kasubay' : userName
-        const actorHandle = isAnonymous ? 'anonymous' : userName
+        const actorHandle = isAnonymous ? 'anonymous' : cleanUserHandle
         const actorAvatar = isAnonymous ? '' : resolvedCommentAvatar
 
         // 1. Notify post author (if not self and not anonymous post author)
@@ -1092,9 +1275,8 @@ export async function addCommentAction(params: {
 
         // 2. Notify replied user if replying to another comment
         if (replyToHandle) {
-          const cleanReplyTarget = replyToHandle.replace(/^@/, '').toLowerCase().trim()
-          const cleanMyHandle = userName.replace(/^@/, '').toLowerCase().trim()
-          if (cleanReplyTarget !== cleanMyHandle && cleanReplyTarget !== targetAuthorHandle.toLowerCase().trim()) {
+          const cleanReplyTarget = normalizeCommunityHandle(replyToHandle)
+          if (cleanReplyTarget && cleanReplyTarget !== cleanUserHandle && cleanReplyTarget !== targetAuthorHandle) {
             await createNotificationRecord({
               recipientHandle: cleanReplyTarget,
               actorName: actorDisplay,
@@ -1109,9 +1291,12 @@ export async function addCommentAction(params: {
         }
 
         // 3. Mentions in comment
-        const mentions = Array.from(new Set(content.match(/@([a-zA-Z0-9_.]+)/g) || [])).map(m => m.slice(1).toLowerCase().trim())
+        const mentions = Array.from(new Set(content.match(/@([a-zA-Z0-9_.]+)/g) || []))
+          .map(m => normalizeCommunityHandle(m))
+          .filter(Boolean)
+        const cleanReplyTarget = normalizeCommunityHandle(replyToHandle)
         for (const mHandle of mentions) {
-          if (mHandle !== userName.replace(/^@/, '').toLowerCase().trim() && mHandle !== replyToHandle?.replace(/^@/, '').toLowerCase().trim()) {
+          if (mHandle !== cleanUserHandle && mHandle !== cleanReplyTarget) {
             await createNotificationRecord({
               recipientHandle: mHandle,
               actorName: actorDisplay,
@@ -1285,7 +1470,7 @@ export async function getCommentsForPostAction(postId: string): Promise<{
           content: isDeleted ? 'This comment has been deleted' : String(c.content || ''),
           author_student_no: isDeleted ? undefined : String(c.author_student_no || ''),
           author_display_name: isDeleted
-            ? ''
+            ? 'Kasubay'
             : isAnon
             ? 'Anonymous Kasubay'
             : String(c.author_display_name || 'Kasubay Student'),
@@ -1437,8 +1622,8 @@ export async function toggleFollowAction(params: {
   followingAvatar?: string
 }): Promise<{ success: boolean; isFollowing: boolean; error?: string }> {
   try {
-    const follower = (params.followerHandle || '').toLowerCase().replace(/^@/, '').trim()
-    const following = (params.followingHandle || '').toLowerCase().replace(/^@/, '').trim()
+    const follower = normalizeCommunityHandle(params.followerHandle)
+    const following = normalizeCommunityHandle(params.followingHandle)
 
     if (!follower || !following) {
       return { success: false, isFollowing: false, error: 'Both follower and target handle required' }
@@ -1450,48 +1635,63 @@ export async function toggleFollowAction(params: {
 
     const { databases } = createServerAppwriteClient()
 
-    // Check if already following
+    // Check if already following (fetch all existing matches to eliminate duplicate records)
     const existing = await databases.listDocuments(
       APPWRITE_DATABASE_ID,
       APPWRITE_COLLECTIONS.FOLLOWS,
       [
         Query.equal('follower_handle', follower),
         Query.equal('following_handle', following),
-        Query.limit(1),
+        Query.limit(25),
       ]
     )
 
     if (existing.documents.length > 0) {
-      await databases.deleteDocument(
-        APPWRITE_DATABASE_ID,
-        APPWRITE_COLLECTIONS.FOLLOWS,
-        existing.documents[0].$id
+      await Promise.all(
+        existing.documents.map(doc =>
+          databases.deleteDocument(
+            APPWRITE_DATABASE_ID,
+            APPWRITE_COLLECTIONS.FOLLOWS,
+            doc.$id
+          )
+        )
       )
       return { success: true, isFollowing: false }
     }
+
+    const cleanFollowerName = (params.followerName || follower).replace(/^@+/, '').trim().slice(0, 100)
+    const cleanFollowingName = (params.followingName || following).replace(/^@+/, '').trim().slice(0, 100)
+
+    // Never pass oversized base64 data URIs directly into string attributes
+    const safeFollowerAvatar = (params.followerAvatar || '').startsWith('data:')
+      ? ''
+      : (params.followerAvatar || '').slice(0, 2048)
+    const safeFollowingAvatar = (params.followingAvatar || '').startsWith('data:')
+      ? ''
+      : (params.followingAvatar || '').slice(0, 2048)
 
     await databases.createDocument(
       APPWRITE_DATABASE_ID,
       APPWRITE_COLLECTIONS.FOLLOWS,
       ID.unique(),
       {
-        follower_student_no: follower,
-        following_student_no: following,
-        follower_handle: follower,
-        following_handle: following,
-        follower_name: params.followerName || follower,
-        follower_avatar: params.followerAvatar || '',
-        following_name: params.followingName || following,
-        following_avatar: params.followingAvatar || '',
+        follower_student_no: follower.slice(0, 255),
+        following_student_no: following.slice(0, 255),
+        follower_handle: follower.slice(0, 100),
+        following_handle: following.slice(0, 100),
+        follower_name: cleanFollowerName || follower,
+        follower_avatar: safeFollowerAvatar,
+        following_name: cleanFollowingName || following,
+        following_avatar: safeFollowingAvatar,
       }
     )
 
     // Dispatch follow notification non-blockingly
     void createNotificationRecord({
       recipientHandle: following,
-      actorName: params.followerName || follower,
+      actorName: cleanFollowerName || follower,
       actorHandle: follower,
-      actorAvatar: params.followerAvatar || '',
+      actorAvatar: safeFollowerAvatar,
       type: 'follow',
       summary: 'started following you',
     })
@@ -1499,6 +1699,7 @@ export async function toggleFollowAction(params: {
     return { success: true, isFollowing: true }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Follow operation failed'
+    console.error('[toggleFollowAction Error]:', err)
     return { success: false, isFollowing: false, error: message }
   }
 }
@@ -1514,8 +1715,8 @@ export async function getFollowStatsAction(
   isFollowedBy: boolean
 }> {
   try {
-    const target = (targetHandle || '').toLowerCase().replace(/^@/, '').trim()
-    const viewer = (viewerHandle || '').toLowerCase().replace(/^@/, '').trim()
+    const target = normalizeCommunityHandle(targetHandle)
+    const viewer = normalizeCommunityHandle(viewerHandle)
 
     if (!target) {
       return { success: false, followersCount: 0, followingCount: 0, isFollowing: false, isFollowedBy: false }
@@ -1570,7 +1771,8 @@ export async function getFollowStatsAction(
       isFollowing,
       isFollowedBy,
     }
-  } catch {
+  } catch (err) {
+    console.error('[getFollowStatsAction Error]:', err)
     return { success: false, followersCount: 0, followingCount: 0, isFollowing: false, isFollowedBy: false }
   }
 }
@@ -1581,8 +1783,8 @@ export async function getFollowListAction(
   viewerHandle?: string
 ): Promise<{ success: boolean; users: FollowUserInfo[] }> {
   try {
-    const target = (targetHandle || '').toLowerCase().replace(/^@/, '').trim()
-    const viewer = (viewerHandle || '').toLowerCase().replace(/^@/, '').trim()
+    const target = normalizeCommunityHandle(targetHandle)
+    const viewer = normalizeCommunityHandle(viewerHandle)
     if (!target) return { success: true, users: [] }
 
     const { databases } = createServerAppwriteClient()
@@ -1602,22 +1804,28 @@ export async function getFollowListAction(
         const [vFollowingRes, vFollowersRes] = await Promise.all([
           databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.FOLLOWS, [
             Query.equal('follower_handle', viewer),
-            Query.limit(100),
+            Query.limit(200),
           ]),
           databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.FOLLOWS, [
             Query.equal('following_handle', viewer),
-            Query.limit(100),
+            Query.limit(200),
           ]),
         ])
-        viewerFollowingSet = new Set(vFollowingRes.documents.map(d => String(d.following_handle || '').toLowerCase().replace(/^@/, '').trim()))
-        viewerFollowersSet = new Set(vFollowersRes.documents.map(d => String(d.follower_handle || '').toLowerCase().replace(/^@/, '').trim()))
+        viewerFollowingSet = new Set(
+          vFollowingRes.documents.map(d => normalizeCommunityHandle(String(d.following_handle || ''))).filter(Boolean)
+        )
+        viewerFollowersSet = new Set(
+          vFollowersRes.documents.map(d => normalizeCommunityHandle(String(d.follower_handle || ''))).filter(Boolean)
+        )
       } catch {}
     }
 
     const users: FollowUserInfo[] = res.documents.map(doc => {
-      const handle = String((type === 'followers' ? doc.follower_handle : doc.following_handle) || 'student').toLowerCase().replace(/^@/, '').trim()
+      const handle = normalizeCommunityHandle(
+        String((type === 'followers' ? doc.follower_handle : doc.following_handle) || 'student')
+      )
       const rawName = (type === 'followers' ? doc.follower_name : doc.following_name) as string | undefined
-      const name = rawName ? rawName.replace(/^@/, '') : handle
+      const name = rawName ? rawName.replace(/^@+/, '').trim() : handle
       const avatar = String((type === 'followers' ? doc.follower_avatar : doc.following_avatar) || '')
 
       return {
@@ -1630,7 +1838,8 @@ export async function getFollowListAction(
     })
 
     return { success: true, users }
-  } catch {
+  } catch (err) {
+    console.error('[getFollowListAction Error]:', err)
     return { success: true, users: [] }
   }
 }
@@ -1639,7 +1848,7 @@ export async function getMyFollowRelationshipsAction(
   rawViewerHandle: string
 ): Promise<{ success: boolean; following: string[]; followers: string[] }> {
   try {
-    const viewer = (rawViewerHandle || '').toLowerCase().replace(/^@/, '').trim()
+    const viewer = normalizeCommunityHandle(rawViewerHandle)
     if (!viewer) return { success: true, following: [], followers: [] }
 
     const { databases } = createServerAppwriteClient()
@@ -1655,11 +1864,16 @@ export async function getMyFollowRelationshipsAction(
       ]),
     ])
 
-    const following = followingRes.documents.map(d => String(d.following_handle || '').toLowerCase().replace(/^@/, '').trim()).filter(Boolean)
-    const followers = followersRes.documents.map(d => String(d.follower_handle || '').toLowerCase().replace(/^@/, '').trim()).filter(Boolean)
+    const following = followingRes.documents
+      .map(d => normalizeCommunityHandle(String(d.following_handle || '')))
+      .filter(Boolean)
+    const followers = followersRes.documents
+      .map(d => normalizeCommunityHandle(String(d.follower_handle || '')))
+      .filter(Boolean)
 
     return { success: true, following, followers }
-  } catch {
+  } catch (err) {
+    console.error('[getMyFollowRelationshipsAction Error]:', err)
     return { success: true, following: [], followers: [] }
   }
 }
@@ -1668,7 +1882,7 @@ export async function getMutualFollowsAction(
   rawHandle: string
 ): Promise<{ success: boolean; mutuals: FollowUserInfo[] }> {
   try {
-    const handle = (rawHandle || '').toLowerCase().replace(/^@/, '').trim()
+    const handle = normalizeCommunityHandle(rawHandle)
     if (!handle) return { success: true, mutuals: [] }
 
     const { databases } = createServerAppwriteClient()
@@ -1687,12 +1901,12 @@ export async function getMutualFollowsAction(
     // Map of followed handles
     const followingMap = new Map<string, { handle: string; name: string }>()
     for (const doc of followingRes.documents) {
-      const h = String(doc.following_handle || '').toLowerCase().replace(/^@/, '').trim()
+      const h = normalizeCommunityHandle(String(doc.following_handle || ''))
       if (h) {
         const rawFollowingName = (doc.following_name as string) || (doc.following_handle as string) || h
         followingMap.set(h, {
           handle: h,
-          name: rawFollowingName.replace(/^@/, ''),
+          name: rawFollowingName.replace(/^@+/, '').trim(),
         })
       }
     }
@@ -1709,13 +1923,13 @@ export async function getMutualFollowsAction(
     const seen = new Set<string>()
 
     for (const doc of followersRes.documents) {
-      const followerHandle = String(doc.follower_handle || '').toLowerCase().replace(/^@/, '').trim()
+      const followerHandle = normalizeCommunityHandle(String(doc.follower_handle || ''))
       if (followerHandle && followingMap.has(followerHandle) && !seen.has(followerHandle)) {
         seen.add(followerHandle)
         const rawFollowerName = (doc.follower_name as string) || followerHandle
         mutuals.push({
           handle: followerHandle,
-          name: rawFollowerName.replace(/^@/, ''),
+          name: rawFollowerName.replace(/^@+/, '').trim(),
           avatar: (doc.follower_avatar as string) || '',
         })
       }
@@ -1750,13 +1964,13 @@ export async function getStudentProfileByHandleAction(
   rawHandle: string
 ): Promise<{ success: boolean; profile?: StudentProfileData }> {
   try {
-    const cleanHandle = (rawHandle || '').toLowerCase().replace(/^@/, '').trim()
+    const cleanHandle = normalizeCommunityHandle(rawHandle)
     if (!cleanHandle) return { success: false }
 
     // 1. Search in Supabase Auth users for this handle
     const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
     const matchedUser = usersData?.users.find(u => {
-      const uHandle = (u.user_metadata?.community_username || '').toLowerCase().replace(/^@/, '').trim()
+      const uHandle = normalizeCommunityHandle(u.user_metadata?.community_username || '')
       return uHandle === cleanHandle
     })
 
@@ -1781,28 +1995,65 @@ export async function getStudentProfileByHandleAction(
 
       // Check students table for authoritative student record
       if (email) {
-        const idMatch = email.match(/^(\d{4})s(\d{5})@antiquespride\.edu\.ph$/i)
-        const possibleNos = idMatch
-          ? [`${idMatch[1]}-S${idMatch[2]}`, `${idMatch[1]}s${idMatch[2]}`, email.split('@')[0]]
-          : [email.split('@')[0]]
+        const boundStudentNo = (meta.student_no as string | undefined)?.trim()
+        let matchingStudent: StudentCandidateItem | null = null
 
-        const { data: candidates } = await supabaseAdmin
-          .from('students')
-          .select('student_no, full_name, year_section')
-          .in('student_no', possibleNos)
-          .eq('is_active', true)
-
-        let matchingStudent = candidates?.find(c => matchStudentNameSimilarity(name, c.full_name))
-
-        // If no candidate matched by student_no and name similarity, try searching all students by name
-        if (!matchingStudent && name && name.trim().split(/\s+/).length >= 2) {
-          const { data: nameCandidates } = await supabaseAdmin
+        // 1. O(1) direct lookup if already permanently bound in user_metadata
+        if (boundStudentNo) {
+          const { data: boundStudent } = await supabaseAdmin
             .from('students')
             .select('student_no, full_name, year_section')
+            .eq('student_no', boundStudentNo)
             .eq('is_active', true)
-            .limit(1000)
+            .maybeSingle()
 
-          matchingStudent = nameCandidates?.find(c => matchStudentNameSimilarity(name, c.full_name))
+          if (boundStudent) {
+            matchingStudent = boundStudent
+          }
+        }
+
+        // 2. If not yet bound, resolve via institutional student number / email prefix
+        if (!matchingStudent) {
+          const idMatch = email.match(/^(\d{4})s(\d{5})@antiquespride\.edu\.ph$/i)
+          const possibleNos = idMatch
+            ? [`${idMatch[1]}-S${idMatch[2]}`, `${idMatch[1]}s${idMatch[2]}`, email.split('@')[0]]
+            : [email.split('@')[0]]
+
+          const { data: candidates } = await supabaseAdmin
+            .from('students')
+            .select('student_no, full_name, year_section')
+            .in('student_no', possibleNos)
+            .eq('is_active', true)
+
+          if (candidates && candidates.length > 0) {
+            matchingStudent = findBestMatchingStudent(name, candidates)
+          }
+
+          // 3. Fallback: search students by multi-token name similarity
+          if (!matchingStudent && name && name.trim().split(/\s+/).length >= 2) {
+            const { data: nameCandidates } = await supabaseAdmin
+              .from('students')
+              .select('student_no, full_name, year_section')
+              .eq('is_active', true)
+              .limit(1000)
+
+            if (nameCandidates && nameCandidates.length > 0) {
+              matchingStudent = findBestMatchingStudent(name, nameCandidates)
+            }
+          }
+
+          // 4. Smart Auto-Binding: Lock in verified student_no and roster attributes
+          if (matchingStudent && matchedUser.id && !boundStudentNo) {
+            void supabaseAdmin.auth.admin.updateUserById(matchedUser.id, {
+              user_metadata: {
+                ...meta,
+                student_no: matchingStudent.student_no,
+                roster_full_name: matchingStudent.full_name,
+                year_section: matchingStudent.year_section || yearSection,
+                identity_status: 'verified_roster',
+              },
+            }).catch(err => console.warn('Auto-bind user_metadata error:', err))
+          }
         }
 
         if (matchingStudent) {
@@ -1866,7 +2117,7 @@ export async function getStudentProfileByHandleAction(
 
     // 3. Fallback to Appwrite posts collection history
     const { databases } = createServerAppwriteClient()
-    const searchHandles = [`@${cleanHandle}`, cleanHandle]
+    const searchHandles = [`@${cleanHandle}`, cleanHandle, `@@${cleanHandle}`]
     const postRes = await databases.listDocuments(
       APPWRITE_DATABASE_ID,
       APPWRITE_COLLECTIONS.POSTS,
@@ -2005,11 +2256,11 @@ export async function createCommunityThreadAction(params: {
         slug: finalSlug.slice(0, 100),
         description: description.trim().slice(0, 1000),
         category: category.trim().slice(0, 50) || 'Feed',
-        creator_student_no: userEmail.slice(0, 100),
+        creator_student_no: userEmail.slice(0, 255),
         creator_display_name: (userName.startsWith('@') ? userName : `@${userName}`).slice(0, 100),
-        creator_avatar: resolvedAvatar ? resolvedAvatar.slice(0, 500) : '',
+        creator_avatar: resolvedAvatar ? resolvedAvatar.slice(0, 2048) : '',
         is_private: Boolean(isPrivate),
-        allowed_users: sanitizedAllowed.map(u => String(u).slice(0, 100)),
+        allowed_users: sanitizedAllowed.map(u => String(u).slice(0, 255)),
         pending_requests: [],
         is_verified_creator: hasUnlimited,
         status: 'active',
@@ -2319,7 +2570,7 @@ export async function getMyNotificationsAction(params: {
   error?: string
 }> {
   try {
-    const cleanHandle = (params.userHandle || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_.]/g, '')
+    const cleanHandle = normalizeCommunityHandle(params.userHandle)
     if (!cleanHandle) return { success: true, notifications: [], unreadCount: 0 }
 
     const { databases } = createServerAppwriteClient()

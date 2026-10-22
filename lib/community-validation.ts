@@ -53,3 +53,13 @@ export function detectProhibitedHandle(
 
   return { prohibited: false, reason: '' }
 }
+
+export function normalizeCommunityHandle(raw?: string): string {
+  if (!raw) return ''
+  return String(raw)
+    .toLowerCase()
+    .replace(/^@+/, '')
+    .replace(/[^a-z0-9_.]/g, '')
+    .trim()
+}
+

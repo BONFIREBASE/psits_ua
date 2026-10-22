@@ -129,7 +129,7 @@ function CommunityOnboardingModalContent({
   // Do NOT auto-default to an ID/email prefix - let user type their own handle
   // Automatically clear any prohibited legacy student ID or email prefix so input starts completely blank
   const [username, setUsername] = useState(() => {
-    const existing = currentProfile?.username ? currentProfile.username.replace(/^@/, '').trim() : ''
+    const existing = currentProfile?.username ? currentProfile.username.replace(/^@+/, '').trim() : ''
     if (!existing) return ''
     const pii = detectProhibitedHandle(existing, user?.email, currentProfile?.name || user?.name)
     if (pii.prohibited) return ''
@@ -137,12 +137,12 @@ function CommunityOnboardingModalContent({
   })
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/^@/, '').toLowerCase().replace(/[^a-z0-9_.]/g, '')
+    const raw = e.target.value.replace(/^@+/, '').toLowerCase().replace(/[^a-z0-9_.]/g, '')
     setUsername(raw)
   }
 
   // 1. Synchronous validation derived directly during render (zero cascading renders!)
-  const cleanUsername = username.trim().toLowerCase().replace(/^@/, '')
+  const cleanUsername = username.trim().toLowerCase().replace(/^@+/, '')
   const piiCheck = detectProhibitedHandle(cleanUsername, user?.email, currentProfile?.name || user?.name)
 
   const syncError = !cleanUsername
@@ -373,8 +373,9 @@ function CommunityOnboardingModalContent({
 
       const verifiedYearSection = eligibilityResult?.yearSection || yearSection || 'BSIT'
 
-      const formattedUsername = username.trim()
-        ? (username.trim().startsWith('@') ? username.trim() : `@${username.trim()}`)
+      const cleanHandle = username.trim().replace(/^@+/, '').replace(/[^a-z0-9_.]/g, '')
+      const formattedUsername = cleanHandle
+        ? `@${cleanHandle}`
         : `@kasubay_${Math.floor(Math.random() * 8999 + 1000)}`
 
       const updatedData: CommunityUserProfile = {
@@ -392,13 +393,16 @@ function CommunityOnboardingModalContent({
         tosAcceptedAt: new Date().toISOString(),
       }
 
-      // Persist to Supabase User Metadata
+      // Persist to Supabase User Metadata (Permanent Smart Identity Binding)
       await supabase.auth.updateUser({
         data: {
           full_name: updatedData.name,
           community_username: updatedData.username,
           community_avatar: updatedData.avatar,
           year_section: updatedData.yearSection,
+          student_no: eligibilityResult?.studentNo || undefined,
+          roster_full_name: eligibilityResult?.name || undefined,
+          identity_status: eligibilityResult?.verified ? 'verified_roster' : 'google_verified',
           bio: updatedData.bio,
           hobbies: updatedData.hobbies,
           social_github: updatedData.github,
