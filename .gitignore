@@ -41,3 +41,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scratch and local test files
+/scratch/
+test-*.mjs
+test-*.js
+test-*.ts
+*.local.mjs
+*.local.js
