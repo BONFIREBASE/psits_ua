@@ -83,11 +83,18 @@ import {
   getMyNotificationsAction,
   markNotificationAsReadAction,
   markAllNotificationsAsReadAction,
+  checkUserOfficerStatusAction,
+  toggleCommentLikeAction,
+  getCommentLikesBatchAction,
+  createNoteAction,
+  getActiveNotesAction,
+  deleteMyNoteAction,
   type FollowUserInfo,
   type CommunityPostItem,
   type CommunityCommentItem,
   type CommunityThreadItem,
   type CommunityNotificationItem,
+  type CommunityNoteItem,
 } from './actions'
 import { normalizeCommunityHandle } from '@/lib/community-validation'
 import { supabase } from '@/lib/supabase'
@@ -275,7 +282,10 @@ function renderAvatarIcon(avatarStr?: string, nameStr?: string, className = 'w-5
         return <Code2 className={className} />
     }
   }
-  return <span className="font-bold text-gold text-xs">{nameStr ? nameStr.charAt(0).toUpperCase() : 'K'}</span>
+  if (!nameStr || nameStr === 'You' || nameStr === 'User' || nameStr === 'Student') {
+    return <User className={className} />
+  }
+  return <span className="font-bold text-gold text-xs">{nameStr.charAt(0).toUpperCase()}</span>
 }
 
 function InstagramVerifiedBadge({ className = 'w-3.5 h-3.5' }: { className?: string }) {
@@ -776,6 +786,7 @@ export default function CommunityPage() {
   // Active Comment Thread Modal
   const [activeCommentPost, setActiveCommentPost] = useState<CommunityPostItem | null>(null)
   const activeCommentPostRef = useRef<CommunityPostItem | null>(null)
+  const openCommentsRef = useRef<(post: CommunityPostItem) => void>(() => {})
   const [comments, setComments] = useState<CommunityCommentItem[]>([])
   const [newCommentText, setNewCommentText] = useState('')
   const [commentsLoading, setCommentsLoading] = useState(false)
@@ -789,10 +800,86 @@ export default function CommunityPage() {
   const commentInputRef = useRef<HTMLInputElement>(null)
   const [collapsedReplyIds, setCollapsedReplyIds] = useState<Set<string>>(new Set())
 
-  // Follow System & Feed Relationships State (Stale-While-Revalidate with localStorage for 0ms instant render)
-  const [myFollowingSet, setMyFollowingSet] = useState<Set<string>>(new Set())
-  const [myFollowerSet, setMyFollowerSet] = useState<Set<string>>(new Set())
-  const [isFollowsResolved, setIsFollowsResolved] = useState<boolean>(false)
+  // Comment Likes State (Heart)
+  const [commentLikes, setCommentLikes] = useState<Record<string, { count: number; liked: boolean }>>({})
+
+  // Instagram-Style Notes State
+  const [activeNotes, setActiveNotes] = useState<CommunityNoteItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('psits_community_active_notes')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {}
+    }
+    return []
+  })
+  const [isNoteComposeOpen, setIsNoteComposeOpen] = useState(false)
+  const [noteText, setNoteText] = useState('')
+  const [isSubmittingNote, setIsSubmittingNote] = useState(false)
+  const [viewingNote, setViewingNote] = useState<CommunityNoteItem | null>(null)
+
+  // ─── Comment Likes (Heart) Handlers ───
+  const handleToggleCommentLike = async (comment: CommunityCommentItem) => {
+    if (!user) {
+      setOnboardingInitialStep(1)
+      setIsOnboardingOpen(true)
+      return
+    }
+
+    const current = commentLikes[comment.$id] || { count: comment.likes_count || 0, liked: false }
+    const nextLiked = !current.liked
+    const nextCount = Math.max(0, current.count + (nextLiked ? 1 : -1))
+
+    // Optimistic UI update in 0ms
+    setCommentLikes(prev => ({
+      ...prev,
+      [comment.$id]: { count: nextCount, liked: nextLiked },
+    }))
+
+    try {
+      const res = await toggleCommentLikeAction({
+        commentId: comment.$id,
+        userEmail: user.email,
+      })
+      if (res.success && typeof res.likesCount === 'number') {
+        setCommentLikes(prev => ({
+          ...prev,
+          [comment.$id]: { count: res.likesCount!, liked: Boolean(res.liked) },
+        }))
+      }
+    } catch {
+      // Revert if error
+      setCommentLikes(prev => ({
+        ...prev,
+        [comment.$id]: current,
+      }))
+    }
+  }
+
+  // ─── Instagram-Style Notes Handlers & Data Sync ───
+  const loadActiveNotes = useCallback(async () => {
+    try {
+      const res = await getActiveNotesAction()
+      if (res.success && Array.isArray(res.notes)) {
+        setActiveNotes(res.notes)
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('psits_community_active_notes', JSON.stringify(res.notes))
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load active notes:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadActiveNotes()
+  }, [loadActiveNotes])
+
   const [cachedActiveHandle, setCachedActiveHandle] = useState<string>('')
 
   // Sync active handle to localStorage safely in an effect (not during render pass)
@@ -808,6 +895,89 @@ export default function CommunityPage() {
     if (live) return live
     return cachedActiveHandle
   }, [userProfile?.username, user?.name, cachedActiveHandle])
+
+  const myActiveNote = useMemo(() => {
+    if (!myHandleNormalized || activeNotes.length === 0) return null
+    return (
+      activeNotes.find(
+        n => normalizeCommunityHandle(n.author_handle) === myHandleNormalized
+      ) || null
+    )
+  }, [myHandleNormalized, activeNotes])
+
+  const notesByHandleMap = useMemo(() => {
+    const map = new Map<string, CommunityNoteItem>()
+    activeNotes.forEach(n => {
+      const h = normalizeCommunityHandle(n.author_handle)
+      if (h) map.set(h, n)
+    })
+    return map
+  }, [activeNotes])
+
+  const handleCreateNote = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) {
+      setOnboardingInitialStep(1)
+      setIsOnboardingOpen(true)
+      return
+    }
+    if (!noteText.trim() || isSubmittingNote) return
+
+    setIsSubmittingNote(true)
+    try {
+      const res = await createNoteAction({
+        content: noteText.trim().slice(0, 60),
+        userEmail: user.email,
+        authorHandle: myHandleNormalized || userProfile?.username || user.name,
+        authorDisplayName: userProfile?.name || user.name,
+        authorAvatar: userProfile?.avatar || user.avatar || '',
+      })
+      if (res.success && res.note) {
+        setActiveNotes(prev => [res.note!, ...prev.filter(n => normalizeCommunityHandle(n.author_handle) !== myHandleNormalized)])
+        setNoteText('')
+        setIsNoteComposeOpen(false)
+      } else {
+        alert(res.error || 'Failed to share note.')
+      }
+    } catch (err) {
+      console.error('Create note error:', err)
+      alert('Failed to share note. Please try again.')
+    } finally {
+      setIsSubmittingNote(false)
+    }
+  }
+
+  const handleDeleteMyNote = async (noteId: string) => {
+    if (!user || !myHandleNormalized) return
+    try {
+      const res = await deleteMyNoteAction({
+        noteId,
+        userEmail: user.email,
+        authorHandle: myHandleNormalized,
+      })
+      if (res.success) {
+        setActiveNotes(prev => prev.filter(n => n.$id !== noteId))
+        setViewingNote(null)
+      }
+    } catch (err) {
+      console.error('Delete note error:', err)
+    }
+  }
+
+  // Ensure comment input and virtual keyboard immediately surrender focus when onboarding modal is open
+  useEffect(() => {
+    if (isOnboardingOpen) {
+      commentInputRef.current?.blur()
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
+      }
+    }
+  }, [isOnboardingOpen])
+
+  // Follow System & Feed Relationships State (Stale-While-Revalidate with localStorage for 0ms instant render)
+  const [myFollowingSet, setMyFollowingSet] = useState<Set<string>>(new Set())
+  const [myFollowerSet, setMyFollowerSet] = useState<Set<string>>(new Set())
+  const [isFollowsResolved, setIsFollowsResolved] = useState<boolean>(false)
 
   const loadFollowRelationships = useCallback(async () => {
     if (!myHandleNormalized) return
@@ -901,8 +1071,8 @@ export default function CommunityPage() {
 
     const currentDisplayName = userProfile?.name || user?.name || (user ? 'Kasubay' : 'Guest Visitor')
     const currentAvatar = userProfile?.avatar || user?.avatar || ''
-    const currentIsOfficer = Boolean(isAdmin)
-    const currentIsVerified = Boolean(isAdmin || userProfile?.tosAccepted)
+    const currentIsOfficer = Boolean(isAdmin || user?.isOfficer)
+    const currentIsVerified = Boolean(isAdmin || user?.isOfficer || userProfile?.tosAccepted)
     const currentYearSection = userProfile?.yearSection || 'BSIT'
 
     const presenceChannel = supabase.channel('community-presence', {
@@ -1002,24 +1172,6 @@ export default function CommunityPage() {
       void supabase.removeChannel(presenceChannel)
     }
   }, [user, userProfile, isAdmin])
-
-  const displayOnlineMembers = useMemo(() => {
-    if (onlineMembers.length > 0) return onlineMembers
-    if (user) {
-      return [{
-        key: user.email,
-        handle: userProfile?.username ? userProfile.username.replace(/^@/, '') : (user.name ? user.name.toLowerCase().replace(/[^a-z0-9_.]/g, '') : 'you'),
-        name: userProfile?.name || user.name || 'You',
-        avatar: userProfile?.avatar || user.avatar || '',
-        isOfficer: Boolean(isAdmin),
-        isVerified: Boolean(isAdmin || userProfile?.tosAccepted),
-        yearSection: userProfile?.yearSection || 'BSIT',
-        isGuest: false,
-        onlineAt: new Date().toISOString(),
-      }]
-    }
-    return []
-  }, [onlineMembers, user, userProfile, isAdmin])
 
   const handleToggleFollowAuthor = async (
     targetHandle: string,
@@ -1340,6 +1492,40 @@ export default function CommunityPage() {
   // Floating New Post Indicator
   const [hasNewPosts, setHasNewPosts] = useState(false)
 
+  // Prevent background scrolling while any modal or sheet is active
+  useEffect(() => {
+    const isAnyModalOpen = Boolean(
+      activeCommentPost ||
+      isOnboardingOpen ||
+      isNotifModalOpen ||
+      isCreateOpen ||
+      isCodeModalOpen ||
+      isSearchModalOpen ||
+      takedownTarget
+    )
+
+    if (!isAnyModalOpen) return
+
+    const originalBodyOverflow = document.body.style.overflow
+    const originalHtmlOverflow = document.documentElement.style.overflow
+
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = originalBodyOverflow
+      document.documentElement.style.overflow = originalHtmlOverflow
+    }
+  }, [
+    activeCommentPost,
+    isOnboardingOpen,
+    isNotifModalOpen,
+    isCreateOpen,
+    isCodeModalOpen,
+    isSearchModalOpen,
+    takedownTarget,
+  ])
+
   /* ─── 0. Custom Threads Loader & Quota Check ─── */
   const loadThreads = useCallback(async (email?: string, handle?: string) => {
     try {
@@ -1575,6 +1761,15 @@ export default function CommunityPage() {
   }
 
   const handleInsertCommentEmoji = (emoji: string) => {
+    if (!user) {
+      commentInputRef.current?.blur()
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
+      }
+      setOnboardingInitialStep(1)
+      setIsOnboardingOpen(true)
+      return
+    }
     const input = commentInputRef.current
     if (!input) {
       setNewCommentText(prev => prev + emoji)
@@ -1720,11 +1915,11 @@ export default function CommunityPage() {
       if (!targetId) return
       const existing = posts.find(p => p.$id === targetId)
       if (existing) {
-        openComments(existing)
+        openCommentsRef.current(existing)
       } else {
         getSingleCommunityPostAction(targetId).then(res => {
           if (res.success && res.post) {
-            openComments(res.post)
+            openCommentsRef.current(res.post)
           }
         })
       }
@@ -1788,6 +1983,21 @@ export default function CommunityPage() {
         setIsAdmin(true)
       }
 
+      // Check database and static officers list in background to ensure real-time officer badge accuracy
+      checkUserOfficerStatusAction(email, name).then(res => {
+        if (res.isOfficer) {
+          setUser(prev => prev ? {
+            ...prev,
+            isOfficer: true,
+            isVerified: true,
+            officerTitle: res.title || prev.officerTitle || 'PSITS Officer',
+          } : prev)
+          if (res.title?.toLowerCase().includes('admin') || email.toLowerCase() === 'psits-ua@antiquespride.edu.ph') {
+            setIsAdmin(true)
+          }
+        }
+      }).catch(() => {})
+
       // Restore cached posts for authenticated student if present
       try {
         const cached = localStorage.getItem(LOCAL_STORAGE_KEY)
@@ -1830,9 +2040,13 @@ export default function CommunityPage() {
           setIsOnboardingOpen(true)
           window.history.replaceState({}, '', window.location.pathname)
         } else if (urlParams.get('setup') === '1') {
-          setOnboardingInitialStep(4)
-          setOnboardingAuthMode('create')
-          setIsOnboardingOpen(true)
+          if (!hasAcceptedTos) {
+            setOnboardingInitialStep(4)
+            setOnboardingAuthMode('create')
+            setIsOnboardingOpen(true)
+          } else {
+            setIsOnboardingOpen(false)
+          }
           window.history.replaceState({}, '', window.location.pathname)
         } else if (!hasAcceptedTos) {
           // New student who signed in with Google but hasn't finalized Kasubay profile yet
@@ -1969,9 +2183,9 @@ export default function CommunityPage() {
       if (events.some(e => e.includes('.create'))) {
         if (docStatus === 'active') {
           const isAnon = Boolean(payload.is_anonymous)
-          const isOff = Boolean(payload.is_officer) && !isAnon
+          const isOff = Boolean(payload.is_officer === true || payload.is_officer === 'true' || payload.is_officer === 1) && !isAnon
           const isVer = isOff || Boolean(payload.is_verified)
-          const offTitle = isOff ? String(payload.officer_title || 'Officer') : undefined
+          const offTitle = isOff ? String(payload.officer_title || 'PSITS Officer') : undefined
 
           const rawAuthorName = String(payload.author_display_name || 'kasubay')
           const formattedAuthorName = isAnon
@@ -2030,17 +2244,29 @@ export default function CommunityPage() {
 
       // Case C: Post Updated (Reactions, Comments, Content Edit, Officer Badge, Lock Status)
       if (events.some(e => e.includes('.update'))) {
+        const isOffUpdate = typeof payload.is_officer === 'boolean'
+          ? payload.is_officer
+          : typeof payload.is_officer === 'string'
+          ? payload.is_officer === 'true'
+          : undefined
+        const isVerUpdate = typeof payload.is_verified === 'boolean'
+          ? payload.is_verified
+          : isOffUpdate
+
         setPosts(prev => {
           const updated = prev.map(p => {
             if (p.$id !== docId) return p
+            const finalIsOff = isOffUpdate !== undefined ? isOffUpdate : p.is_officer
+            const finalIsVer = isVerUpdate !== undefined ? isVerUpdate : (finalIsOff || p.is_verified)
             return {
               ...p,
               content: typeof payload.content === 'string' ? payload.content : p.content,
               likes_count: typeof payload.likes_count === 'number' ? payload.likes_count : p.likes_count,
               comments_count: typeof payload.comments_count === 'number' ? payload.comments_count : p.comments_count,
               is_locked: Boolean(payload.is_locked ?? p.is_locked),
-              is_officer: typeof payload.is_officer === 'boolean' ? payload.is_officer : p.is_officer,
-              is_verified: typeof payload.is_verified === 'boolean' ? payload.is_verified : (Boolean(payload.is_officer) || p.is_verified),
+              is_officer: finalIsOff,
+              is_verified: finalIsVer,
+              officer_title: finalIsOff ? String(payload.officer_title || p.officer_title || 'PSITS Officer') : undefined,
               tags: Array.isArray(payload.tags) ? payload.tags.map(String) : p.tags,
             }
           })
@@ -2048,6 +2274,23 @@ export default function CommunityPage() {
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated))
           } catch {}
           return updated
+        })
+
+        // Also update activeCommentPost in realtime if currently open
+        setActiveCommentPost(prev => {
+          if (!prev || prev.$id !== docId) return prev
+          const finalIsOff = isOffUpdate !== undefined ? isOffUpdate : prev.is_officer
+          const finalIsVer = isVerUpdate !== undefined ? isVerUpdate : (finalIsOff || prev.is_verified)
+          return {
+            ...prev,
+            content: typeof payload.content === 'string' ? payload.content : prev.content,
+            likes_count: typeof payload.likes_count === 'number' ? payload.likes_count : prev.likes_count,
+            comments_count: typeof payload.comments_count === 'number' ? payload.comments_count : prev.comments_count,
+            is_locked: Boolean(payload.is_locked ?? prev.is_locked),
+            is_officer: finalIsOff,
+            is_verified: finalIsVer,
+            officer_title: finalIsOff ? String(payload.officer_title || prev.officer_title || 'PSITS Officer') : undefined,
+          }
         })
       }
     })
@@ -2125,15 +2368,25 @@ export default function CommunityPage() {
       // Case B: Comment Edited
       if (events.some(e => e.includes('.update'))) {
         setComments(prev =>
-          prev.map(c =>
-            c.$id === commentId
-              ? {
-                  ...c,
-                  content: String(payload.content || c.content),
-                  is_edited: Boolean(payload.is_edited ?? c.is_edited),
-                }
-              : c
-          )
+          prev.map(c => {
+            if (c.$id !== commentId) return c
+            const isOff = typeof payload.is_officer === 'boolean'
+              ? payload.is_officer
+              : typeof payload.is_officer === 'string'
+              ? payload.is_officer === 'true'
+              : c.is_officer
+            const isVer = typeof payload.is_verified === 'boolean'
+              ? payload.is_verified
+              : (isOff || c.is_verified)
+            return {
+              ...c,
+              content: String(payload.content || c.content),
+              is_edited: Boolean(payload.is_edited ?? c.is_edited),
+              is_officer: isOff,
+              is_verified: isVer,
+              officer_title: isOff ? String(payload.officer_title || c.officer_title || 'PSITS Officer') : undefined,
+            }
+          })
         )
         return
       }
@@ -2144,6 +2397,11 @@ export default function CommunityPage() {
           // If already in list with same ID, avoid duplicate
           if (prev.some(c => c.$id === commentId)) return prev
 
+          const isAnon = Boolean(payload.is_anonymous)
+          const isOff = Boolean(payload.is_officer === true || payload.is_officer === 'true' || payload.is_officer === 1) && !isAnon
+          const isVer = isOff || Boolean(payload.is_verified)
+          const offTitle = isOff ? String(payload.officer_title || 'PSITS Officer') : undefined
+
           const incoming: CommunityCommentItem = {
             $id: commentId,
             $createdAt: String(payload.$createdAt || new Date().toISOString()),
@@ -2151,10 +2409,10 @@ export default function CommunityPage() {
             author_student_no: payload.author_student_no ? String(payload.author_student_no) : undefined,
             author_display_name: String(payload.author_display_name || 'Kasubay'),
             author_avatar: payload.author_avatar ? String(payload.author_avatar) : '',
-            is_anonymous: Boolean(payload.is_anonymous),
-            is_verified: Boolean(payload.is_verified),
-            is_officer: Boolean(payload.is_officer),
-            officer_title: payload.officer_title ? String(payload.officer_title) : undefined,
+            is_anonymous: isAnon,
+            is_verified: isVer,
+            is_officer: isOff,
+            officer_title: offTitle,
             parent_id: payload.parent_id ? String(payload.parent_id) : undefined,
             reply_to_handle: payload.reply_to_handle ? String(payload.reply_to_handle) : undefined,
             is_edited: Boolean(payload.is_edited),
@@ -2556,15 +2814,34 @@ export default function CommunityPage() {
     try {
       const res = await getCommentsForPostAction(post.$id)
       if (res.success) {
-        setComments(deduplicateComments(res.comments))
+        const list = deduplicateComments(res.comments)
+        setComments(list)
+        if (list.length > 0) {
+          getCommentLikesBatchAction({
+            commentIds: list.map(c => c.$id),
+            userEmail: user?.email,
+          }).then(likesRes => {
+            if (likesRes.success) {
+              setCommentLikes(prev => ({ ...prev, ...likesRes.likes }))
+            }
+          }).catch(() => {})
+        }
       }
     } finally {
       setCommentsLoading(false)
     }
   }
 
+  useEffect(() => {
+    openCommentsRef.current = openComments
+  })
+
   const handleStartReply = (c: CommunityCommentItem) => {
     if (!user) {
+      commentInputRef.current?.blur()
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
+      }
       setOnboardingInitialStep(1)
       setIsOnboardingOpen(true)
       return
@@ -3098,6 +3375,32 @@ export default function CommunityPage() {
             </>
           )}
         </div>
+
+        {/* Comment Heart Reaction (Instagram Style) */}
+        {!isDeleted && editingCommentId !== c.$id && (
+          <div className="flex flex-col items-center justify-start shrink-0 pt-1.5 pl-1 select-none">
+            <button
+              type="button"
+              onClick={() => handleToggleCommentLike(c)}
+              className="p-1 text-slate-400 hover:text-rose-500 transition-transform active:scale-125 cursor-pointer rounded-full"
+              aria-label="Like comment"
+              title={commentLikes[c.$id]?.liked ? 'Unlike' : 'Like'}
+            >
+              <Heart
+                className={`w-3.5 h-3.5 transition-colors duration-150 ${
+                  commentLikes[c.$id]?.liked
+                    ? 'fill-rose-500 text-rose-500 animate-in zoom-in-75 duration-150'
+                    : 'text-slate-400 hover:text-rose-500'
+                }`}
+              />
+            </button>
+            {(commentLikes[c.$id]?.count || 0) > 0 && (
+              <span className="text-[10px] font-semibold text-slate-400 dark:text-white/40 -mt-0.5 select-none font-mono">
+                {commentLikes[c.$id]?.count}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -3265,44 +3568,121 @@ export default function CommunityPage() {
         className="w-full bg-transparent overflow-visible"
         contentClassName="overflow-visible space-y-3 sm:space-y-5"
       >
-      {/* ─── Instagram-Style Mutuals Stories Tray (Minimalist Active Status Badge) ─── */}
-      <div className="pb-2.5 pt-0.5 border-b border-black/[0.04] dark:border-white/[0.06] overflow-hidden -mx-4 px-4 sm:mx-0 sm:px-0">
-        <div className="flex items-center gap-3.5 sm:gap-4.5 overflow-x-auto no-scrollbar scroll-smooth py-1">
-          {/* 1. Current User ("Your story") */}
-          <Link
-            href={user ? `/community/${myHandleNormalized || ''}` : '#'}
-            onClick={(e) => {
-              if (!user) {
-                e.preventDefault()
-                setOnboardingInitialStep(1)
-                setIsOnboardingOpen(true)
-              }
-            }}
-            className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer select-none"
-            title={user ? 'Your Profile' : 'Sign in to join community'}
-          >
-            <div className="relative">
-              <div className="w-14 h-14 sm:w-15 sm:h-15 rounded-full overflow-hidden bg-slate-800 border border-black/[0.08] dark:border-white/10 transition-transform duration-200 group-hover:scale-105 flex items-center justify-center">
-                {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
-                  <Image
-                    src={userProfile.avatar}
-                    alt="You"
-                    width={60}
-                    height={60}
-                    className="w-full h-full object-cover"
-                  />
+      {/* ─── Instagram-Style Mutuals Stories / Notes Tray ─── */}
+      <div className="pb-3 pt-2 border-b border-black/[0.04] dark:border-white/[0.06] -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex items-end gap-3.5 sm:gap-4.5 overflow-x-auto no-scrollbar scroll-smooth pt-7 pb-1.5 px-3 sm:px-2">
+          {/* 1. Current User ("Your note") */}
+          <div className="flex flex-col items-center gap-1 shrink-0 select-none relative group">
+            {/* Instagram Thought Bubble Above Avatar */}
+            {user && (
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (myActiveNote) {
+                    setViewingNote(myActiveNote)
+                  } else {
+                    setNoteText('')
+                    setIsNoteComposeOpen(true)
+                  }
+                }}
+                className="absolute -top-7 left-1/2 -translate-x-1/2 z-20 cursor-pointer hover:scale-105 active:scale-95 transition-transform focus:outline-none"
+                title={myActiveNote ? `Your note: "${myActiveNote.content}"` : 'Share a thought'}
+              >
+                <div
+                  className={`relative px-2.5 py-1 rounded-2xl text-[10.5px] font-medium shadow-md border transition-all ${
+                    myActiveNote
+                      ? 'bg-white dark:bg-[#1a202c] text-slate-800 dark:text-slate-100 border-black/10 dark:border-white/15 max-w-[95px] truncate'
+                      : 'bg-white/95 dark:bg-[#1a202c]/95 text-slate-500 dark:text-slate-400 border-black/10 dark:border-white/10 max-w-[90px] flex items-center gap-1'
+                  }`}
+                >
+                  {myActiveNote ? (
+                    myActiveNote.content
+                  ) : (
+                    <>
+                      <span>Note...</span>
+                    </>
+                  )}
+                  {/* Instagram thought bubble tail dots */}
+                  <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-[1px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#1a202c] border border-black/10 dark:border-white/15 block" />
+                    <span className="w-1 h-1 rounded-full bg-white dark:bg-[#1a202c] border border-black/10 dark:border-white/15 block" />
+                  </div>
+                </div>
+              </button>
+            )}
+
+            {/* Avatar & Plus Button */}
+            <div className="relative group">
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!user) {
+                    setOnboardingInitialStep(1)
+                    setIsOnboardingOpen(true)
+                    return
+                  }
+                  if (myActiveNote) {
+                    setViewingNote(myActiveNote)
+                  } else {
+                    setNoteText('')
+                    setIsNoteComposeOpen(true)
+                  }
+                }}
+                className="w-14 h-14 sm:w-15 sm:h-15 rounded-full overflow-hidden bg-slate-800 border border-black/[0.08] dark:border-white/10 flex items-center justify-center cursor-pointer group-hover:scale-105 active:scale-95 transition-transform focus:outline-none"
+                title={myActiveNote ? 'View note' : 'Share a note'}
+              >
+                {user ? (
+                  userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
+                    <Image
+                      src={userProfile.avatar}
+                      alt="You"
+                      width={60}
+                      height={60}
+                      className="w-full h-full object-cover pointer-events-none"
+                    />
+                  ) : (
+                    renderAvatarIcon(userProfile?.avatar, userProfile?.name || user?.name, 'w-6 h-6 text-gold pointer-events-none')
+                  )
                 ) : (
-                  renderAvatarIcon(userProfile?.avatar, userProfile?.name || user?.name || 'You', 'w-6 h-6 text-gold')
+                  <User className="w-6 h-6 text-slate-400 group-hover:text-gold transition-colors pointer-events-none" />
                 )}
-              </div>
-              {user && (
-                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#07090e]" />
+              </button>
+
+              {/* Active note status indicator (clean, no yellow + button) */}
+              {user && myActiveNote && (
+                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#07090e] pointer-events-none" />
               )}
             </div>
-            <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate w-14 sm:w-15 text-center">
-              Your story
-            </span>
-          </Link>
+
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!user) {
+                  setOnboardingInitialStep(1)
+                  setIsOnboardingOpen(true)
+                  return
+                }
+                if (myActiveNote) {
+                  setViewingNote(myActiveNote)
+                } else {
+                  setNoteText('')
+                  setIsNoteComposeOpen(true)
+                }
+              }}
+              className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate w-14 sm:w-15 text-center cursor-pointer hover:text-gold transition-colors focus:outline-none"
+            >
+              Your note
+            </button>
+          </div>
 
           {/* Skeleton Preloader for Mutuals Tray */}
           {user && isMutualsLoading && displayMutuals.length === 0 ? (
@@ -3316,47 +3696,70 @@ export default function CommunityPage() {
             </>
           ) : (
             <>
-              {/* 2. Mutual Followers Tray: Active Badge (No ring) */}
+              {/* 2. Mutual Followers Tray: Active Badge + Instagram Notes */}
               {displayMutuals.map((m) => {
                 const isOnline = onlineHandlesSet.has(normalizeCommunityHandle(m.handle))
                 const cleanHandle = (m.handle || '').replace(/^@/, '')
+                const mutualNote = notesByHandleMap.get(normalizeCommunityHandle(m.handle))
 
                 return (
-                  <Link
-                    key={m.handle}
-                    href={`/community/${cleanHandle}`}
-                    className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer select-none"
-                    title={`${m.name} (@${cleanHandle}) · ${isOnline ? 'Active now' : 'Offline'}`}
-                  >
-                    <div className="relative">
-                      <div className="w-14 h-14 sm:w-15 sm:h-15 rounded-full overflow-hidden bg-slate-800 border border-black/[0.08] dark:border-white/10 transition-transform duration-200 group-hover:scale-105 flex items-center justify-center">
-                        {m.avatar && !m.avatar.startsWith('preset:') ? (
-                          <Image
-                            src={m.avatar}
-                            alt={m.name}
-                            width={60}
-                            height={60}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          renderAvatarIcon(m.avatar, m.name, 'w-6 h-6 text-gold')
+                  <div key={m.handle} className="flex flex-col items-center gap-1 shrink-0 select-none relative group">
+                    {/* Classmate Active Note Speech Bubble */}
+                    {mutualNote && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setViewingNote(mutualNote)
+                        }}
+                        className="absolute -top-7 left-1/2 -translate-x-1/2 z-20 cursor-pointer hover:scale-105 active:scale-95 transition-transform focus:outline-none"
+                        title={`${m.name}: "${mutualNote.content}"`}
+                      >
+                        <div className="relative px-2.5 py-1 rounded-2xl text-[10.5px] font-medium shadow-md bg-white dark:bg-[#1a202c] text-slate-800 dark:text-slate-100 border border-black/10 dark:border-white/15 max-w-[95px] truncate text-center">
+                          {mutualNote.content}
+                          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-[1px]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#1a202c] border border-black/10 dark:border-white/15 block" />
+                            <span className="w-1 h-1 rounded-full bg-white dark:bg-[#1a202c] border border-black/10 dark:border-white/15 block" />
+                          </div>
+                        </div>
+                      </button>
+                    )}
+
+                    <Link
+                      href={`/community/${cleanHandle}`}
+                      className="flex flex-col items-center gap-1 cursor-pointer"
+                      title={`${m.name} (@${cleanHandle}) · ${isOnline ? 'Active now' : 'Offline'}`}
+                    >
+                      <div className="relative group-hover:scale-105 transition-transform">
+                        <div className="w-14 h-14 sm:w-15 sm:h-15 rounded-full overflow-hidden bg-slate-800 border border-black/[0.08] dark:border-white/10 flex items-center justify-center">
+                          {m.avatar && !m.avatar.startsWith('preset:') ? (
+                            <Image
+                              src={m.avatar}
+                              alt={m.name}
+                              width={60}
+                              height={60}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            renderAvatarIcon(m.avatar, m.name, 'w-6 h-6 text-gold')
+                          )}
+                        </div>
+                        {isOnline && (
+                          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#07090e]" />
                         )}
                       </div>
-                      {isOnline && (
-                        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#07090e]" />
-                      )}
-                    </div>
-                    <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate w-14 sm:w-15 text-center lowercase">
-                      {cleanHandle}
-                    </span>
-                  </Link>
+                      <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate w-14 sm:w-15 text-center lowercase hover:underline">
+                        {cleanHandle}
+                      </span>
+                    </Link>
+                  </div>
                 )
               })}
 
               {/* Empty State: Logged-in user has no mutuals yet */}
               {user && displayMutuals.length === 0 && (
                 <div className="flex items-center gap-2 px-2 py-2 text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">
-                  <span>Follow classmates who follow you back to see their live active status here</span>
+                  <span>Follow classmates who follow you back to see their live active status & notes here</span>
                 </div>
               )}
             </>
@@ -3714,6 +4117,9 @@ export default function CommunityPage() {
                               >
                                 {post.author_display_name.startsWith('@') ? post.author_display_name.slice(1) : post.author_display_name}
                               </Link>
+                              {(post.is_officer || post.is_verified) && (
+                                <InstagramVerifiedBadge className="w-3.5 h-3.5 inline-block shrink-0" />
+                              )}
                               {post.tags?.[0] && (
                                   <button
                                     type="button"
@@ -4225,50 +4631,7 @@ export default function CommunityPage() {
 
           </div>
 
-          {/* ─── Realtime Active Status (Minimalist Card) ─── */}
-          <div className="rounded-2xl border border-black/[0.06] dark:border-white/[0.08] bg-surface p-3.5 flex items-center justify-between gap-2 shadow-xs">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              <span className="text-xs font-semibold text-slate-900 dark:text-white">Active Now</span>
-              <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md">
-                {displayOnlineMembers.length}
-              </span>
-            </div>
-            <div className="flex items-center -space-x-1.5 overflow-hidden shrink-0">
-              {displayOnlineMembers.slice(0, 5).map((member) => {
-                const cleanH = member.handle.replace(/^@/, '')
-                return (
-                  <Link
-                    key={member.key}
-                    href={member.isGuest ? '#' : `/community/${cleanH}`}
-                    title={`${member.name} (@${cleanH}) · Active now`}
-                    className="relative w-6 h-6 rounded-full ring-2 ring-white dark:ring-[#0c1017] overflow-hidden bg-slate-900 hover:scale-110 transition-transform cursor-pointer shrink-0"
-                  >
-                    {member.avatar && !member.avatar.startsWith('preset:') ? (
-                      <Image
-                        src={member.avatar}
-                        alt={member.name}
-                        width={24}
-                        height={24}
-                        className="w-full h-full object-cover"
-                        unoptimized={Boolean(member.avatar.startsWith('data:') || member.avatar.includes('appwrite'))}
-                      />
-                    ) : (
-                      renderAvatarIcon(member.avatar, member.name, 'w-3 h-3 text-gold')
-                    )}
-                  </Link>
-                )
-              })}
-              {displayOnlineMembers.length > 5 && (
-                <span className="w-6 h-6 rounded-full bg-black/5 dark:bg-white/10 ring-2 ring-white dark:ring-[#0c1017] flex items-center justify-center text-[9px] font-mono font-bold text-slate-500 dark:text-white/60">
-                  +{displayOnlineMembers.length - 5}
-                </span>
-              )}
-            </div>
-          </div>
+
 
           {/* Host Thread Join Requests (Only displayed if there are active pending requests) */}
           {user && hostedThreadRequests.length > 0 && (
@@ -4416,6 +4779,196 @@ export default function CommunityPage() {
         onMarkAllAsRead={handleMarkAllNotifsAsRead}
         onOpenPost={handleOpenNotificationPost}
       />
+
+      {/* ─── Instagram-Style Note Composer Modal ─── */}
+      {isNoteComposeOpen && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsNoteComposeOpen(false)
+          }}
+          className="fixed inset-0 z-[120] bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150"
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#0c1017] border border-black/[0.08] dark:border-white/[0.1] shadow-2xl p-6 relative animate-in zoom-in-95 duration-150">
+            {/* Top Navigation Bar: Cancel on Left, Share on Right - NO X BUTTON */}
+            <div className="flex items-center justify-between w-full mb-6">
+              <button
+                type="button"
+                onClick={() => setIsNoteComposeOpen(false)}
+                className="text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                {myActiveNote ? 'Edit note' : 'New note'}
+              </h3>
+              <button
+                type="button"
+                disabled={!noteText.trim() || isSubmittingNote}
+                onClick={handleCreateNote}
+                className="px-4 py-1.5 text-xs font-bold rounded-full bg-gold text-slate-950 hover:bg-gold-muted transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+              >
+                {isSubmittingNote && <RefreshCw className="w-3 h-3 animate-spin" />}
+                <span>Share</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateNote} className="flex flex-col items-center">
+              {/* Instagram Speech/Thought Bubble Above Avatar */}
+              <div className="relative mb-4 w-full flex flex-col items-center">
+                <div className="relative w-full max-w-[260px] bg-slate-100 dark:bg-[#1a202c] border border-black/10 dark:border-white/15 rounded-3xl p-4 shadow-lg transition-all focus-within:ring-2 focus-within:ring-gold/40">
+                  <textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value.slice(0, 60))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleCreateNote(e)
+                      }
+                    }}
+                    placeholder="Share a thought..."
+                    rows={2}
+                    maxLength={60}
+                    autoFocus
+                    className="w-full bg-transparent text-center text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none resize-none leading-relaxed"
+                  />
+                  <div className="text-[10px] text-right font-mono text-slate-400 dark:text-slate-500 mt-1">
+                    {noteText.length}/60
+                  </div>
+                  {/* Instagram Thought Bubble Tail (Dual descending circles) */}
+                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-100 dark:bg-[#1a202c] border border-black/10 dark:border-white/15 block shadow-sm" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-100 dark:bg-[#1a202c] border border-black/10 dark:border-white/15 block" />
+                  </div>
+                </div>
+              </div>
+
+              {/* User Avatar */}
+              <div className="w-18 h-18 rounded-full overflow-hidden bg-slate-800 ring-2 ring-gold/40 shadow-md flex items-center justify-center mt-1 mb-3">
+                {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
+                  <Image
+                    src={userProfile.avatar}
+                    alt="You"
+                    width={72}
+                    height={72}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  renderAvatarIcon(userProfile?.avatar, userProfile?.name || user?.name, 'w-8 h-8 text-gold')
+                )}
+              </div>
+
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center max-w-[240px]">
+                Notes are visible to classmates and disappear after 24 hours.
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Instagram-Style Note Viewer Modal ─── */}
+      {viewingNote && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setViewingNote(null)
+          }}
+          className="fixed inset-0 z-[120] bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150"
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#0c1017] border border-black/[0.08] dark:border-white/[0.1] shadow-2xl p-6 relative animate-in zoom-in-95 duration-150 flex flex-col items-center">
+            {/* NO X BUTTON */}
+
+            {/* Note Speech Bubble Above Avatar */}
+            <div className="relative mb-4 w-full flex flex-col items-center">
+              <div className="relative w-full max-w-[260px] bg-slate-100 dark:bg-[#1a202c] border border-black/10 dark:border-white/15 rounded-3xl p-4 shadow-lg">
+                <p className="text-center text-sm font-medium text-slate-900 dark:text-white leading-relaxed break-words">
+                  {viewingNote.content}
+                </p>
+                {/* Speech bubble tail dots */}
+                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-100 dark:bg-[#1a202c] border border-black/10 dark:border-white/15 block shadow-sm" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-100 dark:bg-[#1a202c] border border-black/10 dark:border-white/15 block" />
+                </div>
+              </div>
+            </div>
+
+            {/* Avatar */}
+            <Link
+              href={`/community/${viewingNote.author_handle}`}
+              onClick={() => setViewingNote(null)}
+              className="w-18 h-18 rounded-full overflow-hidden bg-slate-800 ring-2 ring-gold/40 shadow-md flex items-center justify-center mt-1 mb-2 hover:scale-105 transition-transform cursor-pointer"
+            >
+              {viewingNote.author_avatar && !viewingNote.author_avatar.startsWith('preset:') ? (
+                <Image
+                  src={viewingNote.author_avatar}
+                  alt={viewingNote.author_display_name}
+                  width={72}
+                  height={72}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                renderAvatarIcon(viewingNote.author_avatar, viewingNote.author_display_name, 'w-8 h-8 text-gold')
+              )}
+            </Link>
+
+            <Link
+              href={`/community/${viewingNote.author_handle}`}
+              onClick={() => setViewingNote(null)}
+              className="font-bold text-sm text-slate-900 dark:text-white hover:underline text-center cursor-pointer"
+            >
+              {viewingNote.author_display_name}
+            </Link>
+            <span className="text-xs text-slate-400 dark:text-slate-500 font-mono text-center">
+              @{viewingNote.author_handle}
+            </span>
+
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500 mt-2 mb-5">
+              <Clock className="w-3 h-3" />
+              <span>{formatRelativeTime(viewingNote.$createdAt)} · 24h note</span>
+            </div>
+
+            {/* Actions */}
+            {normalizeCommunityHandle(viewingNote.author_handle) === myHandleNormalized ? (
+              <div className="w-full flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewingNote(null)
+                    setNoteText(viewingNote.content)
+                    setIsNoteComposeOpen(true)
+                  }}
+                  className="flex-1 py-2 text-xs font-semibold rounded-xl bg-gold/15 text-gold border border-gold/30 hover:bg-gold/25 transition-colors cursor-pointer"
+                >
+                  Edit Note
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteMyNote(viewingNote.$id)}
+                  className="py-2 px-3 text-xs font-semibold rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
+              </div>
+            ) : (
+              <div className="w-full flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingNote(null)}
+                  className="flex-1 py-2 text-xs font-semibold rounded-xl border border-black/10 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+                <Link
+                  href={`/community/${viewingNote.author_handle}`}
+                  onClick={() => setViewingNote(null)}
+                  className="flex-1 py-2 text-xs font-bold rounded-xl bg-gold text-slate-950 hover:bg-gold-muted text-center transition-colors shadow-md cursor-pointer"
+                >
+                  View Profile
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ─── Realtime In-App Notification Toast (Facebook/IG Style) ─── */}
       <AnimatePresence>
@@ -5084,7 +5637,7 @@ export default function CommunityPage() {
                           ? (userProfile.username.startsWith('@') ? userProfile.username : `@${userProfile.username}`)
                           : `@${(userProfile?.name || user?.name || 'kasubay').toLowerCase().replace(/[^a-z0-9_.]/g, '')}`}
                       </span>
-                      {(isAdmin || userProfile?.tosAccepted) && (
+                      {(isAdmin || user?.isOfficer || userProfile?.tosAccepted) && (
                         <InstagramVerifiedBadge className="w-3.5 h-3.5" />
                       )}
                     </div>
@@ -5192,8 +5745,18 @@ export default function CommunityPage() {
 
       {/* ─── Minimalist Instagram-Style Comments Modal / Mobile Bottom Sheet ─── */}
       {activeCommentPost && (
-        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-6 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg max-h-[90dvh] sm:max-h-[85vh] flex flex-col rounded-t-[32px] sm:rounded-[28px] bg-white dark:bg-[#0c1017] border-t sm:border border-black/[0.08] dark:border-white/[0.1] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isOnboardingOpen) {
+              setActiveCommentPost(null)
+            }
+          }}
+          className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-6 animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg max-h-[90dvh] sm:max-h-[85vh] flex flex-col rounded-t-[32px] sm:rounded-[28px] bg-white dark:bg-[#0c1017] border-t sm:border border-black/[0.08] dark:border-white/[0.1] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200"
+          >
             {/* Mobile Drag Handle Indicator */}
             <div className="w-10 h-1 rounded-full bg-black/20 dark:bg-white/20 mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
@@ -5484,8 +6047,13 @@ export default function CommunityPage() {
                 </div>
 
                 <div
-                  onClick={() => {
+                  onClick={(e) => {
                     if (!user) {
+                      e.preventDefault()
+                      commentInputRef.current?.blur()
+                      if (document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur()
+                      }
                       setOnboardingInitialStep(1)
                       setIsOnboardingOpen(true)
                     }
@@ -5498,21 +6066,46 @@ export default function CommunityPage() {
                     value={newCommentText}
                     onChange={handleCommentInputChange}
                     onKeyDown={e => e.key === 'Enter' && !isSubmittingComment && handleAddComment()}
-                    onFocus={() => {
-                      if (!user) {
+                    onFocus={(e) => {
+                      if (!user || isOnboardingOpen) {
+                        e.preventDefault()
+                        e.currentTarget.blur()
+                        commentInputRef.current?.blur()
+                        if (document.activeElement instanceof HTMLElement) {
+                          document.activeElement.blur()
+                        }
                         setOnboardingInitialStep(1)
                         setIsOnboardingOpen(true)
                       }
                     }}
-                    readOnly={!user || isSubmittingComment}
+                    onTouchStart={(e) => {
+                      if (!user) {
+                        e.preventDefault()
+                        commentInputRef.current?.blur()
+                        if (document.activeElement instanceof HTMLElement) {
+                          document.activeElement.blur()
+                        }
+                        setOnboardingInitialStep(1)
+                        setIsOnboardingOpen(true)
+                      }
+                    }}
+                    readOnly={!user || isSubmittingComment || isOnboardingOpen}
+                    inputMode={!user ? 'none' : 'text'}
+                    tabIndex={!user || isOnboardingOpen ? -1 : 0}
+                    aria-haspopup={!user ? 'dialog' : undefined}
                     placeholder={user ? (replyingToComment ? `Reply to @${replyingToComment.author}...` : 'Add a comment... (Type @ to mention mutuals)') : 'Sign in to join discussion & comment...'}
                     className="w-full bg-transparent text-xs sm:text-[13px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none font-sans cursor-pointer sm:cursor-text"
                   />
                   <button
                     type="button"
                     disabled={isSubmittingComment || (Boolean(user) && !newCommentText.trim())}
-                    onClick={() => {
+                    onClick={(e) => {
                       if (!user) {
+                        e.preventDefault()
+                        commentInputRef.current?.blur()
+                        if (document.activeElement instanceof HTMLElement) {
+                          document.activeElement.blur()
+                        }
                         setOnboardingInitialStep(1)
                         setIsOnboardingOpen(true)
                         return

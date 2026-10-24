@@ -251,9 +251,11 @@ export function PullToRefresh({
   const indicatorScale = useTransform(y, [0, pullThreshold], [0.86, 1]);
   const isRefreshing = refreshing || internalRefreshing;
 
-  disabledRef.current = disabled;
-  externalRefreshingRef.current = refreshing;
-  refreshingRef.current = isRefreshing;
+  useEffect(() => {
+    disabledRef.current = disabled;
+    externalRefreshingRef.current = refreshing;
+    refreshingRef.current = isRefreshing;
+  }, [disabled, refreshing, isRefreshing]);
 
   const setStatus = useCallback((next: PullToRefreshStatus) => {
     if (statusRef.current === next) return;
@@ -415,7 +417,9 @@ export function PullToRefresh({
       event.currentTarget.scrollTop <= 0 &&
       (typeof window === "undefined" || window.scrollY <= 0);
 
+    const target = event.target as HTMLElement | null;
     if (
+      target?.closest("button, a, input, textarea, select, [role='button']") ||
       event.pointerType === "touch" ||
       event.button !== 0 ||
       !isAtTop ||

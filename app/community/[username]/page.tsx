@@ -34,6 +34,7 @@ import {
   Smile,
   EyeOff,
   Eye,
+  User,
 } from 'lucide-react'
 import { appwrite, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, appwriteStorage, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
@@ -47,6 +48,7 @@ import {
   getFollowStatsAction,
   getFollowListAction,
   getStudentProfileByHandleAction,
+  checkUserOfficerStatusAction,
   type CommunityPostItem,
   type CommunityCommentItem,
   type FollowUserInfo,
@@ -132,7 +134,10 @@ function renderAvatarIcon(avatarStr?: string, nameStr?: string, className = 'w-6
         return <Code2 className={className} />
     }
   }
-  return <span className="font-bold text-gold text-base">{nameStr ? nameStr.charAt(0).toUpperCase() : 'K'}</span>
+  if (!nameStr || nameStr === 'You' || nameStr === 'User' || nameStr === 'Student') {
+    return <User className={className} />
+  }
+  return <span className="font-bold text-gold text-base">{nameStr.charAt(0).toUpperCase()}</span>
 }
 
 function deduplicateComments(items: CommunityCommentItem[]): CommunityCommentItem[] {
@@ -291,6 +296,19 @@ export default function StudentProfilePage() {
         if (email.toLowerCase() === 'psits-ua@antiquespride.edu.ph' || email.toLowerCase().includes('admin')) {
           setIsAdmin(true)
         }
+
+        checkUserOfficerStatusAction(email, name).then(res => {
+          if (res.isOfficer) {
+            setUser(prev => prev ? {
+              ...prev,
+              isOfficer: true,
+              isVerified: true,
+            } : prev)
+            if (res.title?.toLowerCase().includes('admin') || email.toLowerCase() === 'psits-ua@antiquespride.edu.ph') {
+              setIsAdmin(true)
+            }
+          }
+        }).catch(() => {})
       } else {
         setUser(null)
         setUserProfile(null)
@@ -333,6 +351,23 @@ export default function StudentProfilePage() {
           }
         } catch {}
         setUserProfile(userProfileObj)
+
+        if (email.toLowerCase() === 'psits-ua@antiquespride.edu.ph' || email.toLowerCase().includes('admin')) {
+          setIsAdmin(true)
+        }
+
+        checkUserOfficerStatusAction(email, name).then(res => {
+          if (res.isOfficer) {
+            setUser(prev => prev ? {
+              ...prev,
+              isOfficer: true,
+              isVerified: true,
+            } : prev)
+            if (res.title?.toLowerCase().includes('admin') || email.toLowerCase() === 'psits-ua@antiquespride.edu.ph') {
+              setIsAdmin(true)
+            }
+          }
+        }).catch(() => {})
       } else {
         setUser(null)
         setUserProfile(null)
@@ -1605,6 +1640,9 @@ export default function StudentProfilePage() {
                             <span className="font-semibold text-xs sm:text-[13px] text-slate-900 dark:text-slate-100 truncate">
                               {post.author_display_name.startsWith('@') ? post.author_display_name.slice(1) : post.author_display_name}
                             </span>
+                            {(post.is_officer || post.is_verified) && (
+                              <InstagramVerifiedBadge className="w-3.5 h-3.5 inline-block shrink-0" />
+                            )}
                             {post.tags?.[0] && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono text-[10px] font-medium">
                                 <Hash className="w-2.5 h-2.5" />

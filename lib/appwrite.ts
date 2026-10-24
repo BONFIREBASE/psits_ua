@@ -9,6 +9,8 @@ export const APPWRITE_COLLECTIONS = {
   POSTS: 'posts',
   COMMENTS: 'comments',
   REACTIONS: 'reactions',
+  COMMENT_LIKES: 'comment_likes',
+  NOTES: 'notes',
   FOLLOWS: 'follows',
   REPORTS: 'reports',
   THREADS: 'threads',

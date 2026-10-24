@@ -198,6 +198,10 @@ export default function ProjectsClient({
     setAuthError(null)
     setIsSigningIn(true)
     try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('psits_auth_redirect', '/projects?submit=1')
+        localStorage.setItem('psits_auth_redirect', '/projects?submit=1')
+      }
       const redirectUrl =
         typeof window !== 'undefined'
           ? `${window.location.origin}/projects?submit=1`

@@ -165,6 +165,7 @@ export interface CommunityCommentItem {
   reply_to_handle?: string
   is_edited?: boolean
   status?: string
+  likes_count?: number
 }
 
 function formatStudentFullName(rawName: string): string {
@@ -317,6 +318,25 @@ async function resolveOfficerStatus(email: string, name?: string): Promise<{ isO
   }
 
   return { isOfficer: false, title: '' }
+}
+
+export async function checkUserOfficerStatusAction(email: string, name?: string): Promise<{
+  isOfficer: boolean
+  title: string
+  isVerified: boolean
+  name?: string
+}> {
+  try {
+    const res = await resolveOfficerStatus(email, name)
+    return {
+      isOfficer: res.isOfficer,
+      title: res.title || (res.isOfficer ? 'PSITS Officer' : ''),
+      isVerified: res.isOfficer,
+      name: res.name,
+    }
+  } catch {
+    return { isOfficer: false, title: '', isVerified: false }
+  }
 }
 
 export interface AutoResolveEligibilityResult {
@@ -2725,3 +2745,236 @@ export async function deleteCommunityThreadAction(params: {
 }
 
 
+/* ─── 20. Comment Likes (Heart) ─── */
+export async function toggleCommentLikeAction(params: {
+  commentId: string
+  userEmail: string
+}): Promise<{ success: boolean; liked?: boolean; likesCount?: number; error?: string }> {
+  try {
+    const { commentId, userEmail } = params
+    if (!commentId || !userEmail) return { success: false, error: 'Missing parameters.' }
+
+    const { databases } = createServerAppwriteClient()
+
+    const existing = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.COMMENT_LIKES,
+      [Query.equal('comment_id', commentId), Query.equal('user_email', userEmail)]
+    )
+
+    let liked = false
+    if (existing.total > 0) {
+      await databases.deleteDocument(
+        APPWRITE_DATABASE_ID,
+        APPWRITE_COLLECTIONS.COMMENT_LIKES,
+        existing.documents[0].$id
+      )
+      liked = false
+    } else {
+      await databases.createDocument(
+        APPWRITE_DATABASE_ID,
+        APPWRITE_COLLECTIONS.COMMENT_LIKES,
+        ID.unique(),
+        {
+          comment_id: commentId,
+          user_email: userEmail,
+        }
+      )
+      liked = true
+    }
+
+    const countRes = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.COMMENT_LIKES,
+      [Query.equal('comment_id', commentId), Query.limit(1)]
+    )
+
+    return { success: true, liked, likesCount: countRes.total }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to toggle comment like.'
+    console.error('[Comment Like Error]:', err)
+    return { success: false, error: msg }
+  }
+}
+
+export async function getCommentLikesBatchAction(params: {
+  commentIds: string[]
+  userEmail?: string
+}): Promise<{
+  success: boolean
+  likes: Record<string, { count: number; liked: boolean }>
+}> {
+  try {
+    const { commentIds, userEmail } = params
+    if (!commentIds || commentIds.length === 0) return { success: true, likes: {} }
+
+    const { databases } = createServerAppwriteClient()
+    const likes: Record<string, { count: number; liked: boolean }> = {}
+
+    // Batch fetch all comment likes for the given comment IDs (up to 100 at once)
+    const batchIds = commentIds.slice(0, 100)
+    const allLikes = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.COMMENT_LIKES,
+      [Query.equal('comment_id', batchIds), Query.limit(5000)]
+    )
+
+    for (const cId of batchIds) {
+      const matching = allLikes.documents.filter(d => String(d.comment_id) === cId)
+      likes[cId] = {
+        count: matching.length,
+        liked: Boolean(userEmail && matching.some(d => String(d.user_email) === userEmail)),
+      }
+    }
+
+    return { success: true, likes }
+  } catch (err) {
+    console.error('[Comment Likes Batch Error]:', err)
+    return { success: true, likes: {} }
+  }
+}
+
+/* ─── 21. Instagram-Style Notes (24h Ephemeral) ─── */
+export interface CommunityNoteItem {
+  $id: string
+  $createdAt: string
+  author_handle: string
+  author_display_name: string
+  author_avatar: string
+  content: string
+  expires_at: string
+}
+
+export async function createNoteAction(params: {
+  content: string
+  userEmail: string
+  authorHandle: string
+  authorDisplayName: string
+  authorAvatar: string
+}): Promise<{ success: boolean; note?: CommunityNoteItem; error?: string }> {
+  try {
+    const { content, userEmail, authorHandle, authorDisplayName, authorAvatar } = params
+    if (!content?.trim() || !userEmail) return { success: false, error: 'Missing parameters.' }
+
+    const trimmed = content.trim().slice(0, 60)
+    const cleanHandle = normalizeCommunityHandle(authorHandle)
+    if (!cleanHandle) return { success: false, error: 'Invalid handle.' }
+
+    const { databases } = createServerAppwriteClient()
+
+    // Delete any existing active note by this user first (only 1 note at a time)
+    const existing = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.NOTES,
+      [Query.equal('author_handle', cleanHandle), Query.limit(10)]
+    )
+    for (const doc of existing.documents) {
+      try {
+        await databases.deleteDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.NOTES, doc.$id)
+      } catch {}
+    }
+
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
+
+    const doc = await databases.createDocument(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.NOTES,
+      ID.unique(),
+      {
+        author_handle: cleanHandle,
+        author_display_name: authorDisplayName || cleanHandle,
+        author_avatar: authorAvatar || '',
+        content: trimmed,
+        expires_at: expiresAt,
+        author_email: userEmail,
+      }
+    )
+
+    return {
+      success: true,
+      note: {
+        $id: doc.$id,
+        $createdAt: doc.$createdAt,
+        author_handle: cleanHandle,
+        author_display_name: authorDisplayName || cleanHandle,
+        author_avatar: authorAvatar || '',
+        content: trimmed,
+        expires_at: expiresAt,
+      },
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to create note.'
+    console.error('[Create Note Error]:', err)
+    return { success: false, error: msg }
+  }
+}
+
+export async function getActiveNotesAction(): Promise<{
+  success: boolean
+  notes: CommunityNoteItem[]
+}> {
+  try {
+    const { databases } = createServerAppwriteClient()
+    const now = new Date().toISOString()
+
+    const res = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.NOTES,
+      [
+        Query.greaterThan('expires_at', now),
+        Query.orderDesc('$createdAt'),
+        Query.limit(200),
+      ]
+    )
+
+    const notes: CommunityNoteItem[] = res.documents.map(doc => ({
+      $id: doc.$id,
+      $createdAt: doc.$createdAt,
+      author_handle: String(doc.author_handle || ''),
+      author_display_name: String(doc.author_display_name || ''),
+      author_avatar: String(doc.author_avatar || ''),
+      content: String(doc.content || ''),
+      expires_at: String(doc.expires_at || ''),
+    }))
+
+    return { success: true, notes }
+  } catch (err) {
+    console.error('[Get Notes Error]:', err)
+    return { success: true, notes: [] }
+  }
+}
+
+export async function deleteMyNoteAction(params: {
+  noteId: string
+  userEmail: string
+  authorHandle: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { noteId, userEmail, authorHandle } = params
+    if (!noteId || !userEmail) return { success: false, error: 'Missing parameters.' }
+
+    const { databases } = createServerAppwriteClient()
+
+    const doc = await databases.getDocument(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.NOTES,
+      noteId
+    )
+
+    const docHandle = normalizeCommunityHandle(String(doc.author_handle || ''))
+    const docEmail = String(doc.author_email || '').toLowerCase().trim()
+    const cleanHandle = normalizeCommunityHandle(authorHandle)
+
+    if (docEmail !== userEmail.toLowerCase().trim() && docHandle !== cleanHandle) {
+      return { success: false, error: 'Unauthorized.' }
+    }
+
+    await databases.deleteDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS.NOTES, noteId)
+    return { success: true }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to delete note.'
+    console.error('[Delete Note Error]:', err)
+    return { success: false, error: msg }
+  }
+}

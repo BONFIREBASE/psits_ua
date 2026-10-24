@@ -156,6 +156,10 @@ export default function SubmissionPage() {
   const handleGoogleSignIn = async () => {
     setAuthError(null);
     try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("psits_auth_redirect", "/submission");
+        localStorage.setItem("psits_auth_redirect", "/submission");
+      }
       const redirectUrl =
         typeof window !== "undefined"
           ? `${window.location.origin}/submission`
