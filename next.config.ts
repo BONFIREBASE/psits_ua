@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 31536000,
+    localPatterns: [
+      {
+        pathname: '/**',
+      },
+    ],
     remotePatterns: [
       {
         protocol: "https",
@@ -16,13 +23,42 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "*.r2.dev",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "*.googleusercontent.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.cloud.appwrite.io",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "cloud.appwrite.io",
         pathname: "/**",
       },
     ],
   },
   async headers() {
     return [
+      {
+        source: '/assets/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
       {
         source: '/(.*)',
         headers: [

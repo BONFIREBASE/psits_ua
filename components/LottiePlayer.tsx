@@ -5,7 +5,9 @@ import type { AnimationItem } from 'lottie-web'
 
 interface LottiePlayerProps {
   /** Path to the Lottie JSON file in /public (e.g. '/assets/timer.json') */
-  src: string
+  src?: string
+  /** Direct animation data object (bypasses fetch and browser caching) */
+  animationData?: Record<string, unknown>
   /** Whether to loop the animation (default: true) */
   loop?: boolean
   /** Whether to auto-play (default: true) */
@@ -22,6 +24,7 @@ interface LottiePlayerProps {
 
 export default function LottiePlayer({
   src,
+  animationData: directAnimationData,
   loop = true,
   autoplay = true,
   className = '',
@@ -42,12 +45,14 @@ export default function LottiePlayer({
         const lottieModule = await import('lottie-web')
         if (isCancelled || !containerRef.current) return
 
-        // Fetch the JSON animation data
-        const res = await fetch(src)
-        if (!res.ok) return
-        const animData = await res.json()
+        let animData = directAnimationData
+        if (!animData && src) {
+          const res = await fetch(src, { cache: 'no-store' })
+          if (!res.ok) return
+          animData = await res.json()
+        }
 
-        if (isCancelled || !containerRef.current) return
+        if (isCancelled || !containerRef.current || !animData) return
 
         animInstance = lottieModule.default.loadAnimation({
           container: containerRef.current,

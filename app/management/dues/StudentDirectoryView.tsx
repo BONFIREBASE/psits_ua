@@ -34,6 +34,23 @@ interface StudentDirectoryViewProps {
   semester: string
 }
 
+function SortIcon({
+  field,
+  sortField,
+  sortAsc,
+}: {
+  field: string
+  sortField: string
+  sortAsc: boolean
+}) {
+  if (sortField !== field) return null
+  return sortAsc ? (
+    <ChevronUp className="w-3 h-3 inline-block ml-0.5" />
+  ) : (
+    <ChevronDown className="w-3 h-3 inline-block ml-0.5" />
+  )
+}
+
 export default function StudentDirectoryView({
   academicYear,
   semester,
@@ -84,6 +101,7 @@ export default function StudentDirectoryView({
   }, [academicYear, semester, statusFilter, toast])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData()
   }, [loadData])
 
@@ -295,15 +313,6 @@ export default function StudentDirectoryView({
       setSortField(field)
       setSortAsc(true)
     }
-  }
-
-  const SortIcon = ({ field }: { field: string }) => {
-    if (sortField !== field) return null
-    return sortAsc ? (
-      <ChevronUp className="w-3 h-3 inline-block ml-0.5" />
-    ) : (
-      <ChevronDown className="w-3 h-3 inline-block ml-0.5" />
-    )
   }
 
   if (isLoading && !data) {
@@ -648,21 +657,21 @@ export default function StudentDirectoryView({
                     onClick={() => handleSort('student_no')}
                   >
                     Student No.
-                    <SortIcon field="student_no" />
+                    <SortIcon field="student_no" sortField={sortField} sortAsc={sortAsc} />
                   </th>
                   <th
                     className="px-4 py-3 cursor-pointer hover:text-gold transition-colors select-none"
                     onClick={() => handleSort('name')}
                   >
                     Full Name
-                    <SortIcon field="name" />
+                    <SortIcon field="name" sortField={sortField} sortAsc={sortAsc} />
                   </th>
                   <th
                     className="px-4 py-3 cursor-pointer hover:text-gold transition-colors select-none"
                     onClick={() => handleSort('section')}
                   >
                     Year & Section
-                    <SortIcon field="section" />
+                    <SortIcon field="section" sortField={sortField} sortAsc={sortAsc} />
                   </th>
                   <th className="px-4 py-3 text-center">Dues Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>

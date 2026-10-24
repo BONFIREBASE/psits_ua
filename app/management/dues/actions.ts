@@ -730,14 +730,14 @@ export async function getStudentsWithDuesStatusAction(payload: {
 
     // Create a set of normalized names who have paid
     const paidSet = new Set(
-      (paidDues || []).map((d) => d.student_name_normalized)
+      (paidDues || []).map((d) => normalizeStudentName(d.student_name_normalized || ''))
     )
 
     // Map students with their payment status
     const studentsWithStatus: StudentWithDuesStatus[] = (students || []).map(
       (student) => ({
         ...student,
-        has_paid: paidSet.has(student.full_name_normalized),
+        has_paid: paidSet.has(normalizeStudentName(student.full_name)),
       })
     )
 
@@ -774,7 +774,7 @@ export interface StudentWithDuesStatus {
 export async function toggleStudentPaymentAction(payload: {
   studentId: string
   studentName: string
-  studentNameNormalized: string
+  studentNameNormalized?: string
   yearLevel: number
   section: string
   yearSection: string
@@ -786,7 +786,6 @@ export async function toggleStudentPaymentAction(payload: {
   try {
     const {
       studentName,
-      studentNameNormalized,
       yearLevel,
       section,
       yearSection,
@@ -795,6 +794,8 @@ export async function toggleStudentPaymentAction(payload: {
       recordedBy,
       shouldBePaid,
     } = payload
+
+    const cleanNormalizedName = normalizeStudentName(studentName)
 
     const rl = await checkRateLimit(recordedBy || 'toggle_operator', 'dues')
     if (!rl.success) {
@@ -807,7 +808,7 @@ export async function toggleStudentPaymentAction(payload: {
         .from('membership_dues')
         .insert({
           student_name: studentName,
-          student_name_normalized: studentNameNormalized,
+          student_name_normalized: cleanNormalizedName,
           program: DEFAULT_PROGRAM,
           year_level: yearLevel,
           section: section,
@@ -840,7 +841,7 @@ export async function toggleStudentPaymentAction(payload: {
       const { error: deleteError } = await supabaseAdmin
         .from('membership_dues')
         .delete()
-        .eq('student_name_normalized', studentNameNormalized)
+        .eq('student_name_normalized', cleanNormalizedName)
         .eq('year_section', yearSection)
         .eq('academic_year', academicYear)
         .eq('semester', semester)
@@ -869,7 +870,7 @@ export async function batchToggleStudentPaymentsAction(payload: {
   students: Array<{
     studentId: string
     studentName: string
-    studentNameNormalized: string
+    studentNameNormalized?: string
     yearLevel: number
     section: string
     yearSection: string
@@ -891,7 +892,7 @@ export async function batchToggleStudentPaymentsAction(payload: {
       .filter((s) => s.shouldBePaid)
       .map((s) => ({
         student_name: s.studentName,
-        student_name_normalized: s.studentNameNormalized,
+        student_name_normalized: normalizeStudentName(s.studentName),
         program: DEFAULT_PROGRAM,
         year_level: s.yearLevel,
         section: s.section,
@@ -906,7 +907,7 @@ export async function batchToggleStudentPaymentsAction(payload: {
 
     const toDeleteNormalized = students
       .filter((s) => !s.shouldBePaid)
-      .map((s) => s.studentNameNormalized)
+      .map((s) => normalizeStudentName(s.studentName))
 
     let paidCount = 0
     let unpaidCount = 0

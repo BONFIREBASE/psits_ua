@@ -16,7 +16,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const supabaseAdmin = createClient(
   supabaseUrl,
-  supabaseServiceRoleKey || supabaseAnonKey
+  supabaseServiceRoleKey || supabaseAnonKey,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
 );
 
 /* ─── 1. Posts / Blog ─── */
@@ -587,6 +593,8 @@ export async function getArchivePhotos(onlyActive: boolean = false): Promise<Arc
 
 export interface MembershipDueRow {
   id: string;
+  student_id?: string | null;
+  student_no?: string | null;
   student_name: string;
   student_name_normalized: string;
   program: string;

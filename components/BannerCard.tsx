@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowUpRight, Info, ImageOff } from 'lucide-react'
 import type { BannerRow } from '@/lib/supabase'
 
@@ -27,10 +28,10 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
   return (
     <div
       onClick={onClick}
-      className={`relative w-full h-full min-h-[390px] sm:min-h-[420px] md:min-h-[450px] rounded-3xl overflow-hidden border transition-all duration-500 group select-none ${
+      className={`relative w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden border transition-all duration-500 group select-none ${
         isActive
-          ? 'border-black/15 dark:border-white/20 bg-[#070A11] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] dark:shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] ring-1 ring-black/5 dark:ring-white/10'
-          : 'border-black/10 dark:border-white/15 bg-[#0a0e17] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.15)] dark:shadow-[0_15px_40px_-10px_rgba(0,0,0,0.85)] hover:border-gold/40 cursor-pointer'
+          ? 'border-black/10 dark:border-white/20 bg-white dark:bg-[#070A11] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] ring-1 ring-black/5 dark:ring-white/10'
+          : 'border-black/10 dark:border-white/15 bg-slate-100 dark:bg-[#0a0e17] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.06)] dark:shadow-[0_15px_40px_-10px_rgba(0,0,0,0.85)] hover:border-gold/40 cursor-pointer'
       }`}
     >
       {/* ─── Luminous Top Rim Highlight (Defines card edge in 3D space) ─── */}
@@ -42,9 +43,9 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
         }`}
       />
 
-      {/* ─── Thumbnail Image Canvas (Responsive mobile & desktop presentation) ─── */}
+      {/* ─── Thumbnail Image Canvas (Edge-to-Edge Full Fit) ─── */}
       {banner.image_url && !hasError ? (
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-[#070A11]">
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-slate-100 dark:bg-[#070A11]">
           {/* Skeleton & Shimmer Layer (Smoothly fades out once image finishes loading) */}
           <div
             className={`absolute inset-0 transition-opacity duration-700 ease-out z-10 ${
@@ -56,20 +57,20 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
 
             {/* Diagonal shimmer sweep */}
             <div className="absolute inset-0 overflow-hidden">
-              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.07] to-transparent animate-banner-shimmer" />
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-black/[0.04] dark:via-white/[0.07] to-transparent animate-banner-shimmer" />
             </div>
           </div>
 
-          {/* Progressive Blur-Up Image */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          {/* Full-Fit Landscape Image */}
+          <Image
             src={banner.image_url}
             alt={banner.title}
-            decoding="async"
-            loading={isActive ? 'eager' : 'lazy'}
+            fill
+            priority={isActive}
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 1200px, 1400px"
             onLoad={() => setLoadedUrl(banner.image_url)}
             onError={() => setFailedUrl(banner.image_url)}
-            className={`w-full h-full object-cover object-top sm:object-center transition-all duration-700 ease-out group-hover:scale-[1.02] ${
+            className={`w-full h-full object-cover object-center transition-all duration-700 ease-out group-hover:scale-[1.02] ${
               isLoaded
                 ? 'opacity-100 scale-100 blur-0'
                 : 'opacity-0 scale-[1.04] blur-md'
@@ -78,23 +79,23 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
         </div>
       ) : hasError ? (
         /* Modern Fallback for Broken/Failed Image */
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-[#0c121e] via-[#090d16] to-[#05070c] flex items-center justify-center">
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-slate-100 via-slate-200/50 to-slate-100 dark:from-[#0c121e] dark:via-[#090d16] dark:to-[#05070c] flex items-center justify-center">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gold/[0.04] rounded-full blur-[100px]" />
           <div className="flex flex-col items-center gap-2 opacity-35">
-            <ImageOff size={32} className="text-white" />
-            <span className="text-[11px] font-mono uppercase tracking-widest text-white/70">
+            <ImageOff size={32} className="text-slate-800 dark:text-white" />
+            <span className="text-[11px] font-mono uppercase tracking-widest text-slate-700 dark:text-white/70">
               Preview Unavailable
             </span>
           </div>
         </div>
       ) : (
         /* Text-only fallback background */
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-[#0c121e] via-[#090d16] to-[#05070c]" />
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-slate-100 via-slate-200/50 to-slate-100 dark:from-[#0c121e] dark:via-[#090d16] dark:to-[#05070c]" />
       )}
 
-      {/* ─── Minimalist Standalone Info Icon with Micro Tooltip ─── */}
+      {/* ─── Creator Info Button ─── */}
       {banner.image_url && !hasError && (
-        <div className="absolute top-4 left-5 z-30">
+        <div className="absolute top-3 left-3 sm:top-4 sm:left-5 z-30">
           <div className="relative">
             <button
               type="button"
@@ -102,11 +103,11 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
                 e.stopPropagation()
                 setShowCredit((prev) => !prev)
               }}
-              className="w-7 h-7 rounded-full flex items-center justify-center bg-black/50 hover:bg-black/80 active:scale-95 backdrop-blur-md border border-white/15 text-white/70 hover:text-white transition-all shadow-md cursor-pointer"
+              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center bg-black/50 hover:bg-black/80 active:scale-95 backdrop-blur-md border border-white/15 text-white/70 hover:text-white transition-all shadow-md cursor-pointer"
               title="Thumbnail credit"
               aria-label="Thumbnail creator credit"
             >
-              <Info size={13} className="text-gold" />
+              <Info size={12} className="text-gold sm:w-[13px] sm:h-[13px]" />
             </button>
 
             {/* Minimalist Micro Tooltip */}
@@ -125,23 +126,23 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
 
       {/* ─── Inactive Back Card Hint ─── */}
       {!isActive && (
-        <div className="absolute top-4 right-5 z-20 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
-          <span className="text-[10px] font-mono tracking-widest uppercase text-white/70 font-bold bg-[#0D1117]/90 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 shadow-md">
+        <div className="absolute top-3 right-3 sm:top-4 sm:right-5 z-20 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
+          <span className="text-[9px] sm:text-[10px] font-mono tracking-widest uppercase text-white/70 font-bold bg-[#0D1117]/90 backdrop-blur-md px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full border border-white/10 shadow-md">
             Preview
           </span>
         </div>
       )}
 
       {/* ─── Bottom Dock (Aesthetic soft gradient, zero harsh blur lines) ─── */}
-      <div className="absolute bottom-0 inset-x-0 z-20 px-4 sm:px-8 md:px-10 pb-4 sm:pb-5 pt-8 sm:pt-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4 md:gap-8">
+      <div className="absolute bottom-0 inset-x-0 z-20 px-3.5 sm:px-6 md:px-8 pb-3 sm:pb-4 pt-6 sm:pt-8 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col md:flex-row md:items-end justify-between gap-2 sm:gap-4 md:gap-8 pointer-events-none">
         {/* Left: Title & Subtitle */}
         <div className="flex-1 max-w-2xl min-w-0">
-          <h2 className="font-display font-black text-base xs:text-lg sm:text-2xl md:text-3xl lg:text-[32px] text-white leading-[1.18] tracking-tight mb-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] break-words line-clamp-2">
+          <h2 className="font-display font-black text-xs xs:text-sm sm:text-xl md:text-2xl lg:text-[28px] text-white leading-tight tracking-tight drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)] break-words line-clamp-1">
             {banner.title}
           </h2>
 
           {cleanSubtitle && (
-            <p className="text-white/85 text-[11px] sm:text-sm md:text-[14px] leading-relaxed font-normal drop-shadow-[0_1px_6px_rgba(0,0,0,0.9)] line-clamp-1 sm:line-clamp-2 max-w-xl break-words">
+            <p className="text-white/80 text-[10px] sm:text-xs md:text-sm leading-snug font-normal drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)] line-clamp-1 max-w-xl break-words hidden xs:block mt-0.5">
               {cleanSubtitle}
             </p>
           )}
@@ -150,7 +151,7 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
         {/* Right (Side): Action CTAs */}
         {(banner.link_text || banner.secondary_link_text) && (
           <div
-            className={`flex-shrink-0 flex flex-wrap items-center gap-2 sm:gap-3.5 ${
+            className={`flex-shrink-0 flex items-center gap-1.5 sm:gap-3 pointer-events-auto ${
               !isActive ? 'pointer-events-none' : ''
             }`}
           >
@@ -159,26 +160,24 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
                 banner.link_url.startsWith('http') ? (
                   <a
                     href={banner.link_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-gradient-to-r from-gold to-[#FFA726] text-slate-950 font-mono font-bold text-xs sm:text-sm hover:shadow-[0_4px_24px_rgba(245,166,35,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md cursor-pointer"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 py-1 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-gold to-[#FFA726] text-slate-950 font-mono font-bold text-[10px] xs:text-[11px] sm:text-xs hover:shadow-[0_4px_20px_rgba(245,166,35,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md cursor-pointer"
                   >
                     <span>{banner.link_text}</span>
-                    <ArrowUpRight size={14} className="sm:w-[15px] sm:h-[15px]" />
+                    <ArrowUpRight size={12} className="sm:w-3.5 sm:h-3.5" />
                   </a>
                 ) : (
                   <Link
                     href={banner.link_url}
-                    className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-gradient-to-r from-gold to-[#FFA726] text-slate-950 font-mono font-bold text-xs sm:text-sm hover:shadow-[0_4px_24px_rgba(245,166,35,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md cursor-pointer"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 py-1 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-gold to-[#FFA726] text-slate-950 font-mono font-bold text-[10px] xs:text-[11px] sm:text-xs hover:shadow-[0_4px_20px_rgba(245,166,35,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md cursor-pointer"
                   >
                     <span>{banner.link_text}</span>
-                    <ArrowUpRight size={14} className="sm:w-[15px] sm:h-[15px]" />
+                    <ArrowUpRight size={12} className="sm:w-3.5 sm:h-3.5" />
                   </Link>
                 )
               ) : (
-                <span className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-gradient-to-r from-gold to-[#FFA726] text-slate-950 font-mono font-bold text-xs sm:text-sm shadow-md cursor-default">
+                <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 py-1 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-gold to-[#FFA726] text-slate-950 font-mono font-bold text-[10px] xs:text-[11px] sm:text-xs shadow-md cursor-default">
                   <span>{banner.link_text}</span>
-                  <ArrowUpRight size={14} className="sm:w-[15px] sm:h-[15px]" />
+                  <ArrowUpRight size={12} className="sm:w-3.5 sm:h-3.5" />
                 </span>
               )
             )}
@@ -188,22 +187,20 @@ export default function BannerCard({ banner, isActive = true, onClick }: BannerC
                 banner.secondary_link_url.startsWith('http') ? (
                   <a
                     href={banner.secondary_link_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 hover:border-white/30 text-white/90 hover:text-white font-mono text-xs sm:text-sm transition-all backdrop-blur-md cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 hover:border-white/30 text-white/90 hover:text-white font-mono text-[10px] xs:text-[11px] sm:text-xs transition-all backdrop-blur-md cursor-pointer"
                   >
                     <span>{banner.secondary_link_text}</span>
                   </a>
                 ) : (
                   <Link
                     href={banner.secondary_link_url}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 hover:border-white/30 text-white/90 hover:text-white font-mono text-xs sm:text-sm transition-all backdrop-blur-md cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 hover:border-white/30 text-white/90 hover:text-white font-mono text-[10px] xs:text-[11px] sm:text-xs transition-all backdrop-blur-md cursor-pointer"
                   >
                     <span>{banner.secondary_link_text}</span>
                   </Link>
                 )
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/[0.08] border border-white/15 text-white/80 font-mono text-xs sm:text-sm backdrop-blur-md">
+                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-white/[0.08] border border-white/15 text-white/80 font-mono text-[10px] xs:text-[11px] sm:text-xs backdrop-blur-md">
                   {banner.secondary_link_text}
                 </span>
               )

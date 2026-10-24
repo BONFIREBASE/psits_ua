@@ -88,7 +88,7 @@ function parseExcelFile(filePath) {
     const yearLevelNum = parseInt(match[1], 10)
     const sectionLetter = match[2].toUpperCase()
 
-    rows.slice(1).forEach((r, idx) => {
+    rows.slice(1).forEach((r) => {
       let studentNo = ''
       let fullName = ''
 

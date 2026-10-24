@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, supabaseAdmin, findOfficerByEmail } from "@/lib/supabase";
+import { validateSessionAction } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,20 @@ async function authenticateAdmin(req: NextRequest) {
     return { error: "Authentication required.", status: 401 };
   }
 
+  // 1. Check management server session token first (portal standard)
+  try {
+    const sessionRes = await validateSessionAction(token);
+    if (sessionRes.valid && sessionRes.user) {
+      const email = sessionRes.user.email.trim().toLowerCase();
+      const isAdmin = sessionRes.user.role === "admin" || email === ADMIN_EMAIL;
+      const isOfficer = sessionRes.user.role === "officer";
+      return { user: { email, id: token }, email, isAdmin, isOfficer };
+    }
+  } catch (err) {
+    console.warn("Session token validation check error:", err);
+  }
+
+  // 2. Fallback to Supabase Auth JWT
   const {
     data: { user },
     error: authError,

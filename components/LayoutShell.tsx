@@ -22,7 +22,10 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
       <AuthRedirectHandler />
       <Navbar />
       <main>{children}</main>
-      <Footer />
+      {/* On community routes, hide the static footer on mobile so the feed feels like a native social app */}
+      <div className={pathname.startsWith('/community') ? 'hidden sm:block' : ''}>
+        <Footer />
+      </div>
       <CookieConsent />
     </MaintenanceWrapper>
   )

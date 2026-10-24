@@ -22,7 +22,9 @@ import {
   List,
   Link2,
   Quote,
+  Eye,
 } from 'lucide-react'
+import MarkdownContent from '@/components/MarkdownContent'
 import { socialDispatches, type SocialDispatch } from '@/data/announcements'
 import { getPosts, postRowToSocialDispatch, getOfficers, type OfficerRow } from '@/lib/supabase'
 import { deleteBlogPost, seedInitialPosts, updateBlogPost } from './actions'
@@ -57,6 +59,7 @@ export default function BlogListPage() {
   const [editCredits, setEditCredits] = useState<Array<{ role: string; name: string }>>([])
   const [editThumbnail, setEditThumbnail] = useState<File | null>(null)
   const [editThumbnailPreview, setEditThumbnailPreview] = useState<string | null>(null)
+  const [editPreviewMode, setEditPreviewMode] = useState(false)
 
   // Load posts from database
   async function loadPosts() {
@@ -97,6 +100,7 @@ export default function BlogListPage() {
     setEditCategory(post.category)
     setEditDate(post.date)
     setEditContent(post.fullContent || post.excerpt || '')
+    setEditPreviewMode(false)
     setEditHighlightQuote(post.highlightQuote || '')
     setEditQuoteAuthor(post.quoteAuthor || '')
     setEditPostUrl(post.postUrl || '')
@@ -123,6 +127,7 @@ export default function BlogListPage() {
     setEditThumbnail(null)
     setEditThumbnailPreview(null)
     setEditCredits([])
+    setEditPreviewMode(false)
   }
 
   function insertEditFormatting(type: string) {
@@ -487,34 +492,61 @@ export default function BlogListPage() {
                 </label>
                 <div className="space-y-0">
                   {/* Formatting Toolbar */}
-                  <div className="flex items-center gap-0.5 px-2 py-1.5 bg-slate-100 dark:bg-white/[0.03] border border-border-theme border-b-0 rounded-t-xl">
-                    {[
-                      { icon: Bold, type: 'bold', label: 'Bold' },
-                      { icon: Italic, type: 'italic', label: 'Italic' },
-                      { icon: Heading, type: 'heading', label: 'Heading' },
-                      { icon: List, type: 'list', label: 'List' },
-                      { icon: Link2, type: 'link', label: 'Link' },
-                      { icon: Quote, type: 'quote', label: 'Quote' },
-                    ].map((btn) => (
-                      <button
-                        key={btn.type}
-                        type="button"
-                        onClick={() => insertEditFormatting(btn.type)}
-                        title={btn.label}
-                        className="p-1.5 rounded text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-200 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
-                      >
-                        <btn.icon size={14} />
-                      </button>
-                    ))}
+                  <div className="flex items-center justify-between px-2 py-1.5 bg-slate-100 dark:bg-white/[0.03] border border-border-theme border-b-0 rounded-t-xl">
+                    <div className="flex items-center gap-0.5">
+                      {[
+                        { icon: Bold, type: 'bold', label: 'Bold' },
+                        { icon: Italic, type: 'italic', label: 'Italic' },
+                        { icon: Heading, type: 'heading', label: 'Heading' },
+                        { icon: List, type: 'list', label: 'List' },
+                        { icon: Link2, type: 'link', label: 'Link' },
+                        { icon: Quote, type: 'quote', label: 'Quote' },
+                      ].map((btn) => (
+                        <button
+                          key={btn.type}
+                          type="button"
+                          onClick={() => {
+                            if (editPreviewMode) setEditPreviewMode(false)
+                            insertEditFormatting(btn.type)
+                          }}
+                          title={btn.label}
+                          className="p-1.5 rounded text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-200 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                        >
+                          <btn.icon size={14} />
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditPreviewMode(!editPreviewMode)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-colors cursor-pointer ${
+                        editPreviewMode
+                          ? 'bg-amber-500/15 dark:bg-gold/15 text-amber-600 dark:text-gold border border-amber-500/30 dark:border-gold/30 font-bold'
+                          : 'text-muted-foreground-theme hover:text-foreground-theme hover:bg-slate-200 dark:hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      <Eye size={13} />
+                      <span>{editPreviewMode ? 'Edit Mode' : 'Preview'}</span>
+                    </button>
                   </div>
-                  <textarea
-                    id="edit-blog-content"
-                    required
-                    rows={6}
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-b-xl rounded-t-none p-3 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/40 focus:outline-none focus:border-gold/50 leading-relaxed font-body"
-                  />
+                  {editPreviewMode ? (
+                    <div className="w-full min-h-[140px] bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-b-xl rounded-t-none p-3.5 text-xs text-foreground-theme overflow-y-auto max-h-[300px]">
+                      {editContent ? (
+                        <MarkdownContent content={editContent} />
+                      ) : (
+                        <p className="text-muted-foreground-theme italic font-mono text-xs">No content to preview.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      id="edit-blog-content"
+                      required
+                      rows={6}
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-white/[0.04] border border-border-theme rounded-b-xl rounded-t-none p-3 text-xs text-foreground-theme placeholder:text-muted-foreground-theme/40 focus:outline-none focus:border-gold/50 leading-relaxed font-body"
+                    />
+                  )}
                 </div>
               </div>
 

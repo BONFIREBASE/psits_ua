@@ -142,6 +142,7 @@ export async function POST(req: NextRequest) {
           uploadUrl: presigned.uploadUrl,
           fileKey: presigned.key,
           publicUrl: presigned.publicUrl,
+          cacheControl: presigned.cacheControl,
         });
       }
 

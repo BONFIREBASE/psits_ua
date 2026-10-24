@@ -4,8 +4,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Eye, Save, Bold, Italic, Heading, List, Link2, Quote, Loader2, X } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import MarkdownContent from '@/components/MarkdownContent'
 import FormField, { inputStyles, textareaStyles } from '../../_components/FormField'
 import Select from '../../_components/Select'
 import FileUpload from '../../_components/FileUpload'
@@ -482,37 +481,7 @@ function PreviewPanel({
 
         {/* Content */}
         {form.fullContent && (
-          <div className="prose dark:prose-invert prose-sm max-w-none">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                h1: ({ children }) => <h1 className="text-2xl font-display font-bold text-foreground-theme mt-6 mb-3">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-xl font-display font-bold text-foreground-theme mt-5 mb-2.5">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-lg font-display font-bold text-foreground-theme mt-4 mb-2">{children}</h3>,
-                p: ({ children }) => <p className="text-sm text-foreground-theme/80 leading-relaxed mb-3">{children}</p>,
-                strong: ({ children }) => <strong className="text-foreground-theme font-bold">{children}</strong>,
-                em: ({ children }) => <em className="text-foreground-theme/90 italic">{children}</em>,
-                ul: ({ children }) => <ul className="list-disc list-inside text-sm text-foreground-theme/80 space-y-1 mb-3">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-foreground-theme/80 space-y-1 mb-3">{children}</ol>,
-                li: ({ children }) => <li className="text-sm text-foreground-theme/80">{children}</li>,
-                blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-amber-500/40 dark:border-gold/40 pl-4 py-2 my-4 bg-amber-500/5 dark:bg-gold/5 rounded-r">
-                    <div className="text-sm text-foreground-theme/80 italic">{children}</div>
-                  </blockquote>
-                ),
-                a: ({ href, children }) => (
-                  <a href={href} className="text-amber-600 dark:text-gold hover:underline" target="_blank" rel="noopener noreferrer">
-                    {children}
-                  </a>
-                ),
-                code: ({ children }) => (
-                  <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-amber-600 dark:text-gold text-xs font-mono">{children}</code>
-                ),
-              }}
-            >
-              {form.fullContent}
-            </ReactMarkdown>
-          </div>
+          <MarkdownContent content={form.fullContent} />
         )}
 
         {/* Tags */}

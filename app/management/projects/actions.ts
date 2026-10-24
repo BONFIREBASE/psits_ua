@@ -73,13 +73,43 @@ export async function createProjectAction(formData: FormData) {
   }
 }
 
+const ALLOWED_INSTITUTIONAL_DOMAIN = '@antiquespride.edu.ph';
+
 /**
- * 2. Public Project Submission (Requires Management Approval)
+ * 2. Public Project Submission (Requires Management Approval & Institutional Auth)
  */
 export async function submitPublicProjectAction(formData: FormData) {
   try {
+    const sessionToken = (formData.get('sessionToken') as string)?.trim();
+    if (!sessionToken) {
+      return {
+        success: false,
+        error: 'Institutional authentication required. Please sign in with your official @antiquespride.edu.ph Google account before submitting a project.',
+      };
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseAdmin.auth.getUser(sessionToken);
+
+    if (authError || !user || !user.email) {
+      return {
+        success: false,
+        error: 'Invalid or expired session. Please sign in again with your official University of Antique account.',
+      };
+    }
+
+    const submitterEmail = user.email.trim().toLowerCase();
+    if (!submitterEmail.endsWith(ALLOWED_INSTITUTIONAL_DOMAIN)) {
+      return {
+        success: false,
+        error: `Access restricted: "${submitterEmail}" is not an @antiquespride.edu.ph account. Only official University of Antique Google accounts are authorized to upload projects.`,
+      };
+    }
+
     const title = (formData.get('title') as string)?.trim();
-    const team = (formData.get('team') as string)?.trim() || 'Student Developer(s)';
+    const team = (formData.get('team') as string)?.trim() || (user.user_metadata?.full_name as string) || 'Student Developer(s)';
     const category = (formData.get('category') as string)?.trim() || 'Capstone';
     const description = (formData.get('description') as string)?.trim() || '';
     const demoUrl = (formData.get('demoUrl') as string)?.trim() || null;
@@ -111,6 +141,12 @@ export async function submitPublicProjectAction(formData: FormData) {
 
     if (team) {
       tags.push(`By: ${team}`);
+    }
+
+    // Attach verified institutional submitter metadata
+    tags.push(`SubmittedBy: ${submitterEmail}`);
+    if (user.user_metadata?.full_name) {
+      tags.push(`Author: ${user.user_metadata.full_name}`);
     }
 
     let imageUrl: string | null = null;

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Search, CheckCircle2, Circle, Users, Filter, Download, Upload, ArrowUpDown } from 'lucide-react'
+import { Search, CheckCircle2, Circle, Users, ArrowUpDown } from 'lucide-react'
 import { inputStyles } from '../_components/FormField'
 import { DuesTableSkeleton, DuesPageSkeleton } from '../_components/SkeletonPreloader'
 import { useToast } from '../_components/Toast'
@@ -31,7 +31,7 @@ export default function StudentDuesRegistry({ academicYear, semester }: StudentD
   const [showUnpaidOnly, setShowUnpaidOnly] = useState(false)
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set())
   const [isUpdating, setIsUpdating] = useState(false)
-  const [sortBy, setSortBy] = useState<'name' | 'studentNo' | 'section' | 'status'>('name')
+  const [sortBy] = useState<'name' | 'studentNo' | 'section' | 'status'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
   // Load students with payment status
@@ -57,6 +57,7 @@ export default function StudentDuesRegistry({ academicYear, semester }: StudentD
   }, [academicYear, semester, selectedYear, selectedSection, toast])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadStudents()
   }, [loadStudents])
 

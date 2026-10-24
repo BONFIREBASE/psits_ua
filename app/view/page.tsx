@@ -1,17 +1,24 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useSyncExternalStore } from "react";
+import Link from "next/link";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Palette,
+  Vote,
+  Clock,
   X,
   ChevronLeft,
   ChevronRight,
+  ZoomIn,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  LogIn,
   Trophy,
-  ImageOff,
-  Info,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -26,6 +33,40 @@ interface ApprovedEntry {
   file_url: string;
   vote_count?: number;
   created_at: string;
+}
+
+interface VoteStatus {
+  hasVoted: boolean;
+  vote: { id: string; submission_id: string; voted_at: string } | null;
+  votingEnabled: boolean;
+  votingMessage?: string;
+  config?: {
+    voting_enabled?: boolean;
+    voting_start_date?: string | null;
+    voting_end_date?: string | null;
+    allow_vote_change?: boolean;
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Constants
+// ────────────────────────────────────────────────────────────────────────────
+
+const VOTING_OPENS = new Date("2026-10-09T12:00:00+08:00");
+const VOTING_CLOSES = new Date("2026-10-24T23:59:59+08:00");
+const ALLOWED_DOMAIN = "@antiquespride.edu.ph";
+
+function getTimeRemaining() {
+  const now = new Date();
+  const diff = VOTING_OPENS.getTime() - now.getTime();
+  if (diff <= 0) return null; // Voting is open
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  return { days, hours, minutes, seconds, total: diff };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -43,28 +84,12 @@ function WinnerBanner({
 }) {
   const votePercent = totalVotes > 0 ? Math.round(((winner.vote_count || 0) / totalVotes) * 100) : 0;
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
-  const [winnerImgLoaded, setWinnerImgLoaded] = useState(false);
-  const [winnerImgFailed, setWinnerImgFailed] = useState(false);
-  const [winnerFallbackAttempted, setWinnerFallbackAttempted] = useState(false);
-
-  const winnerImgSrc = winnerFallbackAttempted
-    ? `/api/submissions/polo/image?url=${encodeURIComponent(winner.file_url)}`
-    : winner.file_url;
-
-  const handleWinnerError = () => {
-    if (!winnerFallbackAttempted && winner.file_url) {
-      setWinnerFallbackAttempted(true);
-    } else {
-      setWinnerImgFailed(true);
-    }
-  };
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
     if (naturalWidth && naturalHeight) {
       setAspectRatio(naturalWidth / naturalHeight);
     }
-    setWinnerImgLoaded(true);
   };
 
   return (
@@ -88,25 +113,24 @@ function WinnerBanner({
         <div className="px-4 sm:px-8 py-3">
           <div
             onClick={() => onOpenLightbox?.(winner)}
-            className={`group relative w-full ${
-              aspectRatio === null
+            className={`group relative w-full ${aspectRatio === null
                 ? "min-h-[380px] sm:min-h-[460px] md:min-h-[520px]"
                 : aspectRatio < 0.85
-                ? "h-[460px] sm:h-[540px] md:h-[600px]"
-                : aspectRatio < 1.3
-                ? "h-[400px] sm:h-[480px] md:h-[540px]"
-                : "aspect-[16/10] sm:aspect-[16/9] min-h-[340px] max-h-[520px]"
-            } rounded-2xl overflow-hidden bg-[#0A0E17] shadow-2xl border border-gold/25 cursor-pointer transition-all duration-300`}
+                  ? "h-[460px] sm:h-[540px] md:h-[600px]"
+                  : aspectRatio < 1.3
+                    ? "h-[400px] sm:h-[480px] md:h-[540px]"
+                    : "aspect-[16/10] sm:aspect-[16/9] min-h-[340px] max-h-[520px]"
+              } rounded-2xl overflow-hidden bg-[#0A0E17] shadow-2xl border border-gold/25 cursor-pointer transition-all duration-300`}
           >
             {/* Ambient dynamic backdrop matching the winner photo */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
               <Image
-                key={`winner-glow-${winnerImgSrc}`}
-                src={winnerImgSrc}
+                src={winner.file_url}
                 alt=""
                 fill
                 className="object-cover scale-125 blur-3xl opacity-30 dark:opacity-35 brightness-75 saturate-150 transform-gpu"
                 sizes="(max-width: 1024px) 100vw, 1024px"
+                unoptimized
                 aria-hidden
               />
               {/* Theatrical dark vignettes for deep contrast & theme blending */}
@@ -116,40 +140,16 @@ function WinnerBanner({
 
             {/* Foreground image: uncropped, centered, floating with depth shadow */}
             <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-8 z-10">
-              {/* Skeleton Preloader Layer */}
-              {!winnerImgFailed && (
-                <div
-                  className={`absolute inset-4 sm:inset-8 pointer-events-none rounded-xl overflow-hidden transition-opacity duration-700 ease-out z-10 ${
-                    winnerImgLoaded ? "opacity-0" : "opacity-100"
-                  }`}
-                >
-                  <div className="absolute inset-0 bg-white/[0.04] animate-pulse rounded-xl" />
-                  <div className="absolute inset-0 overflow-hidden">
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent animate-banner-shimmer" />
-                  </div>
-                </div>
-              )}
-
-              {!winnerImgFailed ? (
-                <Image
-                  key={`winner-fg-${winnerImgSrc}`}
-                  src={winnerImgSrc}
-                  alt={winner.title || "Winning Polo Shirt Design"}
-                  fill
-                  className={`object-contain p-2 sm:p-6 drop-shadow-[0_20px_40px_rgba(0,0,0,0.7)] transition-all duration-700 ease-out group-hover:scale-[1.015] ${
-                    winnerImgLoaded ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-[1.02] blur-sm"
-                  }`}
-                  sizes="(max-width: 1024px) 100vw, 1024px"
-                  priority
-                  onLoad={handleImageLoad}
-                  onError={handleWinnerError}
-                />
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-white/50">
-                  <ImageOff size={32} />
-                  <span className="text-xs font-mono uppercase tracking-wider">Preview Unavailable</span>
-                </div>
-              )}
+              <Image
+                src={winner.file_url}
+                alt={winner.title || "Winning Polo Shirt Design"}
+                fill
+                className="object-contain p-2 sm:p-6 drop-shadow-[0_20px_40px_rgba(0,0,0,0.7)] transition-transform duration-700 ease-out group-hover:scale-[1.015]"
+                sizes="(max-width: 1024px) 100vw, 1024px"
+                unoptimized
+                priority
+                onLoad={handleImageLoad}
+              />
             </div>
 
             {/* Corner Badge: 1st Place */}
@@ -225,61 +225,6 @@ function WinnerBanner({
 // Lightbox Component
 // ────────────────────────────────────────────────────────────────────────────
 
-function LightboxImageViewer({ entry }: { entry: ApprovedEntry }) {
-  const [fallbackAttempted, setFallbackAttempted] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgFailed, setImgFailed] = useState(false);
-
-  const currentSrc = fallbackAttempted
-    ? `/api/submissions/polo/image?url=${encodeURIComponent(entry.file_url)}`
-    : entry.file_url;
-
-  const handleImageError = () => {
-    if (!fallbackAttempted && entry.file_url) {
-      setFallbackAttempted(true);
-    } else {
-      setImgFailed(true);
-    }
-  };
-
-  return (
-    <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[75vh] rounded-2xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl flex items-center justify-center">
-      {/* Skeleton Preloader Layer */}
-      {!imgFailed && (
-        <div
-          className={`absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out z-10 ${
-            imgLoaded ? "opacity-0" : "opacity-100"
-          }`}
-        >
-          <div className="absolute inset-0 bg-white/[0.04] animate-pulse" />
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent animate-banner-shimmer" />
-          </div>
-        </div>
-      )}
-
-      {!imgFailed ? (
-        <Image
-          src={currentSrc}
-          alt={entry.title || "Design entry"}
-          fill
-          className={`object-contain transition-all duration-500 ${
-            imgLoaded ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-[1.02] blur-sm"
-          }`}
-          sizes="(max-width: 1024px) 95vw, 1024px"
-          onLoad={() => setImgLoaded(true)}
-          onError={handleImageError}
-        />
-      ) : (
-        <div className="flex flex-col items-center gap-2 text-white/50 p-8">
-          <ImageOff size={36} />
-          <span className="text-xs font-mono uppercase tracking-wider">Preview Unavailable</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function Lightbox({
   entries,
   currentIndex,
@@ -298,137 +243,520 @@ function Lightbox({
   const entry = customEntry || entries[currentIndex];
 
   useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      if (!customEntry && entries.length > 1) {
-        if (e.key === "ArrowLeft") onPrev();
-        if (e.key === "ArrowRight") onNext();
-      }
     };
     window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose, onPrev, onNext, customEntry, entries.length]);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [onClose]);
 
   if (!entry) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-5 md:p-6 lg:p-8 bg-slate-900/60 dark:bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
-      {/* Close */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-      >
-        <X className="w-5 h-5" />
-      </button>
-
-      {/* Prev */}
-      {!customEntry && entries.length > 1 && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onPrev();
-          }}
-          className="absolute left-3 sm:left-6 z-50 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-      )}
-
-      {/* Image + Info */}
+      {/* Split Modal Dialog Card */}
       <div
-        className="relative max-w-5xl w-full mx-4 flex flex-col items-center"
+        className="relative w-full max-w-5xl lg:max-w-6xl h-auto lg:h-[84vh] lg:max-h-[720px] lg:min-h-[500px] max-h-[92vh] sm:max-h-[88vh] flex flex-col lg:flex-row rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-[#0D1117] border border-black/10 dark:border-white/10 shadow-2xl backdrop-blur-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <LightboxImageViewer key={entry.id || entry.file_url} entry={entry} />
+        {/* Left Side: Image Showcase Stage */}
+        <div className="relative flex-1 min-h-[340px] sm:min-h-[440px] lg:min-h-full bg-slate-100/90 dark:bg-black/60 flex items-center justify-center p-6 select-none overflow-hidden">
+          <div className="relative w-full h-full min-h-[300px] sm:min-h-[400px] lg:min-h-[480px]">
+            <Image
+              src={entry.file_url}
+              alt={entry.title || "Design entry"}
+              fill
+              className="object-contain drop-shadow-xl"
+              sizes="(max-width: 1024px) 100vw, 65vw"
+              priority
+              unoptimized
+            />
+          </div>
+        </div>
 
-        <div className="mt-4 text-center max-w-xl">
-          {entry.title && (
-            <h3 className="text-lg sm:text-xl font-bold text-white font-display">
-              {entry.title}
-            </h3>
-          )}
-          <p className="text-sm text-white/70 mt-1">
-            {entry.student_name}
-            {entry.student_course_year && (
-              <span className="text-white/40">
-                {" "}
-                · {entry.student_course_year}
-              </span>
+        {/* Right Side: Details & Concept Sidebar */}
+        <div className="w-full lg:w-96 xl:w-[420px] shrink-0 flex flex-col justify-between border-t lg:border-t-0 lg:border-l border-black/10 dark:border-white/10 bg-white dark:bg-[#0D1117] max-h-[46vh] sm:max-h-[42vh] lg:max-h-full lg:h-full overflow-hidden">
+          {/* Header Row */}
+          <div className="p-4 sm:p-5 pb-3 border-b border-black/10 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.02] flex items-center justify-between gap-3 shrink-0">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:bg-gold/15 dark:text-gold border border-amber-500/30 dark:border-gold/30">
+              Design Preview
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close modal"
+              className="p-1.5 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-black/10 dark:bg-white/5 dark:hover:bg-white/15 dark:text-white/70 dark:hover:text-white dark:border-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Scrollable Information Body */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            <div>
+              <h3 className="font-display font-black text-lg sm:text-xl md:text-2xl text-slate-900 dark:text-white tracking-tight uppercase leading-snug">
+                {entry.title || "Untitled Design"}
+              </h3>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  {entry.student_name}
+                </span>
+                {entry.student_course_year && (
+                  <>
+                    <span className="text-slate-400 dark:text-slate-600">•</span>
+                    <span className="font-mono text-amber-600 dark:text-gold font-medium">
+                      {entry.student_course_year}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {entry.description && (
+              <div className="space-y-1.5 pt-3 border-t border-black/10 dark:border-white/10">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+                  Design Concept &amp; Rationale
+                </p>
+                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                  {entry.description}
+                </p>
+              </div>
             )}
-          </p>
-          {entry.description && (
-            <p className="text-xs sm:text-sm text-white/60 mt-2 leading-relaxed max-w-md mx-auto">
-              {entry.description}
-            </p>
-          )}
-          {!customEntry && entries.length > 1 && (
-            <p className="text-xs text-white/30 mt-2 font-mono">
-              {currentIndex + 1} / {entries.length}
-            </p>
-          )}
+          </div>
+
         </div>
       </div>
-
-      {/* Next */}
-      {!customEntry && entries.length > 1 && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onNext();
-          }}
-          className="absolute right-3 sm:right-6 z-50 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-        >
-          <ChevronRight className="w-6 h-6" />
-        </button>
-      )}
     </div>
   );
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Main View Page
+// Countdown Pill
 // ────────────────────────────────────────────────────────────────────────────
 
-export default function ViewPage() {
+const emptySubscribe = () => () => {};
+
+function CountdownPill() {
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+  const [remaining, setRemaining] = useState<ReturnType<typeof getTimeRemaining> | null>(() => getTimeRemaining());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setRemaining(getTimeRemaining());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Show placeholder during initial server render and hydration to guarantee identical trees
+  if (!isClient) {
+    return (
+      <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-xl bg-surface-theme/90 border border-border-theme backdrop-blur-xl shadow-lg">
+        <Clock className="w-4 h-4 text-gold shrink-0" />
+        <span className="text-xs text-muted-foreground-theme font-mono">
+          Loading...
+        </span>
+      </div>
+    );
+  }
+
+  if (!remaining) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-medium border border-emerald-500/20">
+        <Vote className="w-3.5 h-3.5" />
+        Voting is Open
+      </span>
+    );
+  }
+
+  return (
+    <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-xl bg-surface-theme/90 border border-border-theme backdrop-blur-xl shadow-lg">
+      <Clock className="w-4 h-4 text-gold shrink-0" />
+      <span className="text-xs text-muted-foreground-theme font-mono">
+        Voting opens in
+      </span>
+      <div className="flex items-center gap-1">
+        {[
+          { value: remaining.days, label: "d" },
+          { value: remaining.hours, label: "h" },
+          { value: remaining.minutes, label: "m" },
+          { value: remaining.seconds, label: "s" },
+        ].map((unit) => (
+          <span
+            key={unit.label}
+            className="inline-flex items-baseline gap-0.5"
+          >
+            <span className="text-sm font-semibold text-foreground-theme tabular-nums font-display">
+              {String(unit.value).padStart(2, "0")}
+            </span>
+            <span className="text-[10px] text-muted-foreground-theme/60 uppercase font-mono">
+              {unit.label}
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Design Card
+// ────────────────────────────────────────────────────────────────────────────
+
+function DesignCard({
+  entry,
+  index,
+  onOpenLightbox,
+  votingOpen,
+  user,
+  userVote,
+  allowVoteChange = false,
+  onVote,
+  onSignIn,
+  isVoting,
+  isSigningIn,
+}: {
+  entry: ApprovedEntry;
+  index: number;
+  onOpenLightbox: (index: number) => void;
+  votingOpen: boolean;
+  user: User | null;
+  userVote: string | null;
+  allowVoteChange?: boolean;
+  onVote: (submissionId: string) => void;
+  onSignIn: () => void;
+  isVoting: boolean;
+  isSigningIn?: boolean;
+}) {
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const hasVotedForThis = userVote === entry.id;
+
+  const handleVoteClick = () => {
+    if (hasVotedForThis) return;
+    if (userVote && !allowVoteChange) return;
+    setShowConfirm(true);
+  };
+
+  const handleConfirm = () => {
+    setShowConfirm(false);
+    onVote(entry.id);
+  };
+
+  return (
+    <div className={`group bg-surface-theme/90 dark:bg-surface-theme/90 border ${hasVotedForThis ? 'border-gold/50' : 'border-border-theme'} rounded-2xl overflow-hidden hover:border-gold/30 transition-all duration-300 backdrop-blur-xl shadow-lg ${hasVotedForThis ? 'ring-2 ring-gold/20' : ''}`}>
+      {/* Image */}
+      <div
+        className="relative aspect-[3/4] bg-canvas-theme/80 cursor-pointer overflow-hidden"
+        onClick={() => onOpenLightbox(index)}
+      >
+        {!imgLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-canvas-theme/80">
+            <Loader2 className="w-6 h-6 text-muted-foreground-theme/40 animate-spin" />
+          </div>
+        )}
+        <Image
+          src={entry.file_url}
+          alt={entry.title || "Polo shirt design"}
+          fill
+          className={`object-cover transition-all duration-500 group-hover:scale-[1.03] ${imgLoaded ? "opacity-100" : "opacity-0"
+            }`}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          unoptimized
+          onLoad={() => setImgLoaded(true)}
+        />
+
+        {/* Zoom overlay */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+          <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-80 transition-opacity duration-300" />
+        </div>
+
+        {/* Voted badge */}
+        {hasVotedForThis && (
+          <div className="absolute top-2 right-2 bg-gold text-[#0D1117] px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 shadow-lg">
+            <CheckCircle2 className="w-3 h-3" />
+            Your Vote
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="p-5 space-y-2">
+        {entry.title && (
+          <h3 className="text-sm font-semibold text-foreground-theme font-display leading-tight line-clamp-2">
+            {entry.title}
+          </h3>
+        )}
+
+        <p className="text-xs text-muted-foreground-theme">
+          {entry.student_name}
+          {entry.student_course_year && (
+            <span className="text-muted-foreground-theme/60">
+              {" "}
+              · {entry.student_course_year}
+            </span>
+          )}
+        </p>
+
+        {entry.description && (
+          <p className="text-xs text-muted-foreground-theme/70 leading-relaxed line-clamp-3">
+            {entry.description}
+          </p>
+        )}
+
+        {/* Vote Button Section */}
+        <div className="pt-2 space-y-2">
+          {!votingOpen ? (
+            <div className="w-full py-2.5 px-3 rounded-xl bg-canvas-theme/80 dark:bg-canvas-theme text-muted-foreground-theme/50 text-xs text-center border border-border-theme select-none font-mono">
+              <Clock className="w-3 h-3 inline-block mr-1 -mt-0.5" />
+              Voting opens Oct 9, 12:00 PM
+            </div>
+          ) : !user ? (
+            <button
+              type="button"
+              onClick={onSignIn}
+              disabled={isSigningIn}
+              className="w-full py-2.5 px-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-canvas-theme/80 dark:bg-canvas-theme hover:bg-surface-theme dark:hover:bg-surface-theme text-muted-foreground-theme hover:text-foreground-theme transition-colors border border-border-theme flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {isSigningIn ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <LogIn className="w-3.5 h-3.5" />
+              )}
+              {isSigningIn ? "Signing In..." : "Sign In to Vote"}
+            </button>
+          ) : hasVotedForThis ? (
+            <div className="w-full py-2.5 px-3 rounded-xl bg-gold/15 dark:bg-gold/15 text-gold dark:text-gold text-xs text-center border border-gold/30 select-none font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(245,166,35,0.15)]">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              You Voted This
+            </div>
+          ) : userVote && !allowVoteChange ? (
+            <div className="w-full py-2.5 px-3 rounded-xl bg-canvas-theme/60 dark:bg-canvas-theme/60 text-muted-foreground-theme/40 text-xs text-center border border-border-theme/40 select-none font-mono">
+              Vote Cast (Final)
+            </div>
+          ) : showConfirm ? (
+            // Inline confirmation
+            <div className="bg-gold/10 dark:bg-gold/10 border border-gold/30 rounded-xl p-3 space-y-2">
+              <p className="text-xs text-foreground-theme font-medium text-center">
+                {userVote ? "Change your vote?" : "Confirm your vote?"}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  disabled={isVoting}
+                  className="flex-1 py-2 px-2 rounded-lg bg-canvas-theme dark:bg-canvas-theme hover:bg-surface-theme dark:hover:bg-surface-theme text-foreground-theme text-xs font-medium transition-colors border border-border-theme disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  disabled={isVoting}
+                  className="flex-1 py-2 px-2 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isVoting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Yes
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              disabled={isVoting}
+              onClick={handleVoteClick}
+              className="w-full py-2.5 px-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-gold/15 dark:bg-gold/15 hover:bg-gold/25 dark:hover:bg-gold/25 text-gold dark:text-gold transition-colors cursor-pointer border border-gold/20 hover:border-gold/40 flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(245,166,35,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isVoting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <>
+                  <Vote className="w-3.5 h-3.5" />
+                  {userVote ? "Change Vote" : "Vote for this"}
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Main Page
+// ────────────────────────────────────────────────────────────────────────────
+
+export default function ViewGalleryPage() {
   const [entries, setEntries] = useState<ApprovedEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [lightboxCustomEntry, setLightboxCustomEntry] = useState<ApprovedEntry | null>(null);
-  const [showSnackbar, setShowSnackbar] = useState(false);
+  const [votingTick, setVotingTick] = useState(0);
 
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    try {
-      const isDismissed = sessionStorage.getItem("view_snackbar_dismissed");
-      if (!isDismissed) {
-        timer = setTimeout(() => setShowSnackbar(true), 500);
-      }
-    } catch {
-      timer = setTimeout(() => setShowSnackbar(true), 500);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, []);
+  // Derive voting state from current time — no setState in effect needed
+  const votingOpen = (() => {
+    void votingTick; // trigger re-render on tick
+    const now = new Date();
+    return now >= VOTING_OPENS && now <= VOTING_CLOSES;
+  })();
 
-  const handleDismissSnackbar = () => {
-    setShowSnackbar(false);
-    try {
-      sessionStorage.setItem("view_snackbar_dismissed", "true");
-    } catch {
-      // ignore
-    }
-  };
+  const votingEnded = new Date() > VOTING_CLOSES;
 
-  // Determine winner (highest vote_count)
-  const winner = entries.length > 0
+  // Determine winner (highest vote_count after voting concludes on Oct 24)
+  const winner = votingEnded && entries.length > 0
     ? entries.reduce((best, e) => ((e.vote_count || 0) > (best.vote_count || 0) ? e : best), entries[0])
     : null;
 
   const totalVotes = entries.reduce((sum, e) => sum + (e.vote_count || 0), 0);
+
+  // Auth State
+  const [user, setUser] = useState<User | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  // Direct Google OAuth Sign-in returning to /view
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsSigningIn(true);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("psits_auth_redirect", "/view");
+        localStorage.setItem("psits_auth_redirect", "/view");
+      }
+      const redirectUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/view`
+          : "";
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          queryParams: {
+            hd: "antiquespride.edu.ph",
+          },
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) {
+        setVoteMessage({ type: "error", text: error.message });
+        setIsSigningIn(false);
+      }
+    } catch (err) {
+      setVoteMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to sign in with Google.",
+      });
+      setIsSigningIn(false);
+    }
+  };
+
+  // Voting State
+  const [voteStatus, setVoteStatus] = useState<VoteStatus | null>(null);
+  const [isVoting, setIsVoting] = useState(false);
+  const [voteMessage, setVoteMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Fetch user session
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkSession() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!isMounted) return;
+
+        if (session?.user) {
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem("psits_auth_redirect");
+            localStorage.removeItem("psits_auth_redirect");
+          }
+          const email = session.user.email?.toLowerCase() || "";
+          if (email.endsWith(ALLOWED_DOMAIN)) {
+            setUser(session.user);
+            setSessionToken(session.access_token);
+          } else {
+            await supabase.auth.signOut();
+            setUser(null);
+            setSessionToken(null);
+          }
+        }
+      } catch (err) {
+        console.error("Auth session check error:", err);
+      }
+    }
+
+    checkSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+
+      if (session?.user) {
+        const email = session.user.email?.toLowerCase() || "";
+        if (email.endsWith(ALLOWED_DOMAIN)) {
+          setUser(session.user);
+          setSessionToken(session.access_token);
+        } else {
+          await supabase.auth.signOut();
+          setUser(null);
+          setSessionToken(null);
+        }
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+        setSessionToken(null);
+        setVoteStatus(null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Fetch voting status when user is authenticated
+  // Fetch voting status when user is authenticated
+  useEffect(() => {
+    if (!sessionToken) return;
+
+    async function fetchVoteStatus() {
+      try {
+        const res = await fetch("/api/submissions/polo/vote", {
+          headers: { Authorization: `Bearer ${sessionToken}` },
+        });
+        if (!res.ok) {
+          return;
+        }
+        const text = await res.text();
+        if (!text) return;
+        const data = JSON.parse(text);
+        setVoteStatus(data);
+      } catch (err) {
+        console.error("Error fetching vote status:", err);
+      }
+    }
+
+    fetchVoteStatus();
+  }, [sessionToken]);
 
   // Fetch approved designs
   useEffect(() => {
@@ -444,8 +772,76 @@ export default function ViewPage() {
       }
     }
     fetchApproved();
+
+    // Tick to re-derive votingOpen each second
+    const timer = setInterval(() => {
+      setVotingTick((t) => t + 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, []);
 
+  // Handle vote
+  const handleVote = async (submissionId: string) => {
+    if (!sessionToken) return;
+
+    setIsVoting(true);
+    setVoteMessage(null);
+
+    try {
+      const res = await fetch("/api/submissions/polo/vote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ submissionId }),
+      });
+
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : {};
+
+      if (res.ok && data.success) {
+        setVoteMessage({ type: "success", text: data.message });
+        // Refresh vote status
+        const statusRes = await fetch("/api/submissions/polo/vote", {
+          headers: { Authorization: `Bearer ${sessionToken}` },
+        });
+        if (statusRes.ok) {
+          const statusText = await statusRes.text();
+          if (statusText) {
+            const statusData = JSON.parse(statusText);
+            setVoteStatus(statusData);
+          }
+        }
+
+        // Refresh approved designs to update vote count tally
+        try {
+          const entriesRes = await fetch("/api/submissions/polo/approved");
+          if (entriesRes.ok) {
+            const entriesData = await entriesRes.json();
+            if (entriesData.entries) setEntries(entriesData.entries);
+          }
+        } catch {
+          // Non-critical background update
+        }
+
+        // Auto-hide success message after 5 seconds
+        setTimeout(() => setVoteMessage(null), 5000);
+      } else {
+        setVoteMessage({ type: "error", text: data.error || "Failed to record vote." });
+      }
+    } catch {
+      setVoteMessage({ type: "error", text: "An unexpected error occurred." });
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
+  const openLightbox = (i: number) => {
+    setLightboxCustomEntry(null);
+    setLightboxIndex(i);
+  };
   const closeLightbox = () => {
     setLightboxIndex(null);
     setLightboxCustomEntry(null);
@@ -460,8 +856,8 @@ export default function ViewPage() {
     );
 
   return (
-    <div className="relative min-h-screen bg-canvas-theme text-foreground-theme overflow-hidden font-body">
-      {/* Background glow */}
+    <div className="relative min-h-screen bg-canvas-theme text-foreground-theme overflow-hidden">
+      {/* Background glow - matching submission page */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[450px] bg-navy/20 dark:bg-navy/40 rounded-full blur-[140px]" />
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-gold/10 dark:bg-gold/8 rounded-full blur-[120px]" />
@@ -469,90 +865,149 @@ export default function ViewPage() {
       </div>
 
       {/* Page Content Container */}
-      <div className="relative z-10 pt-32 sm:pt-36 pb-28 w-full max-w-5xl mx-auto px-6">
+      <div className="relative z-10 pt-32 sm:pt-36 pb-28 w-full px-6">
+        {/* Vote Message Toast */}
+        {voteMessage && (
+          <div className="fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-[140] max-w-md w-[92%] sm:w-full px-4 animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
+            <div
+              className={`p-4 rounded-2xl backdrop-blur-2xl shadow-2xl border ${voteMessage.type === "success"
+                  ? "bg-emerald-950/90 dark:bg-emerald-950/90 border-emerald-500/40 text-emerald-200 shadow-emerald-950/40"
+                  : "bg-rose-950/90 dark:bg-rose-950/90 border-rose-500/40 text-rose-200 shadow-rose-950/40"
+                } flex items-start gap-3`}
+            >
+              {voteMessage.type === "success" ? (
+                <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5 text-emerald-400" />
+              ) : (
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-rose-400" />
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-medium leading-relaxed">{voteMessage.text}</p>
+              </div>
+              <button
+                onClick={() => setVoteMessage(null)}
+                className="text-current hover:opacity-70 transition-opacity p-1 rounded-lg"
+                aria-label="Close message"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Page Title & Context */}
-        <div className="text-center mb-10 space-y-2 max-w-2xl mx-auto">
+        <div className="text-center mb-8 space-y-2 max-w-2xl mx-auto">
           <p className="font-mono text-xs text-gold tracking-widest uppercase font-semibold">
             PSITS-UA Competition
           </p>
           <h1 className="font-display font-black text-2xl xs:text-3xl sm:text-4xl md:text-5xl text-foreground-theme tracking-tight uppercase leading-[1.08] break-words">
-            Official Contest <span className="text-gold">Winner</span>
+            {votingEnded ? (
+              <>Results &amp; <span className="text-gold">Winner</span></>
+            ) : (
+              <>Design <span className="text-gold">Gallery</span></>
+            )}
           </h1>
           <p className="text-muted-foreground-theme text-xs sm:text-sm">
-            Voting has officially concluded and our winning design has been chosen. Congratulations to the winning designer and thank you to all BSINFO students who participated!
+            {votingEnded
+              ? "Voting has ended. Thank you to all BSINFO students who participated!"
+              : votingOpen
+                ? voteStatus?.vote?.submission_id
+                  ? "Thank you! Your official vote has been recorded. Each vote is final and cannot be modified."
+                  : "Cast your vote for your favorite design! Voting closes Saturday, October 24, 2026 at 11:59 PM PHT."
+                : "Browse the approved polo shirt designs submitted by BSINFO students."}
           </p>
+
+          {!votingEnded && (
+            <div className="pt-2">
+              <CountdownPill />
+            </div>
+          )}
         </div>
 
-        {/* Winner Showcase Only */}
-        {loading ? (
-          <div className="relative mb-14 max-w-5xl mx-auto rounded-3xl bg-surface-theme/85 border border-gold/30 p-8 sm:p-12 text-center animate-pulse shadow-xl">
-            <div className="h-6 w-48 bg-canvas-theme/80 rounded-full mx-auto mb-6" />
-            <div className="aspect-[16/10] sm:aspect-[16/9] min-h-[340px] max-h-[520px] bg-canvas-theme/60 rounded-2xl mx-auto" />
-          </div>
-        ) : winner ? (
+        {/* Winner Banner — shown after voting ends */}
+        {votingEnded && winner && (
           <WinnerBanner
             winner={winner}
             totalVotes={totalVotes}
             onOpenLightbox={(entry) => setLightboxCustomEntry(entry)}
           />
-        ) : (
-          <div className="bg-surface-theme/90 border border-border-theme rounded-2xl p-8 sm:p-12 backdrop-blur-xl shadow-lg text-center max-w-2xl mx-auto">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-canvas-theme/80 border border-border-theme mb-5">
-              <Palette className="w-7 h-7 text-muted-foreground-theme/40" />
-            </div>
-            <h2 className="text-lg sm:text-xl font-bold text-foreground-theme font-display tracking-tight">
-              No Approved Designs Found
-            </h2>
-            <p className="text-xs sm:text-sm text-muted-foreground-theme mt-2 max-w-sm mx-auto leading-relaxed">
-              The winning design is currently being finalized. Please check back soon!
-            </p>
-          </div>
         )}
-      </div>
-      {/* Minimalist Theme-Aware Announcement Banner with Premium Glide Animation */}
-      <AnimatePresence>
-        {showSnackbar && (
-          <motion.aside
-            role="status"
-            aria-live="polite"
-            initial={{ opacity: 0, y: -48, scale: 0.96, filter: "blur(4px)" }}
-            animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-            exit={{
-              opacity: 0,
-              y: -48,
-              scale: 0.95,
-              filter: "blur(6px)",
-              transition: { duration: 0.28, ease: [0.32, 0.72, 0, 1] },
-            }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-lg select-none"
-          >
-            <div className="rounded-2xl bg-white/95 dark:bg-[#0D1117]/95 backdrop-blur-2xl border border-black/10 dark:border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.7)] px-4 py-3 sm:px-5 sm:py-3.5 flex items-center justify-between gap-3.5">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-xl bg-gold/15 text-gold">
-                  <Info className="w-4 h-4" />
+
+        {/* Gallery Grid Container */}
+        <div className="max-w-6xl mx-auto">
+          {loading ? (
+            /* Skeleton loader */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-surface-theme/90 border border-border-theme rounded-2xl overflow-hidden backdrop-blur-xl shadow-lg"
+                >
+                  <div className="aspect-[3/4] bg-canvas-theme/80 animate-pulse" />
+                  <div className="p-5 space-y-2">
+                    <div className="h-4 w-3/4 bg-canvas-theme/80 rounded animate-pulse" />
+                    <div className="h-3 w-1/2 bg-canvas-theme/80 rounded animate-pulse" />
+                    <div className="h-3 w-full bg-canvas-theme/80 rounded animate-pulse mt-3" />
+                  </div>
                 </div>
-                <p className="text-xs sm:text-[13px] text-slate-900 dark:text-slate-100 font-medium leading-snug">
-                  The final entry has been finalized, but the announcement will be delayed for the meantime. Stay tuned!
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleDismissSnackbar}
-                aria-label="Dismiss notice"
-                className="flex-shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              ))}
             </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
+          ) : entries.length === 0 ? (
+            /* Empty state */
+            <div className="bg-surface-theme/90 border border-border-theme rounded-2xl p-8 sm:p-12 backdrop-blur-xl shadow-lg text-center max-w-2xl mx-auto">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-canvas-theme/80 border border-border-theme mb-5">
+                <Palette className="w-7 h-7 text-muted-foreground-theme/40" />
+              </div>
+              <h2 className="text-lg sm:text-xl font-bold text-foreground-theme font-display tracking-tight">
+                No Approved Designs Yet
+              </h2>
+              <p className="text-xs sm:text-sm text-muted-foreground-theme mt-2 max-w-sm mx-auto leading-relaxed">
+                Approved polo shirt designs will appear here once reviewed by
+                the PSITS-UA committee. Check back soon!
+              </p>
+              <div className="pt-5">
+                <Link
+                  href="/submission"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-gold hover:bg-gold-light text-[#0D1117] transition-all cursor-pointer shadow-[0_0_15px_rgba(245,166,35,0.25)]"
+                >
+                  <Palette className="w-3.5 h-3.5" />
+                  <span>Submit Your Design</span>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            /* Design cards */
+            <>
+              <p className="text-xs text-muted-foreground-theme/75 mb-5 font-mono">
+                {entries.length} approved{" "}
+                {entries.length === 1 ? "design" : "designs"}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {entries.map((entry, i) => (
+                  <DesignCard
+                    key={entry.id}
+                    entry={entry}
+                    index={i}
+                    onOpenLightbox={openLightbox}
+                    votingOpen={votingOpen}
+                    user={user}
+                    userVote={voteStatus?.vote?.submission_id || null}
+                    allowVoteChange={voteStatus?.config?.allow_vote_change || false}
+                    onVote={handleVote}
+                    onSignIn={handleGoogleSignIn}
+                    isVoting={isVoting}
+                    isSigningIn={isSigningIn}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Lightbox */}
       {(lightboxIndex !== null || lightboxCustomEntry !== null) && (
         <Lightbox
-          entries={winner ? [winner] : entries}
+          entries={entries}
           currentIndex={lightboxIndex ?? 0}
           customEntry={lightboxCustomEntry}
           onClose={closeLightbox}

@@ -31,35 +31,46 @@ export default function CookieConsent() {
   }
 
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       {isVisible && (
         <motion.aside
           role="region"
           aria-label="Cookie and Privacy Notice"
-          initial={{ opacity: 0, y: 16, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 12, scale: 0.98 }}
-          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed bottom-4 sm:bottom-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-1.5rem)] sm:w-auto max-w-4xl px-4 sm:px-6 py-2.5 sm:py-2 rounded-2xl sm:rounded-full backdrop-blur-xl bg-slate-900/90 dark:bg-black/90 border border-white/15 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-6 text-xs font-mono text-slate-300"
+          initial={{ opacity: 0, y: 20, scale: 0.92, filter: 'blur(6px)' }}
+          animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+          exit={{
+            opacity: 0,
+            y: 32,
+            scale: 0.8,
+            filter: 'blur(14px)',
+            transition: {
+              duration: 0.35,
+              ease: [0.32, 0.72, 0, 1],
+            },
+          }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[calc(100%-1.25rem)] sm:max-w-xl px-3 sm:px-4 py-1.5 rounded-full backdrop-blur-2xl bg-white/80 dark:bg-[#0c121e]/80 border border-black/10 dark:border-white/15 shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)] ring-1 ring-white/60 dark:ring-white/10 flex items-center justify-between gap-2.5 sm:gap-4 text-xs select-none pointer-events-auto"
         >
-          <span className="text-[11px] sm:text-xs text-slate-300 text-center sm:text-left whitespace-normal sm:whitespace-nowrap">
-            This platform uses essential cookies strictly for authentication and system security.
+          <span className="text-[10px] sm:text-[11px] text-text/80 whitespace-nowrap leading-none font-normal">
+            This platform uses essential cookies strictly for security.
           </span>
 
-          <div className="flex items-center gap-3.5 flex-shrink-0 text-[11px] whitespace-nowrap">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 text-[10px] sm:text-[11px] whitespace-nowrap">
             <Link
               href="/privacy"
-              className="text-gold underline underline-offset-2 hover:text-white transition-colors"
+              className="text-gold underline underline-offset-2 hover:text-gold-muted transition-colors font-medium leading-none"
             >
-              Privacy Policy
+              Privacy
             </Link>
-            <button
+            <motion.button
               type="button"
+              whileTap={{ scale: 0.88 }}
+              whileHover={{ scale: 1.05 }}
               onClick={handleAccept}
-              className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white font-medium transition-colors cursor-pointer active:scale-95 text-[11px]"
+              className="px-2.5 sm:px-3 py-1 rounded-full bg-gold hover:bg-gold/90 text-[#0D1117] font-semibold transition-colors cursor-pointer active:scale-95 shadow-sm text-[10px] sm:text-[11px] leading-none"
             >
               Got it
-            </button>
+            </motion.button>
           </div>
         </motion.aside>
       )}

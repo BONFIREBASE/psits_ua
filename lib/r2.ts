@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
+  GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -28,18 +29,26 @@ export interface UploadOptions {
   body: Buffer | Uint8Array | Blob;
   contentType: string;
   metadata?: Record<string, string>;
+  cacheControl?: string;
 }
 
 /**
  * Upload an object directly to Cloudflare R2 from server runtime.
  */
-export async function uploadToR2({ key, body, contentType, metadata }: UploadOptions) {
+export async function uploadToR2({
+  key,
+  body,
+  contentType,
+  metadata,
+  cacheControl = "public, max-age=31536000, immutable",
+}: UploadOptions) {
   const cleanKey = key.replace(/^\//, "");
   const command = new PutObjectCommand({
     Bucket: R2_BUCKET_NAME,
     Key: cleanKey,
     Body: body,
     ContentType: contentType,
+    CacheControl: cacheControl,
     Metadata: metadata,
   });
 
@@ -59,16 +68,19 @@ export async function getPresignedUploadUrl({
   key,
   contentType,
   expiresIn = 3600,
+  cacheControl = "public, max-age=31536000, immutable",
 }: {
   key: string;
   contentType: string;
   expiresIn?: number;
+  cacheControl?: string;
 }) {
   const cleanKey = key.replace(/^\//, "");
   const command = new PutObjectCommand({
     Bucket: R2_BUCKET_NAME,
     Key: cleanKey,
     ContentType: contentType,
+    CacheControl: cacheControl,
   });
 
   const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn });
@@ -77,6 +89,7 @@ export async function getPresignedUploadUrl({
     uploadUrl,
     key: cleanKey,
     publicUrl: getR2PublicUrl(cleanKey),
+    cacheControl,
   };
 }
 
@@ -124,4 +137,17 @@ export async function listR2Objects(prefix = "", maxKeys = 50) {
     })),
     isTruncated: response.IsTruncated,
   };
+}
+
+/**
+ * Retrieve an object directly from Cloudflare R2 bucket.
+ */
+export async function getR2Object(key: string) {
+  const cleanKey = key.replace(/^\//, "");
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: cleanKey,
+  });
+
+  return await r2Client.send(command);
 }

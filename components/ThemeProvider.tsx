@@ -2,8 +2,15 @@
 
 import React, { createContext, useContext, useEffect, useCallback, useSyncExternalStore, useRef } from 'react'
 
-type Theme = 'light' | 'dark' | 'system'
-type ResolvedTheme = 'light' | 'dark'
+export type Theme = 'light' | 'dark' | 'system'
+export type ResolvedTheme = 'light' | 'dark'
+
+export interface SolarDetails {
+  theme: ResolvedTheme
+  isDaylight: boolean
+  sunriseHour: number
+  sunsetHour: number
+}
 
 interface ThemeContextType {
   theme: Theme
@@ -15,6 +22,82 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 const STORAGE_KEY = 'psits-theme'
+
+// Coordinates for Sibalom, Antique, Philippines
+const ANTIQUE_LAT = 10.78
+const ANTIQUE_LNG = 122.01
+
+let serverClockOffsetMs = 0
+let isClockCalibrated = false
+
+export function calibrateClock(serverEpochMs: number) {
+  if (typeof window === 'undefined' || !serverEpochMs) return
+  serverClockOffsetMs = serverEpochMs - Date.now()
+  isClockCalibrated = true
+}
+
+export function getCalibratedNow(): Date {
+  return new Date(Date.now() + serverClockOffsetMs)
+}
+
+/**
+ * Computes astronomical solar sunrise and sunset for Sibalom, Antique, Philippines (UTC+8).
+ * Uses standard NOAA solar positioning equations.
+ */
+export function getPhilippineSolarDetails(date = getCalibratedNow()): SolarDetails {
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const toDeg = (r: number) => (r * 180) / Math.PI
+
+  // Anchor to Philippine Standard Time (UTC+8)
+  const pht = new Date(date.getTime() + 8 * 3600000)
+  const y = pht.getUTCFullYear()
+  const startOfYear = new Date(Date.UTC(y, 0, 1))
+  const dayOfYear = Math.floor((pht.getTime() - startOfYear.getTime()) / 86400000) + 1
+  const lngHour = ANTIQUE_LNG / 15
+
+  function calcSolarHour(isRise: boolean): number {
+    const t = dayOfYear + ((isRise ? 6 : 18) - lngHour) / 24
+    const M = 0.9856 * t - 3.289
+    let L = M + 1.916 * Math.sin(toRad(M)) + 0.02 * Math.sin(toRad(2 * M)) + 282.634
+    L = ((L % 360) + 360) % 360
+
+    let RA = toDeg(Math.atan(0.91764 * Math.tan(toRad(L))))
+    RA = ((RA % 360) + 360) % 360
+    const Lquadrant = Math.floor(L / 90) * 90
+    const RAquadrant = Math.floor(RA / 90) * 90
+    RA = (RA + (Lquadrant - RAquadrant)) / 15
+
+    const sinDec = 0.39782 * Math.sin(toRad(L))
+    const cosDec = Math.cos(Math.asin(sinDec))
+    const cosH = (Math.cos(toRad(90.8333)) - sinDec * Math.sin(toRad(ANTIQUE_LAT))) / (cosDec * Math.cos(toRad(ANTIQUE_LAT)))
+
+    if (cosH > 1 || cosH < -1) return isRise ? 5.75 : 18.0
+
+    let H = isRise ? 360 - toDeg(Math.acos(cosH)) : toDeg(Math.acos(cosH))
+    H = H / 15
+
+    const T = H + RA - 0.06571 * t - 6.622
+    let UT = T - lngHour
+    UT = ((UT % 24) + 24) % 24
+    return (UT + 8) % 24
+  }
+
+  const sunriseHour = calcSolarHour(true)
+  const sunsetHour = calcSolarHour(false)
+  const currentPHT = pht.getUTCHours() + pht.getUTCMinutes() / 60 + pht.getUTCSeconds() / 3600
+
+  const isDaylight = currentPHT >= sunriseHour && currentPHT < sunsetHour
+  return {
+    theme: isDaylight ? 'light' : 'dark',
+    isDaylight,
+    sunriseHour,
+    sunsetHour,
+  }
+}
+
+export function getPhilippineSolarTheme(date = getCalibratedNow()): ResolvedTheme {
+  return getPhilippineSolarDetails(date).theme
+}
 
 const themeListeners = new Set<() => void>()
 
@@ -33,19 +116,14 @@ function subscribeTheme(callback: () => void) {
 function getStoredThemeSnapshot(): Theme {
   if (typeof window === 'undefined') return 'system'
   try {
-    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
+    const stored = sessionStorage.getItem(STORAGE_KEY) as Theme | null
+    if (stored === 'light' || stored === 'dark') return stored
   } catch {}
   return 'system'
 }
 
 function getStoredThemeServerSnapshot(): Theme {
   return 'system'
-}
-
-interface LegacyMediaQueryList {
-  addListener?: (listener: () => void) => void
-  removeListener?: (listener: () => void) => void
 }
 
 interface ViewTransitionInstance {
@@ -60,27 +138,61 @@ interface DocumentWithViewTransition {
 }
 
 function subscribeSystem(callback: () => void) {
-  if (typeof window === 'undefined' || !window.matchMedia) return () => {}
-  const mql = window.matchMedia('(prefers-color-scheme: dark)')
-  if (typeof mql.addEventListener === 'function') {
-    mql.addEventListener('change', callback)
-    return () => mql.removeEventListener('change', callback)
+  if (typeof window === 'undefined') return () => {}
+
+  let lastTheme = getPhilippineSolarTheme()
+
+  const checkSolar = () => {
+    const currentTheme = getPhilippineSolarTheme()
+    if (currentTheme !== lastTheme) {
+      lastTheme = currentTheme
+      callback()
+    }
   }
-  const legacyMql = mql as unknown as LegacyMediaQueryList
-  if (typeof legacyMql.addListener === 'function') {
-    legacyMql.addListener(callback)
-    return () => legacyMql.removeListener?.(callback)
+
+  // Authoritative server clock calibration via HTTP Date header (eliminates client hardware clock drift)
+  if (!isClockCalibrated) {
+    try {
+      fetch('/api/analytics/views', { method: 'HEAD', cache: 'no-store' })
+        .then((res) => {
+          const dateHeader = res.headers.get('date')
+          if (dateHeader) {
+            const serverMs = Date.parse(dateHeader)
+            if (!isNaN(serverMs)) {
+              calibrateClock(serverMs)
+              checkSolar()
+            }
+          }
+        })
+        .catch(() => {})
+    } catch {}
   }
-  return () => {}
+
+  // Poll solar calculation every 60 seconds for smooth sunrise/sunset transitions
+  const intervalId = window.setInterval(checkSolar, 60000)
+
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      checkSolar()
+    }
+  }
+
+  window.addEventListener('visibilitychange', onVisibility)
+  window.addEventListener('focus', checkSolar)
+
+  return () => {
+    window.clearInterval(intervalId)
+    window.removeEventListener('visibilitychange', onVisibility)
+    window.removeEventListener('focus', checkSolar)
+  }
 }
 
 function getSystemSnapshot(): ResolvedTheme {
-  if (typeof window === 'undefined' || !window.matchMedia) return 'dark'
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return getPhilippineSolarTheme()
 }
 
 function getSystemServerSnapshot(): ResolvedTheme {
-  return 'dark'
+  return getPhilippineSolarTheme()
 }
 
 function applyThemeDom(resolved: ResolvedTheme) {
@@ -96,6 +208,8 @@ function applyThemeDom(resolved: ResolvedTheme) {
   }
   root.style.colorScheme = resolved
 }
+
+let fallbackTransitionTimer: ReturnType<typeof setTimeout> | null = null
 
 function executeWithThemeTransition(callback: () => void) {
   if (typeof document === 'undefined') {
@@ -123,6 +237,7 @@ function executeWithThemeTransition(callback: () => void) {
         // Silently catch AbortError if a new transition supersedes this one
         transition.ready?.catch(() => {})
         transition.finished?.catch(() => {})
+        transition.updateCallbackDone?.catch(() => {})
       }
       return
     } catch {
@@ -131,15 +246,15 @@ function executeWithThemeTransition(callback: () => void) {
   }
 
   // Fallback for browsers without View Transitions API
+  if (fallbackTransitionTimer) clearTimeout(fallbackTransitionTimer)
   const root = document.documentElement
   root.classList.add('theme-transitioning')
   callback()
-  setTimeout(() => {
+  fallbackTransitionTimer = setTimeout(() => {
     root.classList.remove('theme-transitioning')
+    fallbackTransitionTimer = null
   }, 350)
 }
-
-let currentResolvedTheme: ResolvedTheme = 'dark'
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useSyncExternalStore(subscribeTheme, getStoredThemeSnapshot, getStoredThemeServerSnapshot)
@@ -147,39 +262,37 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const isManualChangeRef = useRef(false)
 
   const resolvedTheme: ResolvedTheme = theme === 'system' ? systemTheme : (theme as ResolvedTheme)
-
-  // Keep module-level state synced
-  currentResolvedTheme = resolvedTheme
+  const currentResolvedThemeRef = useRef<ResolvedTheme>(resolvedTheme)
 
   useEffect(() => {
+    currentResolvedThemeRef.current = resolvedTheme
+
     if (isManualChangeRef.current) {
       isManualChangeRef.current = false
       return
     }
 
-    const currentTheme = document.documentElement.getAttribute('data-theme')
-    if (currentTheme && currentTheme !== resolvedTheme) {
-      executeWithThemeTransition(() => {
-        applyThemeDom(resolvedTheme)
-      })
-    } else {
-      applyThemeDom(resolvedTheme)
-    }
+    // Quietly synchronize DOM attribute on mount or cross-tab storage sync without triggering animation
+    applyThemeDom(resolvedTheme)
   }, [resolvedTheme])
 
   const setTheme = useCallback((newTheme: Theme) => {
     isManualChangeRef.current = true
     const nextResolvedTheme: ResolvedTheme =
       newTheme === 'system'
-        ? (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        ? getPhilippineSolarTheme()
         : (newTheme as ResolvedTheme)
 
     // Synchronously track the new resolved theme so subsequent rapid clicks alternate correctly
-    currentResolvedTheme = nextResolvedTheme
+    currentResolvedThemeRef.current = nextResolvedTheme
 
     // Update storage and listeners immediately to ensure React components receive the flip
     try {
-      localStorage.setItem(STORAGE_KEY, newTheme)
+      if (newTheme === 'system') {
+        sessionStorage.removeItem(STORAGE_KEY)
+      } else {
+        sessionStorage.setItem(STORAGE_KEY, newTheme)
+      }
     } catch {
       // Ignore storage write errors
     }
@@ -192,14 +305,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const toggleTheme = useCallback(() => {
-    // Strictly 2-state toggle: Dark <-> Light
-    // Check synchronous tracker / DOM state to guarantee 1 click = 1 flip, 2 clicks = full rotation
-    const current: ResolvedTheme =
-      typeof document !== 'undefined'
-        ? ((document.documentElement.getAttribute('data-theme') as ResolvedTheme) || currentResolvedTheme)
-        : resolvedTheme
-
-    const nextTheme: ResolvedTheme = current === 'dark' ? 'light' : 'dark'
+    // Clean direct toggle: Dark <-> Light for the active session
+    const nextTheme: ResolvedTheme = resolvedTheme === 'dark' ? 'light' : 'dark'
     setTheme(nextTheme)
   }, [resolvedTheme, setTheme])
 
@@ -218,31 +325,4 @@ export function useTheme() {
   return context
 }
 
-export const themeScript = `
-(function() {
-  try {
-    var stored = localStorage.getItem('${STORAGE_KEY}');
-    var mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
-    var systemTheme = (mql && mql.matches) ? 'dark' : 'light';
-    var resolved = systemTheme;
-    if (stored === 'light' || stored === 'dark') {
-      resolved = stored;
-    } else if (stored === 'system') {
-      resolved = systemTheme;
-    } else {
-      // First landing without manual override: use system device preference
-      resolved = systemTheme;
-    }
-    var root = document.documentElement;
-    root.setAttribute('data-theme', resolved);
-    if (resolved === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    }
-    root.style.colorScheme = resolved;
-  } catch (e) {}
-})();
-`.trim()
+export const themeScript = `(function(){try{try{localStorage.removeItem('${STORAGE_KEY}');}catch(err){}var s=sessionStorage.getItem('${STORAGE_KEY}'),r;if(s==='light'||s==='dark'){r=s;}else{var d=new Date(),p=new Date(d.getTime()+28800000),y=p.getUTCFullYear(),doy=Math.floor((p.getTime()-Date.UTC(y,0,1))/86400000)+1,lh=122.01/15;function c(rise){var t=doy+((rise?6:18)-lh)/24,M=0.9856*t-3.289,rad=Math.PI/180,L=((M+1.916*Math.sin(M*rad)+0.02*Math.sin(2*M*rad)+282.634)%360+360)%360,RA=((Math.atan(0.91764*Math.tan(L*rad))*180/Math.PI)%360+360)%360,adj=(RA+(Math.floor(L/90)*90-Math.floor(RA/90)*90))/15,sD=0.39782*Math.sin(L*rad),cD=Math.cos(Math.asin(sD)),cH=(Math.cos(90.8333*rad)-sD*Math.sin(10.78*rad))/(cD*Math.cos(10.78*rad));if(cH>1||cH<-1)return rise?5.75:18.0;var H=(rise?360-Math.acos(cH)*180/Math.PI:Math.acos(cH)*180/Math.PI)/15,UT=((H+adj-0.06571*t-6.622-lh)%24+24)%24;return(UT+8)%24;}var cur=p.getUTCHours()+p.getUTCMinutes()/60+p.getUTCSeconds()/3600;r=(cur>=c(true)&&cur<c(false))?'light':'dark';}var root=document.documentElement;root.setAttribute('data-theme',r);if(r==='dark'){root.classList.add('dark');root.classList.remove('light');}else{root.classList.add('light');root.classList.remove('dark');}root.style.colorScheme=r;}catch(e){}})();`

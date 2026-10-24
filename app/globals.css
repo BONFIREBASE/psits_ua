@@ -110,6 +110,8 @@
 
   html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
+    max-width: 100vw;
   }
 
   body {
@@ -117,6 +119,8 @@
     color: var(--color-text);
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    max-width: 100vw;
   }
 
   .bg-base {
@@ -192,6 +196,31 @@
 
   .animate-banner-shimmer {
     animation: banner-shimmer 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes scroll-carousel {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(calc(-100% / 3));
+    }
+  }
+
+  .animate-scroll-carousel {
+    display: flex;
+    width: fit-content;
+    animation: scroll-carousel 42s linear infinite;
+  }
+
+  .animate-scroll-carousel:hover {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-scroll-carousel {
+      animation: none !important;
+    }
   }
 
   .scrollbar-minimal {
@@ -359,16 +388,28 @@
 
 /* Fallback smooth transition for browsers without View Transitions */
 html.theme-transitioning,
-html.theme-transitioning *,
-html.theme-transitioning *::before,
-html.theme-transitioning *::after {
+html.theme-transitioning body,
+html.theme-transitioning header,
+html.theme-transitioning nav,
+html.theme-transitioning main,
+html.theme-transitioning footer,
+html.theme-transitioning section,
+html.theme-transitioning aside,
+html.theme-transitioning div,
+html.theme-transitioning button,
+html.theme-transitioning a {
   transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
               border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
               color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              fill 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              stroke 0.3s cubic-bezier(0.4, 0, 0.2, 1),
               box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   transition-delay: 0s !important;
+}
+
+html.theme-transitioning svg,
+html.theme-transitioning img,
+html.theme-transitioning canvas,
+html.theme-transitioning video {
+  transition: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -377,6 +418,7 @@ html.theme-transitioning *::after {
     animation: none !important;
   }
   html.theme-transitioning,
+  html.theme-transitioning body,
   html.theme-transitioning * {
     transition: none !important;
   }

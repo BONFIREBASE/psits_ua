@@ -7,6 +7,7 @@ import ProgressiveImage from './ProgressiveImage'
 import { X, ArrowUpRight, MapPin, Calendar, Quote, PenTool, Camera, Palette, Clock, Video, FileText } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SocialDispatch } from '@/data/announcements'
+import MarkdownContent from './MarkdownContent'
 
 interface SocialDispatchCardProps {
   dispatch: SocialDispatch
@@ -240,11 +241,7 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
                       </div>
 
                       <div className="space-y-4">
-                        <p
-                          className="text-sm sm:text-base leading-[1.8] font-normal whitespace-pre-line text-slate-700 dark:text-white/90"
-                        >
-                          {dispatch.fullContent}
-                        </p>
+                        <MarkdownContent content={dispatch.fullContent} />
                       </div>
 
                       {dispatch.involvedColleges && dispatch.involvedColleges.length > 0 && (

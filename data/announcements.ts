@@ -28,7 +28,7 @@ export interface SocialDispatch {
 export const socialDispatches: SocialDispatch[] = [
   {
     id: 'fb-1DGqiMHKhc',
-    imageUrl: '/assets/suicide_prevention.jpg',
+    imageUrl: 'https://pub-1813fa24f4b74f44896e886714f409db.r2.dev/blog/suicide_prevention.jpg',
     date: 'September 5, 2026',
     category: 'Official Advisory',
     title: 'Suicide Prevention Month: You Are Not a Burden',
@@ -70,7 +70,7 @@ You are not alone. You are loved. You are valued. And you matter.`,
 
   {
     id: 'fb-1B2Gumht2T',
-    imageUrl: '/assets/butlak.jpg',
+    imageUrl: 'https://pub-1813fa24f4b74f44896e886714f409db.r2.dev/blog/butlak.jpg',
     date: 'September 2, 2026',
     venue: 'UA Tripunan Hall',
     category: 'Event Recap',
@@ -97,7 +97,7 @@ You are not alone. You are loved. You are valued. And you matter.`,
 
   {
     id: 'fb-pubmat-recruitment',
-    imageUrl: '/assets/publication_recruitment.jpg',
+    imageUrl: 'https://pub-1813fa24f4b74f44896e886714f409db.r2.dev/blog/publication_recruitment.jpg',
     date: 'September 1, 2026',
     category: 'Recruitment',
     title: 'PSITS-UA Pubmat Team: Now Accepting Applications',

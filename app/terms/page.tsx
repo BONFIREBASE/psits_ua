@@ -17,8 +17,9 @@ const termsSections = [
   { id: 'competitions', num: '03', label: 'Competitions, Contests & AI' },
   { id: 'voting', num: '04', label: 'Democratic Voting & Secret Ballots' },
   { id: 'showcases', num: '05', label: 'Academic Showcases & SEO' },
-  { id: 'security', num: '06', label: 'Security, Telemetry & Fair Use' },
-  { id: 'governance', num: '07', label: 'Governing Law & Inquiries' },
+  { id: 'community', num: '06', label: 'Community Hub & Dual Identity' },
+  { id: 'security', num: '07', label: 'Security, Telemetry & Fair Use' },
+  { id: 'governance', num: '08', label: 'Governing Law & Inquiries' },
 ]
 
 export default function TermsOfServicePage() {
@@ -248,10 +249,52 @@ export default function TermsOfServicePage() {
 
           <hr className="border-border/40" />
 
-          {/* Section 06: Security & Telemetry */}
+          {/* Section 06: Community Hub & Dual Identity */}
+          <section id="community" className="scroll-mt-24 space-y-3">
+            <p className="text-xs font-mono text-gold uppercase tracking-wider">
+              06 · Academic Forum &amp; Dual Identity
+            </p>
+            <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
+              Community Hub, Dual-Identity &amp; Academic Code of Conduct
+            </h2>
+            <p>
+              The PSITS Community Hub serves as a collaborative academic space for BSIT students to exchange technical insights,
+              share course study materials, discuss project architectures, and engage in peer mentorship. Use of this forum is
+              governed by strict standards of academic integrity:
+            </p>
+            <ul className="list-disc list-outside pl-5 space-y-2">
+              <li>
+                <strong className="text-slate-900 dark:text-white">Dual-Identity Privacy Protocol:</strong> Students may elect
+                to publish contributions under a masked anonymous persona to facilitate honest inquiry without peer bias. When
+                anonymous mode is selected, personal profile identifiers are permanently redacted before content is distributed
+                across edge networks.
+              </li>
+              <li>
+                <strong className="text-slate-900 dark:text-white">Accountability &amp; Anti-Harassment Safeguard:</strong> Anonymity
+                is designed to protect student expression, not to serve as an instrument for impunity. To safeguard the student
+                body against defamation, cyberbullying, doxxing, harassment, or academic dishonesty, all published content is
+                bound to an internal audit verification record. In cases of formal grievances or actionable violations of the
+                University Student Handbook, designated administrators retain the authority to inspect audit logs.
+              </li>
+              <li>
+                <strong className="text-slate-900 dark:text-white">Document &amp; Resource Sharing Standards:</strong> Uploaded
+                course documents, lecture summaries, and technical assets must not contain malicious code, commercial piracy, or
+                unauthorized examination answer keys. Uploads are strictly subject to automated file-type sanitization and size caps.
+              </li>
+              <li>
+                <strong className="text-slate-900 dark:text-white">Moderation &amp; Circuit Breakers:</strong> Platform moderators
+                reserve the right to lock controversial threads, engage rate-limiting cool-downs, or execute immediate content
+                takedowns for material violating organizational safety guidelines.
+              </li>
+            </ul>
+          </section>
+
+          <hr className="border-border/40" />
+
+          {/* Section 07: Security & Telemetry */}
           <section id="security" className="scroll-mt-24 space-y-3">
             <p className="text-xs font-mono text-gold uppercase tracking-wider">
-              06 · System Integrity &amp; Telemetry
+              07 · System Integrity &amp; Telemetry
             </p>
             <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
               Platform Security, Telemetry &amp; Fair Use
@@ -273,10 +316,10 @@ export default function TermsOfServicePage() {
 
           <hr className="border-border/40" />
 
-          {/* Section 07: Governance & Contact */}
+          {/* Section 08: Governance & Contact */}
           <section id="governance" className="scroll-mt-24 space-y-3">
             <p className="text-xs font-mono text-gold uppercase tracking-wider">
-              07 · Institutional Law &amp; Contact
+              08 · Institutional Law &amp; Contact
             </p>
             <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
               Governing Law &amp; Official Inquiries
