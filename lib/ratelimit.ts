@@ -20,6 +20,7 @@ let authRateLimiter: Ratelimit | null = null
 let cronRateLimiter: Ratelimit | null = null
 let voteRateLimiter: Ratelimit | null = null
 let duesRateLimiter: Ratelimit | null = null
+let orderRateLimiter: Ratelimit | null = null
 
 if (isUpstashConfigured && redisUrl && redisToken) {
   try {
@@ -59,6 +60,14 @@ if (isUpstashConfigured && redisUrl && redisToken) {
       prefix: 'psits:rl:dues',
       analytics: true,
     })
+
+    // Merch order submissions: 5 requests per 60 seconds per student (DDoS & mass order protection)
+    orderRateLimiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, '60 s'),
+      prefix: 'psits:rl:order',
+      analytics: true,
+    })
   } catch (err) {
     console.warn('[Upstash Redis Init Warning]:', err)
     redis = null
@@ -67,7 +76,7 @@ if (isUpstashConfigured && redisUrl && redisToken) {
 
 export async function checkRateLimit(
   identifier: string = 'anonymous',
-  type: 'auth' | 'cron' | 'vote' | 'dues' = 'auth'
+  type: 'auth' | 'cron' | 'vote' | 'dues' | 'order' = 'auth'
 ): Promise<RateLimitResult> {
   const limiter =
     type === 'auth'
@@ -76,6 +85,8 @@ export async function checkRateLimit(
       ? cronRateLimiter
       : type === 'vote'
       ? voteRateLimiter
+      : type === 'order'
+      ? orderRateLimiter
       : duesRateLimiter
 
   if (!limiter) {

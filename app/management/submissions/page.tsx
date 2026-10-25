@@ -161,6 +161,25 @@ export default function SubmissionsManagementPage() {
         </div>
       </div>
 
+      {/* Contest Concluded & Merch Active Banner */}
+      <div className="p-4 rounded-xl border border-gold/40 bg-gold/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+        <div className="space-y-0.5">
+          <p className="font-semibold text-xs text-foreground-theme font-display flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>Polo Contest &amp; Voting Concluded · Merch Store Open</span>
+          </p>
+          <p className="text-[11px] text-muted-foreground-theme font-mono">
+            Winning design: <strong className="text-foreground-theme">NEXGEN TECHTORCH</strong>. Official uniform pre-orders are now active.
+          </p>
+        </div>
+        <Link
+          href="/management/orders"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold hover:bg-gold-light text-[#0D1117] text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-xs shrink-0"
+        >
+          <span>Monitor Merch Orders</span>
+        </Link>
+      </div>
+
       {/* Filter & Search Bar */}
       <div className="flex flex-col sm:flex-row items-center gap-3 bg-surface-theme border border-border-theme p-3 rounded-xl shadow-xs">
         <div className="relative flex-1 w-full">

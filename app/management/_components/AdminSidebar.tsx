@@ -20,7 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Megaphone,
-  Palette,
+  ShoppingBag,
   Images,
   Receipt,
 } from 'lucide-react'
@@ -37,7 +37,7 @@ const navItems: NavItem[] = [
   { href: '/management/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/management/blog', label: 'Blog / Dispatches', icon: FileEdit },
   { href: '/management/banners', label: 'Banners', icon: Megaphone },
-  { href: '/management/submissions', label: 'Polo Contest', icon: Palette },
+  { href: '/management/orders', label: 'Merch Orders', icon: ShoppingBag },
   { href: '/management/officers', label: 'Officers', icon: Users },
   { href: '/management/events', label: 'Events & Calendar', icon: CalendarDays },
   { href: '/management/projects', label: 'Projects Showcase', icon: Code2 },
