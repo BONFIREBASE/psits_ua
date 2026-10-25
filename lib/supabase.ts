@@ -647,3 +647,40 @@ export async function getMembershipDues(): Promise<MembershipDueRow[]> {
   }
 }
 
+/* ─── 9. Merch Orders ─── */
+
+export type MerchOrderStatus =
+  | 'processing'
+  | 'ordered'
+  | 'ready_for_pickup'
+  | 'completed'
+  | 'cancelled';
+
+export type MerchPaymentStatus = 'pending_verification' | 'verified' | 'rejected';
+export type PoloShirtSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | string;
+
+export interface MerchOrderRow {
+  id: string;
+  student_name: string;
+  student_email: string;
+  course_year: string | null;
+  contact_number: string | null;
+  item_id: string;
+  item_name: string;
+  size: PoloShirtSize;
+  quantity: number;
+  unit_price: number;
+  total_amount: number;
+  notes: string | null;
+  receipt_key?: string | null;
+  receipt_url?: string | null;
+  receipt_filename?: string | null;
+  receipt_size?: number | null;
+  status: MerchOrderStatus;
+  payment_status: MerchPaymentStatus;
+  verified_by?: string | null;
+  verified_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+

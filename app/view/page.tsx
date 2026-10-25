@@ -215,6 +215,19 @@ function WinnerBanner({
               </p>
             </div>
           </div>
+
+          {/* Merch Store Pre-Order CTA */}
+          <div className="md:col-span-12 pt-4 border-t border-border-theme/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <span className="text-xs font-mono text-muted-foreground-theme">
+              Voting has officially concluded. Orders are now open for all CCIS students!
+            </span>
+            <Link
+              href="/merch"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-gold hover:bg-gold-light text-[#0D1117] transition-all shadow-[0_0_15px_rgba(245,166,35,0.3)] shrink-0"
+            >
+              <span>Order Winning Polo Shirt (₱475)</span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>
