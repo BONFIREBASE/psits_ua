@@ -657,7 +657,7 @@ export type MerchOrderStatus =
   | 'cancelled';
 
 export type MerchPaymentStatus = 'pending_verification' | 'verified' | 'rejected';
-export type PoloShirtSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | string;
+export type PoloShirtSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | string;
 
 export interface MerchOrderRow {
   id: string;

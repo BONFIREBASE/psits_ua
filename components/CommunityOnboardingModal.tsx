@@ -55,7 +55,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Will my student number or email address be public?',
-    a: 'No. In compliance with R.A. 10173 (Data Privacy Act of 2012), your student number, email, and personal records remain strictly confidential and masked. Only your chosen public Kasubay handle (@username) and academic section are visible.',
+    a: 'No. In compliance with R.A. 10173 (Data Privacy Act of 2012), your student number, email, and personal records remain strictly confidential and masked. Only your chosen public username (@username) and academic section are visible.',
   },
   {
     q: 'Can I customize my username and profile photo later?',
@@ -633,11 +633,11 @@ function CommunityOnboardingModalContent({
                 </div>
               </div>
 
-              {/* Handle Field */}
+              {/* Username Field */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <label className="font-mono text-[11px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">
-                    Kasubay Handle <span className="text-rose-500">*</span>
+                    Username <span className="text-rose-500">*</span>
                   </label>
                   <span
                     className={`font-mono text-[10px] font-bold ${
@@ -659,7 +659,7 @@ function CommunityOnboardingModalContent({
                     type="text"
                     value={username}
                     onChange={handleUsernameChange}
-                    placeholder="your_handle"
+                    placeholder="username"
                     className="w-full bg-slate-50 dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-xl pl-8 pr-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none focus:border-gold font-mono"
                   />
                 </div>

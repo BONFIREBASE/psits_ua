@@ -41,6 +41,7 @@ const SIZES: { size: PoloShirtSize; chest: string; length: string }[] = [
   { size: "M", chest: '40"', length: '27"' },
   { size: "L", chest: '42"', length: '28"' },
   { size: "XL", chest: '44"', length: '29"' },
+  { size: "XXL", chest: '46"', length: '30"' },
 ];
 
 const POLO_IMAGE =
@@ -78,6 +79,7 @@ export default function MerchPage() {
     M: 0,
     L: 0,
     XL: 0,
+    XXL: 0,
   });
 
   const bulkTotalQuantity = Object.values(bulkQuantities).reduce((acc, qty) => acc + qty, 0);
@@ -979,7 +981,7 @@ export default function MerchPage() {
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-5 gap-2">
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                           {SIZES.map((s) => {
                             const isSelected = selectedSize === s.size;
                             return (

@@ -271,6 +271,7 @@ export default function MerchOrdersManagementPage() {
       M: 0,
       L: 0,
       XL: 0,
+      XXL: 0,
     };
     orders.forEach((o) => {
       if (o.status !== "cancelled" && sizeTallies[o.size] !== undefined) {
@@ -498,8 +499,8 @@ export default function MerchOrdersManagementPage() {
             Total Shirts: {metrics.total - orders.filter(o => o.status === 'cancelled').length}
           </span>
         </div>
-        <div className="grid grid-cols-5 gap-2 pt-1">
-          {(["XS", "S", "M", "L", "XL"] as PoloShirtSize[]).map((sz) => (
+        <div className="grid grid-cols-6 gap-2 pt-1">
+          {(["XS", "S", "M", "L", "XL", "XXL"] as PoloShirtSize[]).map((sz) => (
             <div
               key={sz}
               className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-50 dark:bg-black/30 border border-black/10 dark:border-white/10"
@@ -560,6 +561,7 @@ export default function MerchOrdersManagementPage() {
               <option value="M" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">M</option>
               <option value="L" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">L</option>
               <option value="XL" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">XL</option>
+              <option value="XXL" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">XXL</option>
             </select>
           </div>
         </div>

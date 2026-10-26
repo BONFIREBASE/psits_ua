@@ -16,7 +16,7 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/webp",
 ]);
 const POLO_PRICE = 475;
-const VALID_SIZES = new Set(["XS", "S", "M", "L", "XL"]);
+const VALID_SIZES = new Set(["XS", "S", "M", "L", "XL", "XXL"]);
 
 /**
  * Authenticates either a student (via Supabase auth token) or an admin/officer
