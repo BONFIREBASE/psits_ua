@@ -1167,7 +1167,7 @@ export default function MerchPage() {
                             type="text"
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            placeholder="Optional nickname for embroidery or order note"
+                            placeholder="Note (optional)"
                             className="w-full px-3.5 py-3 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme placeholder:text-muted/60 focus:outline-none focus:border-gold"
                           />
                         </div>

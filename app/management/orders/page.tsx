@@ -1082,12 +1082,12 @@ export default function MerchOrdersManagementPage() {
                   </FormField>
                 </div>
 
-                <FormField label="Order Notes / Nickname">
+                <FormField label="Order Note">
                   <textarea
                     rows={2}
                     value={editFormData.notes || ""}
                     onChange={(e) => setEditFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Embroidery nickname or special instructions"
+                    placeholder="Order note or special instructions"
                     className={textareaStyles}
                   />
                 </FormField>
