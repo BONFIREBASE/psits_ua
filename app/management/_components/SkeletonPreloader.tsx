@@ -184,9 +184,9 @@ export function LoginCardSkeleton() {
 
 export function ManagementTableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="w-full bg-surface-theme border border-border-theme rounded-2xl overflow-hidden shadow-xs animate-pulse select-none">
+    <div className="w-full bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-2xl overflow-hidden shadow-xs animate-pulse select-none">
       {/* Table Top Toolbar Skeleton */}
-      <div className="p-4 border-b border-border-theme flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="p-4 border-b border-black/10 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="w-48 sm:w-64 h-9 bg-slate-200 dark:bg-white/[0.05] rounded-xl" />
         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           <div className="w-24 h-9 bg-slate-200 dark:bg-white/[0.05] rounded-xl" />
@@ -195,7 +195,7 @@ export function ManagementTableSkeleton({ rows = 5 }: { rows?: number }) {
       </div>
 
       {/* Header Row */}
-      <div className="bg-slate-50 dark:bg-white/[0.02] border-b border-border-theme px-4 py-3 grid grid-cols-12 gap-4">
+      <div className="bg-slate-50 dark:bg-white/[0.02] border-b border-black/10 dark:border-white/10 px-4 py-3 grid grid-cols-12 gap-4">
         <div className="col-span-4 sm:col-span-3 h-3 bg-slate-300 dark:bg-white/[0.08] rounded" />
         <div className="col-span-3 sm:col-span-3 h-3 bg-slate-300 dark:bg-white/[0.08] rounded" />
         <div className="col-span-3 sm:col-span-3 h-3 bg-slate-300 dark:bg-white/[0.08] rounded" />
@@ -203,7 +203,7 @@ export function ManagementTableSkeleton({ rows = 5 }: { rows?: number }) {
       </div>
 
       {/* Rows */}
-      <div className="divide-y divide-border-theme">
+      <div className="divide-y divide-black/5 dark:divide-white/5">
         {Array.from({ length: rows }).map((_, i) => (
           <div key={i} className="px-4 py-4 grid grid-cols-12 gap-4 items-center">
             <div className="col-span-4 sm:col-span-3 space-y-2">
@@ -228,13 +228,92 @@ export function ManagementTableSkeleton({ rows = 5 }: { rows?: number }) {
   )
 }
 
+export function MerchOrdersTableSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="w-full bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-xl overflow-hidden shadow-xs animate-pulse select-none">
+      {/* Table Header Row Skeleton */}
+      <div className="border-b border-black/10 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] px-4 py-3 flex items-center justify-between text-xs">
+        <div className="w-24 h-3 bg-slate-200 dark:bg-white/[0.06] rounded" />
+        <div className="hidden sm:block w-28 h-3 bg-slate-200 dark:bg-white/[0.06] rounded" />
+        <div className="w-12 h-3 bg-slate-200 dark:bg-white/[0.06] rounded text-center" />
+        <div className="w-16 h-3 bg-slate-200 dark:bg-white/[0.06] rounded" />
+        <div className="hidden md:block w-16 h-3 bg-slate-200 dark:bg-white/[0.06] rounded" />
+        <div className="w-20 h-3 bg-slate-200 dark:bg-white/[0.06] rounded" />
+        <div className="w-28 h-3 bg-slate-200 dark:bg-white/[0.06] rounded" />
+        <div className="hidden lg:block w-20 h-3 bg-slate-200 dark:bg-white/[0.06] rounded" />
+        <div className="w-16 h-3 bg-slate-200 dark:bg-white/[0.06] rounded ml-auto" />
+      </div>
+
+      {/* Rows */}
+      <div className="divide-y divide-black/5 dark:divide-white/5">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div
+            key={i}
+            className="px-4 py-3.5 flex items-center justify-between gap-3 text-xs"
+          >
+            {/* Student Info */}
+            <div className="w-48 sm:w-56 space-y-1.5 shrink-0">
+              <div
+                className="h-3.5 bg-slate-200 dark:bg-white/[0.08] rounded"
+                style={{ width: `${60 + ((i * 17) % 35)}%` }}
+              />
+              <div className="w-32 h-2.5 bg-slate-200 dark:bg-white/[0.04] rounded" />
+            </div>
+
+            {/* Course & Section */}
+            <div className="hidden sm:block w-24 shrink-0">
+              <div className="w-20 h-5 rounded bg-slate-100 dark:bg-white/[0.04] border border-black/5 dark:border-white/5" />
+            </div>
+
+            {/* Size */}
+            <div className="w-12 flex justify-center shrink-0">
+              <div className="w-8 h-5 rounded bg-gold/15 border border-gold/20" />
+            </div>
+
+            {/* Amount */}
+            <div className="w-16 shrink-0">
+              <div className="w-12 h-3.5 bg-slate-200 dark:bg-white/[0.08] rounded" />
+            </div>
+
+            {/* Receipt button */}
+            <div className="hidden md:flex justify-center w-16 shrink-0">
+              <div className="w-14 h-6 rounded-md bg-slate-100 dark:bg-white/[0.04] border border-black/5 dark:border-white/5" />
+            </div>
+
+            {/* Payment Status */}
+            <div className="w-20 shrink-0">
+              <div className="w-16 h-4 rounded bg-emerald-500/15" />
+            </div>
+
+            {/* Pipeline Status */}
+            <div className="w-28 shrink-0">
+              <div className="w-24 h-6 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-black/5 dark:border-white/5" />
+            </div>
+
+            {/* Date */}
+            <div className="hidden lg:block w-20 shrink-0">
+              <div className="w-16 h-3 bg-slate-200 dark:bg-white/[0.04] rounded" />
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-1.5 shrink-0 ml-auto">
+              <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-white/[0.04] border border-black/5 dark:border-white/5" />
+              <div className="w-7 h-7 rounded-lg bg-rose-500/10 border border-rose-500/20" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function ManagementCardGridSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-pulse select-none">
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="bg-surface-theme border border-border-theme rounded-2xl p-5 space-y-4 shadow-xs flex flex-col justify-between"
+          className="bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-2xl p-5 space-y-4 shadow-xs flex flex-col justify-between"
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -248,7 +327,7 @@ export function ManagementCardGridSkeleton({ count = 6 }: { count?: number }) {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-border-theme flex items-center justify-between">
+          <div className="pt-4 border-t border-black/10 dark:border-white/10 flex items-center justify-between">
             <div className="w-24 h-3 bg-slate-200 dark:bg-white/[0.04] rounded" />
             <div className="flex gap-1.5">
               <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-white/[0.04]" />
@@ -267,7 +346,7 @@ export function ManagementListSkeleton({ count = 5 }: { count?: number }) {
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="bg-surface-theme border border-border-theme rounded-xl p-4 flex items-center justify-between gap-4 shadow-xs"
+          className="bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-xl p-4 flex items-center justify-between gap-4 shadow-xs"
         >
           <div className="flex items-center gap-3.5 flex-1 min-w-0">
             <div className="w-11 h-11 rounded-full bg-slate-200 dark:bg-white/[0.06] flex-shrink-0" />
