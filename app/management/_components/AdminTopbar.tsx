@@ -36,7 +36,7 @@ export default function AdminTopbar({
   })
 
   return (
-    <header className="sticky top-0 z-40 h-14 flex items-center justify-between gap-4 px-4 sm:px-6 bg-white/85 dark:bg-[#0a0e17]/80 backdrop-blur-xl border-b border-black/8 dark:border-white/6 transition-colors duration-200">
+    <header className="flex-shrink-0 z-40 h-14 flex items-center justify-between gap-4 px-4 sm:px-6 bg-white/85 dark:bg-[#0a0e17]/80 backdrop-blur-xl border-b border-black/8 dark:border-white/6 transition-colors duration-200">
       <div className="flex items-center gap-4 min-w-0">
         <button
           onClick={onMenuToggle}

@@ -66,44 +66,54 @@ function normalizeKey(name) {
 }
 
 /**
- * Parse Excel file across all section sheets
+ * Parse Excel file or directory of section Excel files
  */
-function parseExcelFile(filePath) {
-  console.log(`📖 Reading Excel file: ${filePath}`)
-  
-  const workbook = readFile(filePath)
+function parseExcelFile(targetPath) {
+  const isDirectory = fs.statSync(targetPath).isDirectory()
   const uniquePeople = new Map()
-  const sheetNames = workbook.SheetNames.filter(s => s !== 'Master List')
 
-  console.log(`📊 Scanning ${sheetNames.length} individual section sheets...`)
+  if (isDirectory) {
+    console.log(`📁 Reading Excel section files from directory: ${targetPath}`)
+    const files = fs.readdirSync(targetPath).filter(f => /^BS INFO/i.test(f)).sort()
+    console.log(`📊 Found ${files.length} BS INFO section files...`)
 
-  for (const sheet of sheetNames) {
-    const worksheet = workbook.Sheets[sheet]
-    const rows = utils.sheet_to_json(worksheet, { header: 1 })
-    
-    // Parse year level and section from sheet name (e.g., "BS INFO 1-A", "BSIT 1-A")
-    const match = sheet.match(/(\d+)-([A-E])/i)
-    if (!match) continue
+    for (const file of files) {
+      const fullPath = path.join(targetPath, file)
+      const workbook = readFile(fullPath)
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows = utils.sheet_to_json(sheet, { header: 1 })
 
-    const yearLevelNum = parseInt(match[1], 10)
-    const sectionLetter = match[2].toUpperCase()
+      const match = file.match(/BS INFO\s*(\d)\s*([A-E])/i)
+      if (!match) continue
+      const yearLevelNum = parseInt(match[1], 10)
+      const sectionLetter = match[2].toUpperCase()
 
-    rows.slice(1).forEach((r) => {
-      let studentNo = ''
-      let fullName = ''
+      let foundHeader = false
+      let studentNoCol = 1
+      let nameCol = 2
 
-      r.forEach(cell => {
-        const str = String(cell || '').trim()
-        if (/^\d{4}-/i.test(str)) studentNo = str
-      })
-      r.forEach(cell => {
-        const str = String(cell || '').trim()
-        if (str && !/^\d+$/.test(str) && !/^\d{4}-/i.test(str)) fullName = str
-      })
+      for (let r = 0; r < rows.length; r++) {
+        const row = rows[r]
+        if (!row || row.length === 0) continue
 
-      if (fullName) {
+        if (!foundHeader) {
+          const rowStr = row.map(c => String(c || '').trim()).join(' ')
+          if (/Student No/i.test(rowStr) && /Name/i.test(rowStr)) {
+            foundHeader = true
+            row.forEach((cell, idx) => {
+              if (/Student No/i.test(String(cell))) studentNoCol = idx
+              if (/Name/i.test(String(cell))) nameCol = idx
+            })
+          }
+          continue
+        }
+
+        const studentNo = String(row[studentNoCol] || '').trim()
+        const fullName = String(row[nameCol] || '').trim()
+
+        if (!fullName || ['male', 'female', 'total', 'name'].includes(fullName.toLowerCase())) continue
+
         const key = normalizeKey(fullName)
-        // Keep first occurrence (primary cohort)
         if (!uniquePeople.has(key)) {
           uniquePeople.set(key, {
             originalStudentNo: studentNo,
@@ -114,11 +124,59 @@ function parseExcelFile(filePath) {
             year_section: `BSIT ${yearLevelNum}-${sectionLetter}`,
             program: 'BSIT',
             is_active: true,
-            sheet,
+            sheet: file,
           })
         }
       }
-    })
+    }
+  } else {
+    console.log(`📖 Reading Excel file: ${targetPath}`)
+    const workbook = readFile(targetPath)
+    const sheetNames = workbook.SheetNames.filter(s => s !== 'Master List')
+
+    console.log(`📊 Scanning ${sheetNames.length} individual section sheets...`)
+
+    for (const sheet of sheetNames) {
+      const worksheet = workbook.Sheets[sheet]
+      const rows = utils.sheet_to_json(worksheet, { header: 1 })
+      
+      const match = sheet.match(/(\d+)-([A-E])/i)
+      if (!match) continue
+
+      const yearLevelNum = parseInt(match[1], 10)
+      const sectionLetter = match[2].toUpperCase()
+
+      rows.slice(1).forEach((r) => {
+        let studentNo = ''
+        let fullName = ''
+
+        r.forEach(cell => {
+          const str = String(cell || '').trim()
+          if (/^\d{4}-/i.test(str)) studentNo = str
+        })
+        r.forEach(cell => {
+          const str = String(cell || '').trim()
+          if (str && !/^\d+$/.test(str) && !/^\d{4}-/i.test(str)) fullName = str
+        })
+
+        if (fullName) {
+          const key = normalizeKey(fullName)
+          if (!uniquePeople.has(key)) {
+            uniquePeople.set(key, {
+              originalStudentNo: studentNo,
+              full_name: fullName,
+              full_name_normalized: normalizeStudentName(fullName),
+              year_level: yearLevelNum,
+              section: sectionLetter,
+              year_section: `BSIT ${yearLevelNum}-${sectionLetter}`,
+              program: 'BSIT',
+              is_active: true,
+              sheet,
+            })
+          }
+        }
+      })
+    }
   }
 
   // Fallback: If no individual section sheets, fall back to Sheet 0
@@ -273,12 +331,18 @@ async function importStudents(students) {
  */
 async function main() {
   const args = process.argv.slice(2)
-  let excelFilePath = args[0] || path.join(__dirname, 'University_of_Antique_Master_Class_List.xlsx')
-  
-  if (!fs.existsSync(excelFilePath)) {
-    const downloadsFallback = 'C:\\Users\\BONFIRE BASE\\Downloads\\University_of_Antique_Master_Class_List.xlsx'
-    if (fs.existsSync(downloadsFallback)) {
-      excelFilePath = downloadsFallback
+  let excelFilePath = args[0]
+  if (!excelFilePath) {
+    const ccisDir = 'C:\\Users\\BONFIRE BASE\\Downloads\\ccisstudentslist20262027'
+    const masterFile = path.join(__dirname, 'University_of_Antique_Master_Class_List.xlsx')
+    const downloadsMaster = 'C:\\Users\\BONFIRE BASE\\Downloads\\University_of_Antique_Master_Class_List.xlsx'
+
+    if (fs.existsSync(ccisDir)) {
+      excelFilePath = ccisDir
+    } else if (fs.existsSync(masterFile)) {
+      excelFilePath = masterFile
+    } else if (fs.existsSync(downloadsMaster)) {
+      excelFilePath = downloadsMaster
     }
   }
 

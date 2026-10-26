@@ -65,9 +65,9 @@ export default function AdminSidebar() {
     <aside
       className={`
         hidden lg:flex flex-col flex-shrink-0
-        h-screen sticky top-0
+        h-full
         bg-white dark:bg-[#0a0e17] border-r border-black/8 dark:border-white/6
-        transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+        transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
         ${collapsed ? 'w-[64px]' : 'w-[252px]'}
       `}
     >

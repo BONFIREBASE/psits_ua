@@ -47,14 +47,14 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-100 dark:bg-[#0a0e17] text-slate-900 dark:text-white transition-colors duration-200">
+    <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-[#0a0e17] text-slate-900 dark:text-white transition-colors duration-200">
       <AdminSidebar />
       <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         <AdminTopbar onMenuToggle={() => setMobileOpen((o) => !o)} />
-        <div className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto min-h-0">
           {children}
-        </div>
+        </main>
       </div>
     </div>
   )

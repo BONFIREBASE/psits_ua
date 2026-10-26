@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   RefreshCw,
   UserCheck,
+  GraduationCap,
 } from 'lucide-react'
 import { inputStyles } from '../_components/FormField'
 import { DuesTableSkeleton, DuesPageSkeleton } from '../_components/SkeletonPreloader'
@@ -25,6 +26,7 @@ import {
   createStudentAction,
   updateStudentAction,
   deleteStudentAction,
+  graduateStudentsAction,
   type StudentRegistryData,
   type StudentRegistryStudent,
 } from './actions'
@@ -70,10 +72,15 @@ export default function StudentDirectoryView({
   const [sortAsc, setSortAsc] = useState(true)
 
   // CRUD Modal States
-  const [showModal, setShowModal] = useState<'add' | 'edit' | null>(null)
+  const [showModal, setShowModal] = useState<'add' | 'edit' | 'graduate' | null>(null)
   const [selectedStudent, setSelectedStudent] = useState<StudentRegistryStudent | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<StudentRegistryStudent | null>(null)
   const [deleteType, setDeleteType] = useState<'archive' | 'permanent'>('archive')
+
+  // Graduation / Alumni States
+  const [selectedGraduates, setSelectedGraduates] = useState<string[]>([])
+  const [graduateSearch, setGraduateSearch] = useState('')
+  const [isGraduating, setIsGraduating] = useState(false)
 
   // Form Fields
   const [formStudentNo, setFormStudentNo] = useState('')
@@ -125,6 +132,52 @@ export default function StudentDirectoryView({
     setFormSection(student.section)
     setFormIsActive(student.is_active ?? true)
     setShowModal('edit')
+  }
+
+  // Open Graduation Modal
+  const handleOpenGraduateModal = () => {
+    const fourthYears = (data?.students || []).filter(
+      (s) => s.year_level === 4 && s.is_active !== false
+    )
+    setSelectedGraduates(fourthYears.map((s) => s.id))
+    setGraduateSearch('')
+    setShowModal('graduate')
+  }
+
+  const handleToggleGraduate = (id: string) => {
+    setSelectedGraduates((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    )
+  }
+
+  const handleToggleAllGraduates = (allIds: string[]) => {
+    if (selectedGraduates.length === allIds.length) {
+      setSelectedGraduates([])
+    } else {
+      setSelectedGraduates(allIds)
+    }
+  }
+
+  const handleConfirmGraduate = async () => {
+    if (selectedGraduates.length === 0) {
+      toast('Please select at least one student to graduate', 'error')
+      return
+    }
+    setIsGraduating(true)
+    try {
+      const res = await graduateStudentsAction({ studentIds: selectedGraduates })
+      if (res.success && res.data) {
+        toast(`✓ Successfully archived ${res.data.count} graduating students as Alumni`, 'success')
+        setShowModal(null)
+        await loadData()
+      } else {
+        toast(res.error || 'Failed to archive graduating students', 'error')
+      }
+    } catch {
+      toast('Failed to archive graduating students', 'error')
+    } finally {
+      setIsGraduating(false)
+    }
   }
 
   // Handle Quick Reactivate for Returning / Moved-In Student
@@ -394,35 +447,6 @@ export default function StudentDirectoryView({
               />
             </div>
           </div>
-
-          <div className="hidden lg:block w-px h-8 bg-black/5 dark:bg-white/10" />
-
-          {/* Quick Year Level Distribution (scrollable pills on mobile) */}
-          <div className="col-span-2 lg:col-span-auto flex items-center gap-1.5 order-4 overflow-x-auto pb-0.5 no-scrollbar w-full lg:w-auto">
-            {data.stats.byYearLevel.map((yl) => {
-              const isSelected = selectedYearLevel === String(yl.year)
-              return (
-                <button
-                  key={yl.year}
-                  onClick={() => {
-                    setSelectedYearLevel(isSelected ? 'all' : String(yl.year))
-                    setSelectedSection('all')
-                  }}
-                  className={`px-2.5 py-1.5 rounded-lg border text-left transition-all cursor-pointer shrink-0 ${
-                    isSelected
-                      ? 'border-gold bg-gold/10 text-gold-dark dark:text-gold font-bold shadow-xs'
-                      : 'border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] text-slate-600 dark:text-white/60 hover:border-black/15 dark:hover:border-white/15'
-                  }`}
-                  title={`Filter Year ${yl.year}`}
-                >
-                  <span className="text-[10px] font-mono uppercase block leading-none">
-                    Y{yl.year}
-                  </span>
-                  <span className="text-xs font-bold font-mono">{yl.count}</span>
-                </button>
-              )
-            })}
-          </div>
         </div>
       )}
 
@@ -453,15 +477,28 @@ export default function StudentDirectoryView({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={handleOpenAdd}
-            className="h-9.5 px-3.5 rounded-xl text-xs font-mono uppercase tracking-wider font-bold bg-gold hover:bg-gold-light text-black flex items-center gap-1.5 shadow-xs transition-all shrink-0 cursor-pointer active:scale-98"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Student</span>
-            <span className="sm:hidden">Add</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleOpenGraduateModal}
+              className="h-9.5 px-3 rounded-xl text-xs font-mono uppercase tracking-wider font-bold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 shadow-xs transition-all cursor-pointer active:scale-98"
+              title="Archive graduating 4th-year class as Alumni"
+            >
+              <GraduationCap className="w-4 h-4" />
+              <span className="hidden sm:inline">Graduate Class</span>
+              <span className="sm:hidden">Graduate</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenAdd}
+              className="h-9.5 px-3.5 rounded-xl text-xs font-mono uppercase tracking-wider font-bold bg-gold hover:bg-gold-light text-black flex items-center gap-1.5 shadow-xs transition-all shrink-0 cursor-pointer active:scale-98"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Student</span>
+              <span className="sm:hidden">Add</span>
+            </button>
+          </div>
         </div>
 
         {/* Filter Controls Row (touch-friendly horizontal slider on mobile) */}
@@ -1053,6 +1090,157 @@ export default function StudentDirectoryView({
           </div>
         </div>
       )}
+
+      {/* Graduate 4th-Year Class Modal */}
+      {showModal === 'graduate' && (() => {
+        const fourthYears = (data?.students || []).filter(
+          (s) => s.year_level === 4 && s.is_active !== false
+        )
+        const filteredFourthYears = fourthYears.filter((s) => {
+          if (!graduateSearch.trim()) return true
+          const q = graduateSearch.toLowerCase()
+          return (
+            s.full_name.toLowerCase().includes(q) ||
+            s.student_no.toLowerCase().includes(q) ||
+            s.year_section.toLowerCase().includes(q)
+          )
+        })
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white dark:bg-[#121212] border border-black/10 dark:border-white/10 rounded-2xl max-w-xl w-full p-5 space-y-4 shadow-2xl relative my-8">
+              <button
+                type="button"
+                onClick={() => setShowModal(null)}
+                className="absolute right-4 top-4 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                  <GraduationCap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white font-mono uppercase tracking-wide">
+                    Graduate 4th-Year Class
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-white/50 font-mono">
+                    Soft-archive graduating students into the Alumni Roster
+                  </p>
+                </div>
+              </div>
+
+              {/* Informational banner */}
+              <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs font-mono space-y-1">
+                <div className="font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
+                  <span>Audit & Financial Protection Active</span>
+                </div>
+                <p className="text-[11px] text-indigo-600/90 dark:text-indigo-300/80 leading-relaxed">
+                  Marking graduates as <strong>Alumni (Inactive)</strong> removes them from active enrollment tallies while permanently preserving 100% of their historical payment receipts, polo shirt votes, and store orders.
+                </p>
+              </div>
+
+              {/* Selection Bar & Quick Search */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-600 dark:text-white/70">
+                    Selected: <strong>{selectedGraduates.length}</strong> of {fourthYears.length} graduates
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAllGraduates(fourthYears.map((s) => s.id))}
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer"
+                  >
+                    {selectedGraduates.length === fourthYears.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search 4th-year students to exclude/include..."
+                    value={graduateSearch}
+                    onChange={(e) => setGraduateSearch(e.target.value)}
+                    className={`${inputStyles} pl-8.5 text-xs h-8.5 rounded-lg font-mono`}
+                  />
+                </div>
+              </div>
+
+              {/* Student Checklist Container */}
+              <div className="max-h-60 overflow-y-auto rounded-xl border border-black/10 dark:border-white/10 p-2 space-y-1 divide-y divide-black/5 dark:divide-white/5">
+                {filteredFourthYears.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-slate-400 font-mono">
+                    No matching 4th-year students found.
+                  </div>
+                ) : (
+                  filteredFourthYears.map((student) => {
+                    const isSelected = selectedGraduates.includes(student.id)
+                    return (
+                      <label
+                        key={student.id}
+                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-indigo-500/5 dark:bg-indigo-500/10'
+                            : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleGraduate(student.id)}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                              {student.full_name}
+                            </p>
+                            <p className="text-[10px] font-mono text-slate-500 dark:text-white/40">
+                              {student.student_no} • {student.year_section}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 text-slate-600 dark:text-white/60 shrink-0">
+                          {student.year_section}
+                        </span>
+                      </label>
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-black/10 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(null)}
+                  className="px-4 h-9 rounded-lg text-xs font-mono uppercase text-slate-600 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isGraduating || selectedGraduates.length === 0}
+                  onClick={handleConfirmGraduate}
+                  className="px-4 h-9 rounded-lg text-xs font-mono uppercase font-bold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  {isGraduating ? (
+                    <span>Processing...</span>
+                  ) : (
+                    <span>Graduate ({selectedGraduates.length}) Students</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
+

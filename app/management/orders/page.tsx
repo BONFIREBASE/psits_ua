@@ -125,8 +125,8 @@ export default function MerchOrdersManagementPage() {
     const token =
       typeof window !== "undefined"
         ? localStorage.getItem("psits_mgmt_token") ||
-          sessionStorage.getItem("psits_mgmt_token") ||
-          ""
+        sessionStorage.getItem("psits_mgmt_token") ||
+        ""
         : "";
 
     async function load() {
@@ -583,235 +583,235 @@ export default function MerchOrdersManagementPage() {
               </p>
             </div>
           ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-black/10 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] text-slate-500 dark:text-slate-400 font-mono uppercase text-[10px] tracking-wider">
-                  <th className="py-3 px-4">Student</th>
-                  <th className="py-3 px-4">Course & Section</th>
-                  <th className="py-3 px-4 text-center">Size</th>
-                  <th className="py-3 px-4">Amount</th>
-                  <th className="py-3 px-4 text-center">Receipt</th>
-                  <th className="py-3 px-4">Payment</th>
-                  <th className="py-3 px-4">Order Pipeline Status</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5 dark:divide-white/5 font-body">
-                {filteredOrders.map((order) => {
-                  const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.processing;
-                  const StatusIcon = cfg.icon;
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-black/10 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] text-slate-500 dark:text-slate-400 font-mono uppercase text-[10px] tracking-wider">
+                    <th className="py-3 px-4">Student</th>
+                    <th className="py-3 px-4">Course & Section</th>
+                    <th className="py-3 px-4 text-center">Size</th>
+                    <th className="py-3 px-4">Amount</th>
+                    <th className="py-3 px-4 text-center">Receipt</th>
+                    <th className="py-3 px-4">Payment</th>
+                    <th className="py-3 px-4">Order Pipeline Status</th>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/5 dark:divide-white/5 font-body">
+                  {filteredOrders.map((order) => {
+                    const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.processing;
+                    const StatusIcon = cfg.icon;
 
-                  return (
-                    <tr
-                      key={order.id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors"
-                    >
-                      {/* Student Info */}
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900 dark:text-white font-display text-[13px]">
-                          {order.student_name}
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
-                          <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                          <span>{order.student_email}</span>
-                        </div>
-                        {order.contact_number && (
+                    return (
+                      <tr
+                        key={order.id}
+                        className="hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors"
+                      >
+                        {/* Student Info */}
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-slate-900 dark:text-white font-display text-[13px]">
+                            {order.student_name}
+                          </div>
                           <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
-                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{order.contact_number}</span>
+                            <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{order.student_email}</span>
                           </div>
-                        )}
-                        {order.notes && (
-                          <div className="mt-1 text-[11px] text-slate-700 dark:text-slate-300 italic bg-slate-100 dark:bg-white/[0.04] border border-black/5 dark:border-white/5 p-1.5 rounded max-w-xs">
-                            &ldquo;{order.notes}&rdquo;
+                          {order.contact_number && (
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                              <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span>{order.contact_number}</span>
+                            </div>
+                          )}
+                          {order.notes && (
+                            <div className="mt-1 text-[11px] text-slate-700 dark:text-slate-300 italic bg-slate-100 dark:bg-white/[0.04] border border-black/5 dark:border-white/5 p-1.5 rounded max-w-xs">
+                              &ldquo;{order.notes}&rdquo;
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Course / Year */}
+                        <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
+                          {order.course_year ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-white/[0.04] border border-black/10 dark:border-white/10">
+                              <GraduationCap className="w-3 h-3" />
+                              <span>{order.course_year}</span>
+                            </span>
+                          ) : (
+                            <span className="opacity-50">—</span>
+                          )}
+                        </td>
+
+                        {/* Size */}
+                        <td className="py-3 px-4 text-center">
+                          <span className="inline-block px-2.5 py-1 rounded-md font-mono font-bold text-xs bg-gold/15 text-gold border border-gold/30">
+                            {order.size}
+                          </span>
+                        </td>
+
+                        {/* Amount */}
+                        <td className="py-3 px-4 font-mono font-semibold text-slate-900 dark:text-white text-[12px]">
+                          ₱{order.total_amount || 475}
+                        </td>
+
+                        {/* Receipt */}
+                        <td className="py-3 px-4 text-center">
+                          {order.receipt_key &&
+                            order.receipt_key !== "pending_upload" &&
+                            order.receipt_url &&
+                            order.receipt_url !== "/api/merch/orders/pending" ? (
+                            <button
+                              onClick={() => {
+                                setSelectedReceiptOrder(order);
+                                setReceiptImageLoading(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium bg-white dark:bg-[#0a0e17] border border-black/10 dark:border-white/10 hover:border-gold text-slate-900 dark:text-white hover:text-gold transition-colors cursor-pointer shadow-xs"
+                              title="Inspect uploaded payment receipt"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>Inspect</span>
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-mono text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                              Awaiting
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Payment Verification Status */}
+                        <td className="py-3 px-4">
+                          {order.payment_status === "verified" ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-medium">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Verified</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-600 dark:text-amber-400 font-medium">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>Pending</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Pipeline Status Dropdown */}
+                        <td className="py-3 px-4">
+                          <div className="relative inline-flex items-center gap-1.5">
+                            <StatusIcon className={`w-3.5 h-3.5 ${cfg.text} shrink-0`} />
+                            <select
+                              value={order.status}
+                              disabled={updatingId === order.id}
+                              onChange={(e) =>
+                                handleUpdateStatus(
+                                  order.id,
+                                  e.target.value as MerchOrderStatus,
+                                  e.target.value === "ordered" || e.target.value === "ready_for_pickup"
+                                    ? "verified"
+                                    : undefined
+                                )
+                              }
+                              className={`px-2.5 py-1 rounded-lg text-xs font-mono font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border} focus:outline-none cursor-pointer disabled:opacity-50`}
+                            >
+                              <option value="processing" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">Processing</option>
+                              <option value="ordered" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">Ordered (Production)</option>
+                              <option value="ready_for_pickup" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">Ready for Pick Up</option>
+                              <option value="completed" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">Completed / Claimed</option>
+                              <option value="cancelled" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">Cancelled</option>
+                            </select>
                           </div>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Course / Year */}
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
-                        {order.course_year ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-white/[0.04] border border-black/10 dark:border-white/10">
-                            <GraduationCap className="w-3 h-3" />
-                            <span>{order.course_year}</span>
-                          </span>
-                        ) : (
-                          <span className="opacity-50">—</span>
-                        )}
-                      </td>
+                        {/* Date */}
+                        <td className="py-3 px-4 text-[11px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                          {new Date(order.created_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </td>
 
-                      {/* Size */}
-                      <td className="py-3 px-4 text-center">
-                        <span className="inline-block px-2.5 py-1 rounded-md font-mono font-bold text-xs bg-gold/15 text-gold border border-gold/30">
-                          {order.size}
-                        </span>
-                      </td>
-
-                      {/* Amount */}
-                      <td className="py-3 px-4 font-mono font-semibold text-slate-900 dark:text-white text-[12px]">
-                        ₱{order.total_amount || 475}
-                      </td>
-
-                      {/* Receipt */}
-                      <td className="py-3 px-4 text-center">
-                        {order.receipt_key &&
-                        order.receipt_key !== "pending_upload" &&
-                        order.receipt_url &&
-                        order.receipt_url !== "/api/merch/orders/pending" ? (
-                          <button
-                            onClick={() => {
-                              setSelectedReceiptOrder(order);
-                              setReceiptImageLoading(true);
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium bg-white dark:bg-[#0a0e17] border border-black/10 dark:border-white/10 hover:border-gold text-slate-900 dark:text-white hover:text-gold transition-colors cursor-pointer shadow-xs"
-                            title="Inspect uploaded payment receipt"
-                          >
-                            <Eye className="w-3 h-3" />
-                            <span>Inspect</span>
-                          </button>
-                        ) : (
-                          <span className="text-[10px] font-mono text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
-                            Awaiting
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Payment Verification Status */}
-                      <td className="py-3 px-4">
-                        {order.payment_status === "verified" ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-medium">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Verified</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-600 dark:text-amber-400 font-medium">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>Pending</span>
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Pipeline Status Dropdown */}
-                      <td className="py-3 px-4">
-                        <div className="relative inline-flex items-center gap-1.5">
-                          <StatusIcon className={`w-3.5 h-3.5 ${cfg.text} shrink-0`} />
-                          <select
-                            value={order.status}
-                            disabled={updatingId === order.id}
-                            onChange={(e) =>
-                              handleUpdateStatus(
-                                order.id,
-                                e.target.value as MerchOrderStatus,
-                                e.target.value === "ordered" || e.target.value === "ready_for_pickup"
-                                  ? "verified"
-                                  : undefined
-                              )
-                            }
-                            className={`px-2.5 py-1 rounded-lg text-xs font-mono font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border} focus:outline-none cursor-pointer disabled:opacity-50`}
-                          >
-                            <option value="processing" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">Processing</option>
-                            <option value="ordered" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">Ordered (Production)</option>
-                            <option value="ready_for_pickup" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">Ready for Pick Up</option>
-                            <option value="completed" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">Completed / Claimed</option>
-                            <option value="cancelled" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">Cancelled</option>
-                          </select>
-                        </div>
-                      </td>
-
-                      {/* Date */}
-                      <td className="py-3 px-4 text-[11px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                        {new Date(order.created_at).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* Edit Button */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingOrder(order);
-                              setEditFormData({
-                                size: order.size,
-                                quantity: order.quantity,
-                                total_amount: order.total_amount,
-                                course_year: order.course_year || "",
-                                contact_number: order.contact_number || "",
-                                notes: order.notes || "",
-                                status: order.status,
-                                payment_status: order.payment_status,
-                              });
-                              setEditError(null);
-                            }}
-                            className="p-1.5 rounded-lg border border-black/10 dark:border-white/10 hover:border-gold/50 bg-slate-50 dark:bg-white/[0.04] hover:bg-slate-100 dark:hover:bg-white/[0.08] text-slate-900 dark:text-white transition-colors cursor-pointer"
-                            title="Edit Order Details"
-                          >
-                            <Pencil className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 hover:text-gold" />
-                          </button>
-
-                          {/* Delete Button */}
-                          <button
-                            type="button"
-                            onClick={() => setDeletingOrder(order)}
-                            className="p-1.5 rounded-lg border border-rose-500/20 hover:border-rose-500/50 bg-rose-500/5 hover:bg-rose-500/15 text-rose-500 transition-colors cursor-pointer"
-                            title="Delete Order Permanently"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-
-                          {order.payment_status !== "verified" && (
+                        {/* Actions */}
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Edit Button */}
                             <button
-                              onClick={() =>
-                                handleUpdateStatus(order.id, order.status, "verified")
-                              }
-                              disabled={updatingId === order.id}
-                              className="px-2 py-1 rounded text-[11px] font-mono font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors cursor-pointer"
-                              title="Verify receipt payment"
+                              type="button"
+                              onClick={() => {
+                                setEditingOrder(order);
+                                setEditFormData({
+                                  size: order.size,
+                                  quantity: order.quantity,
+                                  total_amount: order.total_amount,
+                                  course_year: order.course_year || "",
+                                  contact_number: order.contact_number || "",
+                                  notes: order.notes || "",
+                                  status: order.status,
+                                  payment_status: order.payment_status,
+                                });
+                                setEditError(null);
+                              }}
+                              className="p-1.5 rounded-lg border border-black/10 dark:border-white/10 hover:border-gold/50 bg-slate-50 dark:bg-white/[0.04] hover:bg-slate-100 dark:hover:bg-white/[0.08] text-slate-900 dark:text-white transition-colors cursor-pointer"
+                              title="Edit Order Details"
                             >
-                              Verify
+                              <Pencil className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 hover:text-gold" />
                             </button>
-                          )}
-                          {order.status === "processing" && (
+
+                            {/* Delete Button */}
                             <button
-                              onClick={() =>
-                                handleUpdateStatus(order.id, "ordered", "verified")
-                              }
-                              disabled={updatingId === order.id}
-                              className="px-2 py-1 rounded text-[11px] font-mono font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-colors cursor-pointer"
-                              title="Mark as sent to manufacturer"
+                              type="button"
+                              onClick={() => setDeletingOrder(order)}
+                              className="p-1.5 rounded-lg border border-rose-500/20 hover:border-rose-500/50 bg-rose-500/5 hover:bg-rose-500/15 text-rose-500 transition-colors cursor-pointer"
+                              title="Delete Order Permanently"
                             >
-                              Order
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                          )}
-                          {order.status === "ordered" && (
-                            <button
-                              onClick={() =>
-                                handleUpdateStatus(order.id, "ready_for_pickup")
-                              }
-                              disabled={updatingId === order.id}
-                              className="px-2 py-1 rounded text-[11px] font-mono font-medium bg-purple-500/10 text-purple-600 dark:text-purple-300 hover:bg-purple-500/20 border border-purple-500/20 transition-colors cursor-pointer"
-                              title="Mark as arrived at office ready for pickup"
-                            >
-                              Ready
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+
+                            {order.payment_status !== "verified" && (
+                              <button
+                                onClick={() =>
+                                  handleUpdateStatus(order.id, order.status, "verified")
+                                }
+                                disabled={updatingId === order.id}
+                                className="px-2 py-1 rounded text-[11px] font-mono font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors cursor-pointer"
+                                title="Verify receipt payment"
+                              >
+                                Verify
+                              </button>
+                            )}
+                            {order.status === "processing" && (
+                              <button
+                                onClick={() =>
+                                  handleUpdateStatus(order.id, "ordered", "verified")
+                                }
+                                disabled={updatingId === order.id}
+                                className="px-2 py-1 rounded text-[11px] font-mono font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-colors cursor-pointer"
+                                title="Mark as sent to manufacturer"
+                              >
+                                Order
+                              </button>
+                            )}
+                            {order.status === "ordered" && (
+                              <button
+                                onClick={() =>
+                                  handleUpdateStatus(order.id, "ready_for_pickup")
+                                }
+                                disabled={updatingId === order.id}
+                                className="px-2 py-1 rounded text-[11px] font-mono font-medium bg-purple-500/10 text-purple-600 dark:text-purple-300 hover:bg-purple-500/20 border border-purple-500/20 transition-colors cursor-pointer"
+                                title="Mark as arrived at office ready for pickup"
+                              >
+                                Ready
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Receipt Preview Modal */}
@@ -863,9 +863,8 @@ export default function MerchOrdersManagementPage() {
                 {/* Image proxy URL */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`/api/merch/orders/${selectedReceiptOrder.id}/receipt${
-                    getSessionToken() ? `?token=${encodeURIComponent(getSessionToken())}` : ""
-                  }`}
+                  src={`/api/merch/orders/${selectedReceiptOrder.id}/receipt${getSessionToken() ? `?token=${encodeURIComponent(getSessionToken())}` : ""
+                    }`}
                   alt="Student Official Payment Receipt"
                   className="max-w-full max-h-[460px] object-contain rounded-lg"
                   onLoad={() => setReceiptImageLoading(false)}
