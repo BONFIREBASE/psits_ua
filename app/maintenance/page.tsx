@@ -7,41 +7,82 @@ import { Home, Clock } from 'lucide-react'
 import MaintenanceAnimation from '@/components/MaintenanceAnimation'
 import type { MaintenanceConfigData } from '@/lib/maintenance'
 
-export default function MaintenancePage() {
-  const [config, setConfig] = useState<MaintenanceConfigData | null>(null)
+interface MaintenancePageProps {
+  initialConfig?: MaintenanceConfigData | null
+}
+
+interface TimeRemaining {
+  days: number
+  hours: number
+  minutes: number
+  seconds: number
+  total: number
+}
+
+function calculateRemaining(isoTarget: string | null | undefined): TimeRemaining | null {
+  if (!isoTarget) return null
+  const target = new Date(isoTarget).getTime()
+  if (isNaN(target)) return null
+  const now = Date.now()
+  const diff = target - now
+  if (diff <= 0) return null
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+  return { days, hours, minutes, seconds, total: diff }
+}
+
+export default function MaintenancePage({ initialConfig }: MaintenancePageProps = {}) {
+  const [config, setConfig] = useState<MaintenanceConfigData | null>(initialConfig || null)
+  const [remaining, setRemaining] = useState<TimeRemaining | null>(() =>
+    calculateRemaining(initialConfig?.estimated_return)
+  )
 
   useEffect(() => {
-    async function fetchStatus() {
-      try {
-        const res = await fetch('/api/maintenance/status', { cache: 'no-store' })
-        if (res.ok) {
-          const data = await res.json()
-          setConfig(data.config)
+    // Lock body scroll to prevent background scroll bleed on mobile/desktop
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    if (!initialConfig) {
+      async function fetchStatus() {
+        try {
+          const res = await fetch('/api/maintenance/status', { cache: 'no-store' })
+          if (res.ok) {
+            const data = await res.json()
+            setConfig(data.config)
+          }
+        } catch {
+          // Fallback
         }
-      } catch {
-        // Fallback
       }
+      fetchStatus()
     }
-    fetchStatus()
-  }, [])
+
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [initialConfig])
+
+  // Live ticking countdown timer
+  useEffect(() => {
+    const target = config?.estimated_return
+    setRemaining(calculateRemaining(target))
+    if (!target) return
+
+    const timer = setInterval(() => {
+      setRemaining(calculateRemaining(target))
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [config?.estimated_return])
 
   const title = config?.title || 'System Under Scheduled Maintenance'
   const message =
     config?.message ||
     'We are currently performing scheduled maintenance to improve our services.'
-
-  // Specifically formatted for Philippine Standard Time (PST / Asia/Manila, UTC+8)
-  const estimatedReturn = config?.estimated_return
-    ? new Date(config.estimated_return).toLocaleString('en-US', {
-        timeZone: 'Asia/Manila',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      })
-    : null
 
   return (
     <div className="fixed inset-0 z-[9999] bg-canvas text-text flex items-center justify-center p-4 sm:p-6 overflow-hidden select-none">
@@ -73,14 +114,28 @@ export default function MaintenancePage() {
         {/* Animated Construction Site Lottie Graphic */}
         <MaintenanceAnimation />
 
-        {/* Status / Return Time Pill Badge */}
+        {/* Live Countdown Timer Badge */}
         <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-medium bg-gold/10 text-gold border border-gold/25 shadow-sm shrink-0">
-          {estimatedReturn ? (
+          {remaining ? (
             <>
               <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gold shrink-0" />
-              <span>
-                Available again: <strong className="font-semibold text-text">{estimatedReturn}</strong>
-              </span>
+              <span>Available in:</span>
+              <div className="flex items-center gap-1 font-mono font-bold">
+                {remaining.days > 0 && (
+                  <span className="px-1.5 py-0.5 rounded bg-surface border border-card-border">
+                    {remaining.days}d
+                  </span>
+                )}
+                <span className="px-1.5 py-0.5 rounded bg-surface border border-card-border">
+                  {String(remaining.hours).padStart(2, '0')}h
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-surface border border-card-border">
+                  {String(remaining.minutes).padStart(2, '0')}m
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-surface border border-card-border">
+                  {String(remaining.seconds).padStart(2, '0')}s
+                </span>
+              </div>
             </>
           ) : (
             <>

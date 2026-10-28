@@ -90,8 +90,8 @@ export default function MaintenanceRealtimeWatcher() {
   })
 
   if (isSiteWide || isRouteBlocked) {
-    // Render the maintenance overlay in real-time
-    return <MaintenancePage />
+    // Render the maintenance overlay in real-time with cached live config
+    return <MaintenancePage initialConfig={activeConfig} />
   }
 
   return null

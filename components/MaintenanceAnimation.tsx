@@ -21,7 +21,9 @@ export default function MaintenanceAnimation() {
         className="w-full h-full"
         animationClassName="drop-shadow-[0_15px_35px_rgba(245,166,35,0.2)]"
         placeholder={
-          <div className="w-12 h-12 border-2 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+          <div className="w-full h-full rounded-2xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/5 dark:border-white/5 animate-pulse flex items-center justify-center">
+            <div className="w-16 h-16 rounded-xl bg-gold/10 animate-pulse" />
+          </div>
         }
       />
     </div>
