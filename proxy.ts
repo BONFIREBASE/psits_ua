@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { isPathUnderMaintenance } from '@/lib/maintenance'
 
 const ipRequestMap = new Map<string, number[]>()
 
@@ -18,7 +19,7 @@ setInterval(() => {
   }
 }, 60 * 1000)
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (
@@ -38,6 +39,27 @@ export function proxy(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = cleanPath
     return NextResponse.redirect(url, 308)
+  }
+
+  // Maintenance Interceptor
+  try {
+    const { isUnderMaintenance, config } = await isPathUnderMaintenance(pathname)
+    if (isUnderMaintenance) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          {
+            error: config?.message || 'This service is currently undergoing scheduled maintenance.',
+            maintenance: true,
+          },
+          { status: 503 }
+        )
+      }
+      const url = request.nextUrl.clone()
+      url.pathname = '/maintenance'
+      return NextResponse.rewrite(url, { status: 503 })
+    }
+  } catch {
+    // If maintenance check fails, fail open to prevent service disruption
   }
 
   const forwardedFor = request.headers.get('x-forwarded-for')

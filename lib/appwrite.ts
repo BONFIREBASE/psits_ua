@@ -15,6 +15,7 @@ export const APPWRITE_COLLECTIONS = {
   REPORTS: 'reports',
   THREADS: 'threads',
   NOTIFICATIONS: 'notifications',
+  MAINTENANCE: 'maintenance_config',
 } as const
 
 /* ─── Client-Side SDK (Browser, Public Read, WebSockets) ─── */

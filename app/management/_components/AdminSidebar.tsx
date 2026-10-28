@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   Images,
   Receipt,
+  Wrench,
 } from 'lucide-react'
 import { useAuth } from '../_context/auth-context'
 
@@ -48,6 +49,7 @@ const navItems: NavItem[] = [
   { href: '/management/treasury', label: 'Treasury', icon: Landmark, roles: ['admin'] },
   { href: '/management/audit', label: 'Audit Reports', icon: ClipboardCheck, roles: ['admin'] },
   { href: '/management/backup', label: 'Data & Backup', icon: HardDriveDownload, roles: ['admin'] },
+  { href: '/management/maintenance', label: 'Maintenance', icon: Wrench, roles: ['admin'] },
 ]
 
 export default function AdminSidebar() {
