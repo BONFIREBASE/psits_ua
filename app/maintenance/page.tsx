@@ -67,13 +67,24 @@ export default function MaintenancePage() {
         {/* Animated Construction Site Lottie Graphic */}
         <MaintenanceAnimation />
 
-        {/* Status Pill Badge */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-medium bg-gold/10 text-gold border border-gold/25 shadow-sm">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-gold"></span>
-          </span>
-          <span>Maintenance In Progress</span>
+        {/* Status / Return Time Pill Badge */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-gold/10 text-gold border border-gold/25 shadow-sm">
+          {estimatedReturn ? (
+            <>
+              <Clock className="w-3.5 h-3.5 text-gold shrink-0" />
+              <span>
+                Available again: <strong className="font-semibold text-text">{estimatedReturn}</strong>
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-gold"></span>
+              </span>
+              <span>Returning shortly</span>
+            </>
+          )}
         </div>
 
         {/* Text Content */}
@@ -85,16 +96,6 @@ export default function MaintenancePage() {
             {message}
           </p>
         </div>
-
-        {/* Estimated Return Box if configured */}
-        {estimatedReturn && (
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-surface border border-card-border text-xs text-muted">
-            <Clock className="w-3.5 h-3.5 text-gold" />
-            <span>
-              Estimated Return: <strong className="text-text font-medium">{estimatedReturn}</strong>
-            </span>
-          </div>
-        )}
 
         {/* Return Home Action */}
         <div className="pt-2 flex items-center justify-center">
