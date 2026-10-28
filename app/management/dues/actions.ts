@@ -1394,5 +1394,44 @@ export async function deleteStudentAction(payload: {
   }
 }
 
+/**
+ * Batch archive graduating students (Year 4 -> Alumni).
+ * Safely marks students as inactive while preserving 100% of their historical
+ * treasury receipts and orders.
+ */
+export async function graduateStudentsAction(payload: {
+  studentIds: string[]
+}): Promise<DuesActionResult<{ count: number }>> {
+  try {
+    const studentIds = payload.studentIds?.filter(Boolean) || []
 
+    if (studentIds.length === 0) {
+      return { success: false, error: 'No students selected for graduation.' }
+    }
 
+    const { error, data } = await supabaseAdmin
+      .from('students')
+      .update({
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', studentIds)
+      .select('id')
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    await invalidateStudentCaches()
+    revalidatePath('/management/dues')
+    revalidatePath('/dues')
+
+    return {
+      success: true,
+      data: { count: data?.length || studentIds.length },
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to archive graduating students'
+    return { success: false, error: message }
+  }
+}

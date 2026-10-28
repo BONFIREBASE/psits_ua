@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import LayoutShell from "@/components/LayoutShell";
 import { ThemeProvider, themeScript } from "@/components/ThemeProvider";
+import MaintenanceRealtimeWatcher from "@/components/MaintenanceRealtimeWatcher";
 
 const syne = localFont({
   src: "../public/assets/font/Syne/Syne-VariableFont_wght.ttf",
@@ -207,6 +208,7 @@ export default function RootLayout({
       </head>
       <body className="bg-base text-text font-body">
         <ThemeProvider>
+          <MaintenanceRealtimeWatcher />
           <LayoutShell>{children}</LayoutShell>
         </ThemeProvider>
         <Analytics />

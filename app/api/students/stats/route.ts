@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getCache, setCache } from '@/lib/ratelimit'
 
+export const dynamic = 'force-dynamic';
+
 interface StudentStatsPayload {
   totalStudents: number
   totalSections: number

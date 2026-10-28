@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.merch_orders (
   contact_number TEXT,
   item_id TEXT NOT NULL DEFAULT 'polo-2026',
   item_name TEXT NOT NULL DEFAULT 'Official PSITS Polo Shirt (AY 2026–2027) - NEXGEN TECHTORCH',
-  size TEXT NOT NULL CHECK (size IN ('XS', 'S', 'M', 'L', 'XL')),
+  size TEXT NOT NULL CHECK (size IN ('XS', 'S', 'M', 'L', 'XL', 'XXL')),
   quantity INT NOT NULL DEFAULT 1 CHECK (quantity = 1),
   unit_price NUMERIC NOT NULL DEFAULT 475,
   total_amount NUMERIC NOT NULL DEFAULT 475,

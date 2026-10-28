@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   Images,
   Receipt,
+  Wrench,
 } from 'lucide-react'
 import { useAuth } from '../_context/auth-context'
 
@@ -48,6 +49,7 @@ const navItems: NavItem[] = [
   { href: '/management/treasury', label: 'Treasury', icon: Landmark, roles: ['admin'] },
   { href: '/management/audit', label: 'Audit Reports', icon: ClipboardCheck, roles: ['admin'] },
   { href: '/management/backup', label: 'Data & Backup', icon: HardDriveDownload, roles: ['admin'] },
+  { href: '/management/maintenance', label: 'Maintenance', icon: Wrench, roles: ['admin'] },
 ]
 
 export default function AdminSidebar() {
@@ -65,9 +67,9 @@ export default function AdminSidebar() {
     <aside
       className={`
         hidden lg:flex flex-col flex-shrink-0
-        h-screen sticky top-0
+        h-full
         bg-white dark:bg-[#0a0e17] border-r border-black/8 dark:border-white/6
-        transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+        transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
         ${collapsed ? 'w-[64px]' : 'w-[252px]'}
       `}
     >

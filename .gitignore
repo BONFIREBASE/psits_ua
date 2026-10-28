@@ -38,6 +38,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# backups
+scripts/backups/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
@@ -49,3 +52,6 @@ test-*.js
 test-*.ts
 *.local.mjs
 *.local.js
+
+# supabase CLI temp
+supabase/.temp/
