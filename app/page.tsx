@@ -24,9 +24,28 @@ import {
 } from '@/lib/supabase'
 import coverImage from '@/public/assets/cover.jpg'
 
+// Seasonal Halloween campaign ends at the start of November 6, 2026 (GMT+8)
+const HALLOWEEN_EXPIRY = new Date('2026-11-06T00:00:00+08:00').getTime()
+
 export default function HomePage() {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
+  const [isHalloween, setIsHalloween] = useState(() => Date.now() < HALLOWEEN_EXPIRY)
+  const [kasubayStage, setKasubayStage] = useState<'hero' | 'leaping' | 'patrol'>('hero')
+
+  useEffect(() => {
+    setIsHalloween(Date.now() < HALLOWEEN_EXPIRY)
+  }, [])
+
+  useEffect(() => {
+    if (isHalloween) return
+    if (typeof window !== 'undefined' && window.scrollY > 50) {
+      const id = requestAnimationFrame(() => {
+        setKasubayStage('patrol')
+      })
+      return () => cancelAnimationFrame(id)
+    }
+  }, [isHalloween])
   const [dispatches, setDispatches] = useState(socialDispatches)
   const [activeBanners, setActiveBanners] = useState<BannerRow[]>([])
   const [bannersLoading, setBannersLoading] = useState(true)
@@ -40,16 +59,6 @@ export default function HomePage() {
     activeNow: 1,
   })
   const [viewsLoading, setViewsLoading] = useState(false)
-  const [kasubayStage, setKasubayStage] = useState<'hero' | 'leaping' | 'patrol'>('hero')
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.scrollY > 50) {
-      const id = requestAnimationFrame(() => {
-        setKasubayStage('patrol')
-      })
-      return () => cancelAnimationFrame(id)
-    }
-  }, [])
 
   useEffect(() => {
     async function load() {
@@ -245,37 +254,51 @@ export default function HomePage() {
               </span>
             </div>
 
-            <h1 className="font-display font-black text-4xl xs:text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight leading-none mb-6 select-none">
-              <span className="relative inline-block text-slate-950 dark:text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
-                PSITS
-                {isDark && (
-                  <KasubayHeroNest
-                    key="psits-night"
-                    variant="lay-psits"
-                    stage={kasubayStage}
-                    onStartLeap={() => setKasubayStage('leaping')}
-                    onLeapComplete={() => setKasubayStage('patrol')}
-                  />
-                )}
-              </span>{' '}
-              <span className="inline-flex items-baseline whitespace-nowrap">
-                <span className="relative inline-block text-[#F5A623] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
-                  U
-                  {!isDark && (
+            {isHalloween ? (
+              <div className="relative mb-6 select-none flex justify-center items-center w-full max-w-2xl sm:max-w-3xl lg:max-w-4xl px-2">
+                <Image
+                  src="/assets/psits_ua_halloween.png"
+                  alt="PSITS UA"
+                  width={1024}
+                  height={241}
+                  priority
+                  className="w-full h-auto object-contain drop-shadow-[0_4px_20px_rgba(0,0,0,0.35)] dark:drop-shadow-[0_6px_32px_rgba(168,85,247,0.4)]"
+                />
+                <h1 className="sr-only">PSITS UA</h1>
+              </div>
+            ) : (
+              <h1 className="font-display font-black text-4xl xs:text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight leading-none mb-6 select-none">
+                <span className="relative inline-block text-slate-950 dark:text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                  PSITS
+                  {isDark && (
                     <KasubayHeroNest
-                      key="u-day"
-                      variant="sit-u"
+                      key="psits-night"
+                      variant="lay-psits"
                       stage={kasubayStage}
                       onStartLeap={() => setKasubayStage('leaping')}
                       onLeapComplete={() => setKasubayStage('patrol')}
                     />
                   )}
+                </span>{' '}
+                <span className="inline-flex items-baseline whitespace-nowrap">
+                  <span className="relative inline-block text-[#F5A623] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                    U
+                    {!isDark && (
+                      <KasubayHeroNest
+                        key="u-day"
+                        variant="sit-u"
+                        stage={kasubayStage}
+                        onStartLeap={() => setKasubayStage('leaping')}
+                        onLeapComplete={() => setKasubayStage('patrol')}
+                      />
+                    )}
+                  </span>
+                  <span className="text-[#E63946] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                    A
+                  </span>
                 </span>
-                <span className="text-[#E63946] drop-shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
-                  A
-                </span>
-              </span>
-            </h1>
+              </h1>
+            )}
 
             <p className="text-slate-800 dark:text-white/90 text-sm sm:text-base md:text-lg lg:text-xl mb-4 font-normal tracking-wide max-w-3xl drop-shadow-[0_1px_4px_rgba(255,255,255,0.8)] dark:drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] break-words">
               Philippine Society of Information Technology Students — University of Antique
@@ -292,7 +315,7 @@ export default function HomePage() {
       <section className="relative max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 pt-24 sm:pt-14 pb-8 sm:pb-12 lg:py-12">
         <ScrollReveal>
           <div className="relative bg-surface-theme/75 backdrop-blur-md border border-border-theme rounded-2xl p-4 sm:p-6 md:p-8 shadow-xs">
-            <KasubayPatrol isReady={kasubayStage === 'patrol'} />
+            <KasubayPatrol isReady={isHalloween || kasubayStage === 'patrol'} />
             <div className="grid grid-cols-3 divide-x divide-border-theme items-center">
               <div className="text-center px-1 sm:px-4 md:px-8">
                 <p className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-foreground-theme tracking-tight mb-1 whitespace-nowrap pt-1">

@@ -30,6 +30,8 @@ interface KasubayHeroNestProps {
   onStartLeap?: () => void
   onLeapComplete?: () => void
   variant?: KasubayHeroVariant
+  className?: string
+  style?: React.CSSProperties
 }
 
 export default function KasubayHeroNest({
@@ -37,6 +39,8 @@ export default function KasubayHeroNest({
   onStartLeap,
   onLeapComplete,
   variant = 'sit-u',
+  className,
+  style,
 }: KasubayHeroNestProps) {
   // Speculative preload hints for the HTML scanner
   preload('/assets/kasubay/kasubay-cheer.png', { as: 'image' })
@@ -159,10 +163,13 @@ export default function KasubayHeroNest({
 
   return (
     <div
+      style={style}
       className={
+        className || (
         isLayPsits
           ? 'absolute bottom-[68%] xs:bottom-[70%] sm:bottom-[72%] md:bottom-[74%] left-[15%] -translate-x-1/2 pointer-events-auto cursor-pointer z-20 select-none'
           : 'absolute bottom-[20%] xs:bottom-[22%] sm:bottom-[24%] left-1/2 -translate-x-[46%] pointer-events-auto cursor-pointer z-20 select-none'
+        )
       }
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}

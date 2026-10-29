@@ -23,6 +23,23 @@ const browserClient = new BrowserClient()
   .setEndpoint(APPWRITE_ENDPOINT)
   .setProject(APPWRITE_PROJECT_ID)
 
+// Suppress Appwrite SDK non-fatal WebSocket reconnect logs in development
+// Turbopack intercepts all console.error calls and renders a full-screen overlay.
+// Downgrading to console.warn keeps DevTools informative without breaking UI.
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  const originalConsoleError = console.error
+  console.error = (...args: unknown[]) => {
+    if (
+      typeof args[0] === 'string' &&
+      args[0].includes('Realtime got disconnected')
+    ) {
+      console.warn('[Appwrite SDK Realtime]', ...args)
+      return
+    }
+    originalConsoleError.apply(console, args)
+  }
+}
+
 export const appwrite = browserClient
 export const appwriteDatabases = new BrowserDatabases(browserClient)
 export const appwriteStorage = new BrowserStorage(browserClient)
