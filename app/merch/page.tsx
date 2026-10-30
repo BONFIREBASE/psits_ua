@@ -22,6 +22,9 @@ import {
   FileText,
   Plus,
   Users,
+  Lock,
+  Download,
+  CheckCircle2,
 } from "lucide-react";
 import FormalMerchReceipt, { type BulkStudentItem } from "@/components/FormalMerchReceipt";
 import MerchLockWrapper from "@/components/MerchLockWrapper";
@@ -545,6 +548,12 @@ export default function MerchPage() {
   const isFulfilled =
     !isCancelled &&
     (activeOrder?.status === "ready_for_pickup" || activeOrder?.status === "completed");
+  const isReceiptUnlocked =
+    Boolean(activeOrder) &&
+    !isCancelled &&
+    (activeOrder?.status === "ordered" ||
+      activeOrder?.status === "ready_for_pickup" ||
+      activeOrder?.status === "completed");
 
   // Handle switching to mobile order form
   const handleProceedToMobileForm = () => {
@@ -843,10 +852,12 @@ export default function MerchPage() {
                     <button
                       type="button"
                       onClick={() => setShowFormalReceipt(true)}
-                      className="w-full py-3.5 px-4 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
+                      className="w-full py-3.5 px-4 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 active:scale-[0.99]"
                     >
-                      <FileText size={15} />
-                      <span>Download Official PSITS Receipt</span>
+                      <Download size={15} className="sm:hidden" />
+                      <FileText size={15} className="hidden sm:inline" />
+                      <span className="sm:hidden">Download Official Receipt</span>
+                      <span className="hidden sm:inline">View &amp; Print Official Receipt</span>
                     </button>
 
                     <button
@@ -882,13 +893,28 @@ export default function MerchPage() {
                     </p>
                   </div>
 
-                  {/* Informational callout: Official receipt generated */}
-                  <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 text-xs font-mono text-slate-800 dark:text-slate-200 text-left leading-relaxed space-y-1">
-                    <p className="font-bold text-gold">Official PSITS Receipt &amp; Claim Slip Ready</p>
-                    <p className="text-[11px] opacity-90">
-                      Your official receipt and claim slip has been generated. You can view, download, or print it below. Present this receipt when settling your payment and claiming your polo shirt at the PSITS Office.
-                    </p>
-                  </div>
+                  {/* Informational callout: Official receipt status */}
+                  {isReceiptUnlocked ? (
+                    <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 text-xs font-mono text-slate-800 dark:text-slate-200 text-left leading-relaxed space-y-1">
+                      <p className="font-bold text-gold flex items-center gap-1.5">
+                        <CheckCircle2 size={15} className="text-gold" />
+                        <span>Official PSITS Receipt &amp; Claim Slip Ready</span>
+                      </p>
+                      <p className="text-[11px] opacity-90 text-slate-700 dark:text-slate-300">
+                        Your official receipt and claim slip has been generated. You can download or print it below. Present this receipt when settling your payment and claiming your polo shirt at the PSITS Office.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs font-mono text-slate-800 dark:text-slate-200 text-left leading-relaxed space-y-1.5">
+                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold">
+                        <Lock size={15} className="shrink-0" />
+                        <span>Official Receipt Locked · Awaiting Order Status</span>
+                      </div>
+                      <p className="text-[11px] opacity-90 text-slate-600 dark:text-slate-400">
+                        Your order is currently in processing. Your official receipt and claim slip will unlock and become available for download once PSITS officers update your order status to <span className="font-semibold text-amber-600 dark:text-amber-300">&ldquo;Ordered&rdquo;</span>.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-2 font-mono text-xs text-left pt-2 border-t border-border/50">
                     <div className="flex justify-between py-1 border-b border-border/30">
@@ -916,14 +942,28 @@ export default function MerchPage() {
                   </div>
 
                   <div className="space-y-2.5 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowFormalReceipt(true)}
-                      className="w-full py-4 px-6 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(245,166,35,0.3)] flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <FileText size={16} />
-                      <span>View &amp; Print Official Receipt</span>
-                    </button>
+                    {isReceiptUnlocked ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowFormalReceipt(true)}
+                        className="w-full py-4 px-6 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(245,166,35,0.3)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                      >
+                        <Download size={16} className="sm:hidden" />
+                        <FileText size={16} className="hidden sm:inline" />
+                        <span className="sm:hidden">Download Official Receipt</span>
+                        <span className="hidden sm:inline">View &amp; Print Official Receipt</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full py-3.5 px-4 rounded-2xl bg-slate-200/80 dark:bg-white/[0.05] border border-black/10 dark:border-white/10 text-slate-500 dark:text-slate-400 font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed opacity-80"
+                        title="Receipt unlocks once order status is updated to Ordered in the management pipeline"
+                      >
+                        <Lock size={15} />
+                        <span>Receipt Unlocks at &ldquo;Ordered&rdquo; Status</span>
+                      </button>
+                    )}
 
                     {hasReceipt && (
                       <button
@@ -1616,7 +1656,7 @@ export default function MerchPage() {
         )}
 
         {/* MODAL: OFFICIAL PSITS GENERATED RECEIPT */}
-        {showFormalReceipt && activeOrder && (
+        {showFormalReceipt && activeOrder && isReceiptUnlocked && (
           <FormalMerchReceipt
             order={activeOrder}
             onClose={() => setShowFormalReceipt(false)}

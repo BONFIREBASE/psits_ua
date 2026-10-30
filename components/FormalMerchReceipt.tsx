@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Image from 'next/image'
-import { Printer, X, CheckCircle2, ShieldCheck, Shirt, AlertCircle, Users } from 'lucide-react'
+import { Printer, Download, X, CheckCircle2, ShieldCheck, Shirt, AlertCircle, Users } from 'lucide-react'
 import type { MerchOrderRow } from '@/lib/supabase'
 
 export interface BulkStudentItem {
@@ -114,10 +114,12 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
             type="button"
             onClick={handlePrint}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-gold text-[#0D1117] font-mono font-bold text-xs shadow-xl hover:bg-gold-light transition-all cursor-pointer active:scale-95"
-            title="Print receipt or save as PDF formatted for A4 paper"
+            title="Download PDF or print receipt formatted for A4 paper"
           >
-            <Printer size={15} />
-            <span>Print / Save PDF (A4)</span>
+            <Download size={15} className="sm:hidden" />
+            <Printer size={15} className="hidden sm:inline" />
+            <span className="sm:hidden">Download PDF</span>
+            <span className="hidden sm:inline">Print / Save PDF (A4)</span>
           </button>
 
           {onClose && (

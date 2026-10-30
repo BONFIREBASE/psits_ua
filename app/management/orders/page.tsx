@@ -21,6 +21,7 @@ import {
   AlertCircle,
   FileText,
   Users,
+  Lock,
 } from "lucide-react";
 import FormalMerchReceipt from "@/components/FormalMerchReceipt";
 import type { MerchOrderRow, MerchOrderStatus, MerchPaymentStatus, PoloShirtSize } from "@/lib/supabase";
@@ -694,32 +695,51 @@ export default function MerchOrdersManagementPage() {
 
                         {/* Receipt */}
                         <td className="py-3 px-4 text-center">
-                          <div className="inline-flex items-center gap-1.5 justify-center">
-                            <button
-                              type="button"
-                              onClick={() => setShowOfficialReceipt(order)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-gold/15 hover:bg-gold/25 border border-gold/30 text-gold transition-colors cursor-pointer shadow-xs"
-                              title="View official generated PSITS receipt & claim slip"
-                            >
-                              <FileText className="w-3 h-3" />
-                              <span>Official Slip</span>
-                            </button>
-
-                            {order.receipt_key &&
-                              order.receipt_key !== "pending_upload" &&
-                              order.receipt_url &&
-                              order.receipt_url !== "/api/merch/orders/pending" && (
+                          <div className="inline-flex flex-col items-center gap-1 justify-center">
+                            <div className="inline-flex items-center gap-1.5 justify-center">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setSelectedReceiptOrder(order);
-                                  setReceiptImageLoading(true);
-                                }}
-                                className="p-1 rounded-md text-slate-400 hover:text-foreground-theme hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                title="Inspect uploaded photo"
+                                onClick={() => setShowOfficialReceipt(order)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-gold/15 hover:bg-gold/25 border border-gold/30 text-gold transition-colors cursor-pointer shadow-xs"
+                                title="View official generated PSITS receipt & claim slip"
                               >
-                                <Eye className="w-3.5 h-3.5" />
+                                <FileText className="w-3 h-3" />
+                                <span>Official Slip</span>
                               </button>
+
+                              {order.receipt_key &&
+                                order.receipt_key !== "pending_upload" &&
+                                order.receipt_url &&
+                                order.receipt_url !== "/api/merch/orders/pending" && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedReceiptOrder(order);
+                                    setReceiptImageLoading(true);
+                                  }}
+                                  className="p-1 rounded-md text-slate-400 hover:text-foreground-theme hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                  title="Inspect uploaded photo"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                            {order.status === "processing" ? (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-500/90 font-medium"
+                                title="Student cannot view receipt until order status is set to Ordered"
+                              >
+                                <Lock className="w-2.5 h-2.5" />
+                                <span>Locked for Student</span>
+                              </span>
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-500/90 font-medium"
+                                title="Student can view/download receipt on portal"
+                              >
+                                <CheckCircle2 className="w-2.5 h-2.5" />
+                                <span>Unlocked for Student</span>
+                              </span>
                             )}
                           </div>
                         </td>
