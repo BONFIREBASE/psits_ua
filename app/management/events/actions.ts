@@ -4,6 +4,16 @@ import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase';
 import { calendarActivities } from '@/data/events';
 
+function normalizeEventStatus(rawStatus: string | null | undefined): 'Upcoming' | 'Ongoing' | 'Completed' | 'Cancelled' {
+  if (!rawStatus) return 'Upcoming';
+  const s = rawStatus.trim().toLowerCase();
+  if (s === 'scheduled' || s === 'upcoming') return 'Upcoming';
+  if (s === 'ongoing' || s === 'live' || s === 'in progress') return 'Ongoing';
+  if (s === 'completed' || s === 'done' || s === 'past') return 'Completed';
+  if (s === 'cancelled' || s === 'canceled' || s === 'postponed') return 'Cancelled';
+  return 'Upcoming';
+}
+
 export async function createEventAction(formData: FormData) {
   try {
     const title = (formData.get('title') as string)?.trim();
@@ -12,7 +22,8 @@ export async function createEventAction(formData: FormData) {
     const location = (formData.get('location') as string)?.trim() || 'CCIS Building';
     const category = (formData.get('category') as string)?.trim() || 'Department';
     const description = (formData.get('description') as string)?.trim() || '';
-    const status = (formData.get('status') as string)?.trim() || 'Upcoming';
+    const rawStatus = (formData.get('status') as string)?.trim();
+    const status = normalizeEventStatus(rawStatus);
 
     if (!title || !date) {
       return { success: false, error: 'Title and date are required.' };
@@ -51,7 +62,8 @@ export async function updateEventAction(id: string, formData: FormData) {
     const location = (formData.get('location') as string)?.trim() || 'CCIS Building';
     const category = (formData.get('category') as string)?.trim() || 'Department';
     const description = (formData.get('description') as string)?.trim() || '';
-    const status = (formData.get('status') as string)?.trim() || 'Upcoming';
+    const rawStatus = (formData.get('status') as string)?.trim();
+    const status = normalizeEventStatus(rawStatus);
 
     if (!id || !title || !date) {
       return { success: false, error: 'Event ID, title, and date are required.' };

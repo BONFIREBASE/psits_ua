@@ -27,7 +27,7 @@ import { useToast } from '../_components/Toast'
 import { getEvents, supabase } from '@/lib/supabase'
 import { createEventAction, updateEventAction, deleteEventAction } from './actions'
 
-export type EventStatus = 'Scheduled' | 'Completed' | 'Postponed' | 'Cancelled'
+export type EventStatus = 'Scheduled' | 'Upcoming' | 'Ongoing' | 'Completed' | 'Postponed' | 'Cancelled'
 
 export type ManagedActivity = Activity & {
   status?: EventStatus
@@ -48,6 +48,7 @@ const categoryOptions = [
 
 const statusOptions = [
   { value: 'Scheduled', label: 'Scheduled' },
+  { value: 'Ongoing', label: 'Ongoing' },
   { value: 'Completed', label: 'Completed' },
   { value: 'Postponed', label: 'Postponed' },
   { value: 'Cancelled', label: 'Cancelled' },
@@ -139,7 +140,7 @@ export default function EventsManagementPage() {
   const [formVenue, setFormVenue] = useState('')
   const [formSemester, setFormSemester] = useState<Activity['semester']>('1st Semester (2026)')
   const [formCategory, setFormCategory] = useState<Activity['category']>('Governance')
-  const [formStatus, setFormStatus] = useState<'Scheduled' | 'Completed' | 'Postponed' | 'Cancelled'>('Scheduled')
+  const [formStatus, setFormStatus] = useState<EventStatus>('Scheduled')
   const [formFeatured, setFormFeatured] = useState(false)
 
   // Filtered events
