@@ -63,7 +63,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const postUrl = `${baseUrl}/blog/${post.slug || post.id}`
 
   // Original thumbnail of the blog (mandatory requirement)
-  const thumbnail = post.imageUrl || `${baseUrl}/assets/cover.jpg`
+  const defaultLogo = `${baseUrl}/assets/logo/PSITS%20logo.png`
+  const thumbnail = post.imageUrl || defaultLogo
 
   const cleanDescription = (post.excerpt || post.fullContent || '')
     .replace(/^[\s\u200B-\u200D\uFEFF\u200E\u200F]+/, '')
@@ -143,7 +144,7 @@ export default async function BlogPostPage({ params }: PageProps) {
       name: 'Philippine Society of Information Technology Students - University of Antique',
       logo: {
         '@type': 'ImageObject',
-        url: `${baseUrl}/assets/logo.png`,
+        url: `${baseUrl}/assets/logo/PSITS%20logo.png`,
       },
     },
     mainEntityOfPage: {
@@ -196,19 +197,17 @@ export default async function BlogPostPage({ params }: PageProps) {
           </h1>
         </header>
 
-        {/* Featured Original Thumbnail */}
-        {post.imageUrl && (
-          <div className="relative w-full aspect-video sm:aspect-[16/9] rounded-2xl overflow-hidden border border-white/10 mb-10 shadow-2xl bg-black/40">
-            <Image
-              src={post.imageUrl}
-              alt={post.title}
-              fill
-              priority
-              className="object-cover"
-              sizes="(max-width: 1024px) 100vw, 896px"
-            />
-          </div>
-        )}
+        {/* Featured Original Thumbnail or Default PSITS Logo Fallback */}
+        <div className="relative w-full aspect-video sm:aspect-[16/9] rounded-2xl overflow-hidden border border-white/10 mb-10 shadow-2xl bg-black/40">
+          <Image
+            src={post.imageUrl || '/assets/logo/PSITS logo.png'}
+            alt={post.title}
+            fill
+            priority
+            className={post.imageUrl ? 'object-cover' : 'object-contain p-12 sm:p-16'}
+            sizes="(max-width: 1024px) 100vw, 896px"
+          />
+        </div>
 
         {/* Highlight Quote if present */}
         {post.highlightQuote && (
