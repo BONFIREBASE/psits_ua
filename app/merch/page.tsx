@@ -88,6 +88,7 @@ export default function MerchPage() {
   const [isSearchingStudents, setIsSearchingStudents] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customName, setCustomName] = useState("");
+  const [showOptionalNote, setShowOptionalNote] = useState(false);
   const studentCacheRef = useRef<Map<string, Array<{ id: string; full_name: string; year_section: string }>>>(new Map());
   const [showFormalReceipt, setShowFormalReceipt] = useState(false);
 
@@ -1433,77 +1434,65 @@ export default function MerchPage() {
                     )}
                   </div>
 
-                  {/* 3. ORDER DETAILS (REQUIRED SECTION, OPTIONAL PHONE/NOTE) */}
-                  {user && (
+                  {/* SINGLE ORDER: 3. ORDER DETAILS (Class Section & Contact/Note) */}
+                  {user && !isBulkOrder && (
                     <div className="space-y-2.5 pt-2 border-t border-border/50">
                       <label className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-white block">
                         3. Order Details
                       </label>
 
                       <div className="space-y-2 font-mono text-xs">
-                        {isBulkOrder ? (
-                          <div>
-                            <label className="block text-[11px] text-muted mb-1 font-semibold">
-                              Class Section (Bulk Order)
-                            </label>
-                            <div className="w-full px-3.5 py-2.5 rounded-xl bg-gold/10 border border-gold/30 text-gold font-mono font-bold text-xs flex items-center justify-between">
-                              <span>{selectedYearSection || "No Section Selected"}</span>
-                              <span className="text-[10.5px] text-muted font-normal">Locked from Step 1</span>
-                            </div>
+                        <div>
+                          <label className="block text-[11px] text-muted mb-1 font-semibold">
+                            Class Year &amp; Section *
+                          </label>
+                          <div className="grid grid-cols-2 gap-2 mb-2">
+                            <select
+                              value={bulkYear}
+                              onChange={(e) => {
+                                const yr = e.target.value;
+                                setBulkYear(yr);
+                                if (yr && bulkSection) {
+                                  setCourseYear(`BSIT ${yr}-${bulkSection}`);
+                                }
+                              }}
+                              className="w-full px-3 py-2.5 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme focus:border-gold outline-none cursor-pointer text-xs"
+                            >
+                              <option value="">Year Level...</option>
+                              <option value="1">1st Year</option>
+                              <option value="2">2nd Year</option>
+                              <option value="3">3rd Year</option>
+                              <option value="4">4th Year</option>
+                            </select>
+                            <select
+                              value={bulkSection}
+                              onChange={(e) => {
+                                const sec = e.target.value;
+                                setBulkSection(sec);
+                                if (bulkYear && sec) {
+                                  setCourseYear(`BSIT ${bulkYear}-${sec}`);
+                                }
+                              }}
+                              className="w-full px-3 py-2.5 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme focus:border-gold outline-none cursor-pointer text-xs"
+                            >
+                              <option value="">Section...</option>
+                              <option value="A">Section A</option>
+                              <option value="B">Section B</option>
+                              <option value="C">Section C</option>
+                              <option value="D">Section D</option>
+                              <option value="E">Section E</option>
+                            </select>
                           </div>
-                        ) : (
-                          <div>
-                            <label className="block text-[11px] text-muted mb-1 font-semibold">
-                              Class Year &amp; Section *
-                            </label>
-                            <div className="grid grid-cols-2 gap-2 mb-2">
-                              <select
-                                value={bulkYear}
-                                onChange={(e) => {
-                                  const yr = e.target.value;
-                                  setBulkYear(yr);
-                                  if (yr && bulkSection) {
-                                    setCourseYear(`BSIT ${yr}-${bulkSection}`);
-                                  }
-                                }}
-                                className="w-full px-3 py-2.5 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme focus:border-gold outline-none cursor-pointer text-xs"
-                              >
-                                <option value="">Year Level...</option>
-                                <option value="1">1st Year</option>
-                                <option value="2">2nd Year</option>
-                                <option value="3">3rd Year</option>
-                                <option value="4">4th Year</option>
-                              </select>
-                              <select
-                                value={bulkSection}
-                                onChange={(e) => {
-                                  const sec = e.target.value;
-                                  setBulkSection(sec);
-                                  if (bulkYear && sec) {
-                                    setCourseYear(`BSIT ${bulkYear}-${sec}`);
-                                  }
-                                }}
-                                className="w-full px-3 py-2.5 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme focus:border-gold outline-none cursor-pointer text-xs"
-                              >
-                                <option value="">Section...</option>
-                                <option value="A">Section A</option>
-                                <option value="B">Section B</option>
-                                <option value="C">Section C</option>
-                                <option value="D">Section D</option>
-                                <option value="E">Section E</option>
-                              </select>
-                            </div>
-                            {(!bulkYear || !bulkSection) && (
-                              <input
-                                type="text"
-                                value={courseYear}
-                                onChange={(e) => setCourseYear(e.target.value)}
-                                placeholder="Or specify program / faculty (e.g. BSCS 3-A, Faculty) *"
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme placeholder:text-muted/60 focus:outline-none focus:border-gold text-xs"
-                              />
-                            )}
-                          </div>
-                        )}
+                          {(!bulkYear || !bulkSection) && (
+                            <input
+                              type="text"
+                              value={courseYear}
+                              onChange={(e) => setCourseYear(e.target.value)}
+                              placeholder="Or specify program / faculty (e.g. BSCS 3-A, Faculty) *"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme placeholder:text-muted/60 focus:outline-none focus:border-gold text-xs"
+                            />
+                          )}
+                        </div>
 
                         <div>
                           <input
@@ -1525,6 +1514,56 @@ export default function MerchPage() {
                           />
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {/* BULK ORDER: Optional Note / Instructions Button (Collapsed by default) */}
+                  {user && isBulkOrder && (
+                    <div className="pt-2 border-t border-border/50 font-mono text-xs">
+                      {!showOptionalNote ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowOptionalNote(true)}
+                          className="text-[11px] text-muted hover:text-gold flex items-center gap-1.5 transition-colors cursor-pointer py-1"
+                        >
+                          <FileText size={13} className="text-gold/70" />
+                          <span>+ Add optional note or contact</span>
+                        </button>
+                      ) : (
+                        <div className="p-3.5 rounded-2xl bg-black/5 dark:bg-white/[0.03] border border-border/60 space-y-2.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="flex items-center gap-1.5 text-foreground-theme font-bold">
+                              <FileText size={12} className="text-gold" />
+                              <span>Order Note &amp; Contact (Optional)</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowOptionalNote(false);
+                                setNotes("");
+                                setContactNumber("");
+                              }}
+                              className="text-muted hover:text-rose-500 text-[10.5px] cursor-pointer"
+                            >
+                              Clear &amp; Hide
+                            </button>
+                          </div>
+                          <input
+                            type="tel"
+                            value={contactNumber}
+                            onChange={(e) => setContactNumber(e.target.value)}
+                            placeholder="Contact Number (optional)"
+                            className="w-full px-3 py-2 rounded-xl bg-surface border border-border/70 text-foreground-theme placeholder:text-muted/60 focus:outline-none focus:border-gold text-xs"
+                          />
+                          <input
+                            type="text"
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            placeholder="Add note or distribution instructions (optional)..."
+                            className="w-full px-3 py-2 rounded-xl bg-surface border border-border/70 text-foreground-theme placeholder:text-muted/60 focus:outline-none focus:border-gold text-xs"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1557,10 +1596,12 @@ export default function MerchPage() {
                         </>
                       ) : !user ? (
                         <span>Sign In to Place Order</span>
+                      ) : isBulkOrder && (!bulkYear || !bulkSection) ? (
+                        <span>Select Class Section to Continue</span>
                       ) : !courseYear.trim() ? (
                         <span>Enter Course &amp; Section to Continue</span>
                       ) : isBulkOrder && bulkTotalQuantity < 1 ? (
-                        <span>Select at least 1 shirt size</span>
+                        <span>Add at least 1 student to continue</span>
                       ) : (
                         <span>Proceed to Place Order — ₱{currentTotalAmount}.00</span>
                       )}
