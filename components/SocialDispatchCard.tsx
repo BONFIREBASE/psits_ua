@@ -224,11 +224,13 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
                               &ldquo;{dispatch.highlightQuote}&rdquo;
                             </p>
                           </div>
-                          <p
-                            className="text-xs font-mono font-semibold mt-2.5 pl-8 text-gold"
-                          >
-                            — {dispatch.quoteAuthor || 'Student Affairs and Services (SAS) Head'}
-                          </p>
+                          {dispatch.quoteAuthor && (
+                            <p
+                              className="text-xs font-mono font-semibold mt-2.5 pl-8 text-gold"
+                            >
+                              — {dispatch.quoteAuthor}
+                            </p>
+                          )}
                         </div>
                       )}
 
