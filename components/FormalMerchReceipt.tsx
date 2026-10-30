@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Image from 'next/image'
-import { Printer, Download, X, CheckCircle2, ShieldCheck, Shirt, AlertCircle, Users } from 'lucide-react'
+import { Printer, Download, X, CheckCircle2, ShieldCheck, Shirt, AlertCircle, Users, Clock } from 'lucide-react'
 import type { MerchOrderRow } from '@/lib/supabase'
 
 export interface BulkStudentItem {
@@ -37,6 +37,8 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
   const bulkItems = parseBulkItemsFromNotes(order.notes)
   const isBulk = bulkItems.length > 0 || order.quantity > 1
 
+  const isPaid = order.status === 'ordered' || order.status === 'ready_for_pickup' || order.status === 'completed'
+
   const formattedDate = new Date(order.created_at).toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
@@ -49,7 +51,7 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
         day: 'numeric',
         year: 'numeric',
       })
-    : formattedDate
+    : (isPaid ? formattedDate : '—')
 
   const receiptRef = `#POLO-${order.id.slice(0, 8).toUpperCase()}`
 
@@ -193,10 +195,17 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
               </h3>
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-mono text-[11px] sm:text-xs font-bold self-start sm:self-auto">
-              <CheckCircle2 size={13} className="text-emerald-700" />
-              <span>PAID &amp; CONFIRMED</span>
-            </div>
+            {isPaid ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-mono text-[11px] sm:text-xs font-bold self-start sm:self-auto">
+                <CheckCircle2 size={13} className="text-emerald-700" />
+                <span>PAID</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-mono text-[11px] sm:text-xs font-bold self-start sm:self-auto">
+                <Clock size={13} className="text-amber-700" />
+                <span>CONFIRMED</span>
+              </div>
+            )}
           </div>
 
           {/* Order Details Grid */}
@@ -231,7 +240,7 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
               </div>
               <div className="flex">
                 <span className="w-24 sm:w-28 text-slate-500">Payment Mode:</span>
-                <span className="text-slate-900 font-semibold">Cash / PSITS Office Verified</span>
+                <span className="text-slate-900 font-semibold">{isPaid ? "Cash / PSITS Office Verified" : "Cash on Claim / PSITS Office"}</span>
               </div>
               <div className="flex">
                 <span className="w-24 sm:w-28 text-slate-500">Claim Venue:</span>
@@ -331,7 +340,7 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
                   <tfoot>
                     <tr className="bg-slate-50 border-t-2 border-slate-300 font-bold">
                       <td colSpan={4} className="py-2.5 px-3 text-right uppercase text-slate-600">
-                        Total Amount Paid:
+                        {isPaid ? "Total Amount Paid:" : "Total Amount Payable:"}
                       </td>
                       <td className="py-2.5 px-3 text-right text-base text-slate-900">
                         ₱{order.total_amount || 475}.00
@@ -358,12 +367,10 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
             </div>
 
             <div className="flex flex-col justify-end text-center font-mono">
-              <div className="pt-6 sm:pt-8 border-b border-slate-800 pb-1 max-w-[240px] mx-auto w-full">
-                <strong className="font-bold text-xs uppercase text-slate-900 block">
-                  {order.verified_by || 'PSITS Treasury Committee'}
-                </strong>
+              <div className="pt-8 border-b border-slate-800 pb-1 max-w-[240px] mx-auto w-full min-h-[32px]">
+                {/* Verifier name blank for now */}
               </div>
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider pt-1 block">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider pt-1.5 block">
                 Official Chapter Verifier &amp; Issuer
               </span>
             </div>
@@ -372,7 +379,6 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
           {/* Institutional Document Footer */}
           <div className="mt-6 sm:mt-8 pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[10px] font-mono text-slate-400 gap-1.5 sm:gap-2">
             <span>Generated by PSITS-UA Portal System</span>
-            <span>Security Hash: {order.id.replace(/-/g, '').slice(0, 16).toUpperCase()}</span>
             <span>SIBALOM, ANTIQUE</span>
           </div>
         </div>

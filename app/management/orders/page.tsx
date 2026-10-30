@@ -695,12 +695,34 @@ export default function MerchOrdersManagementPage() {
 
                         {/* Receipt */}
                         <td className="py-3 px-4 text-center">
-                          <div className="inline-flex flex-col items-center gap-1 justify-center">
-                            <div className="inline-flex items-center gap-1.5 justify-center">
+                          <div className="inline-flex flex-col items-center gap-1.5 justify-center">
+                            {order.status === "ordered" || order.status === "ready_for_pickup" || order.status === "completed" ? (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                                title="Receipt is unlocked and marked Paid"
+                              >
+                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                <span>Paid</span>
+                              </span>
+                            ) : order.status === "cancelled" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                <span>Cancelled</span>
+                              </span>
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                title="Order placed and confirmed; receipt unlocks and becomes Paid once status is Ordered"
+                              >
+                                <Clock className="w-3 h-3 text-amber-500" />
+                                <span>Confirmed</span>
+                              </span>
+                            )}
+
+                            <div className="inline-flex items-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => setShowOfficialReceipt(order)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-gold/15 hover:bg-gold/25 border border-gold/30 text-gold transition-colors cursor-pointer shadow-xs"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-gold/15 hover:bg-gold/25 border border-gold/30 text-gold transition-colors cursor-pointer shadow-xs"
                                 title="View official generated PSITS receipt & claim slip"
                               >
                                 <FileText className="w-3 h-3" />
@@ -717,44 +739,27 @@ export default function MerchOrdersManagementPage() {
                                     setSelectedReceiptOrder(order);
                                     setReceiptImageLoading(true);
                                   }}
-                                  className="p-1 rounded-md text-slate-400 hover:text-foreground-theme hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                  title="Inspect uploaded photo"
+                                  className="p-1 rounded text-slate-400 hover:text-foreground-theme hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                  title="Inspect uploaded legacy photo"
                                 >
-                                  <Eye className="w-3.5 h-3.5" />
+                                  <Eye className="w-3 h-3" />
                                 </button>
                               )}
                             </div>
-                            {order.status === "processing" ? (
-                              <span
-                                className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-500/90 font-medium"
-                                title="Student cannot view receipt until order status is set to Ordered"
-                              >
-                                <Lock className="w-2.5 h-2.5" />
-                                <span>Locked for Student</span>
-                              </span>
-                            ) : (
-                              <span
-                                className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-500/90 font-medium"
-                                title="Student can view/download receipt on portal"
-                              >
-                                <CheckCircle2 className="w-2.5 h-2.5" />
-                                <span>Unlocked for Student</span>
-                              </span>
-                            )}
                           </div>
                         </td>
 
                         {/* Payment Verification Status */}
                         <td className="py-3 px-4">
-                          {order.payment_status === "verified" ? (
+                          {order.status === "ordered" || order.status === "ready_for_pickup" || order.status === "completed" || order.payment_status === "verified" ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-medium">
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Verified</span>
+                              <span>Paid</span>
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-600 dark:text-amber-400 font-medium">
                               <Clock className="w-3.5 h-3.5" />
-                              <span>Pending</span>
+                              <span>Confirmed</span>
                             </span>
                           )}
                         </td>
