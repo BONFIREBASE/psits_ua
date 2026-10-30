@@ -20,11 +20,28 @@ import {
   Trash2,
   AlertCircle,
   FileText,
+  Users,
 } from "lucide-react";
 import FormalMerchReceipt from "@/components/FormalMerchReceipt";
 import type { MerchOrderRow, MerchOrderStatus, MerchPaymentStatus, PoloShirtSize } from "@/lib/supabase";
 import FormField, { inputStyles, textareaStyles } from "../_components/FormField";
 import { MerchOrdersTableSkeleton } from "../_components/SkeletonPreloader";
+
+function parseOrderNotes(rawNotes: string | null | undefined): { customerNote: string | null; bulkCount: number } {
+  if (!rawNotes) return { customerNote: null, bulkCount: 0 };
+  const trimmed = rawNotes.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      const bulkCount = Array.isArray(parsed.bulkItems) ? parsed.bulkItems.length : 0;
+      const note = typeof parsed.customerNote === "string" && parsed.customerNote.trim() ? parsed.customerNote.trim() : null;
+      return { customerNote: note, bulkCount };
+    } catch {
+      // fallback
+    }
+  }
+  return { customerNote: trimmed || null, bulkCount: 0 };
+}
 
 const STATUS_CONFIG: Record<
   MerchOrderStatus,
@@ -626,11 +643,29 @@ export default function MerchOrdersManagementPage() {
                               <span>{order.contact_number}</span>
                             </div>
                           )}
-                          {order.notes && (
-                            <div className="mt-1 text-[11px] text-slate-700 dark:text-slate-300 italic bg-slate-100 dark:bg-white/[0.04] border border-black/5 dark:border-white/5 p-1.5 rounded max-w-xs">
-                              &ldquo;{order.notes}&rdquo;
-                            </div>
-                          )}
+                          {(() => {
+                            const { customerNote, bulkCount } = parseOrderNotes(order.notes);
+                            return (
+                              <>
+                                {bulkCount > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowOfficialReceipt(order)}
+                                    className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gold/15 hover:bg-gold/25 border border-gold/30 text-gold font-mono text-[11px] font-bold transition-all cursor-pointer"
+                                    title="View Class Roster & Official Slip"
+                                  >
+                                    <Users className="w-3 h-3" />
+                                    <span>{bulkCount} Students Class Roster</span>
+                                  </button>
+                                )}
+                                {customerNote && (
+                                  <div className="mt-1 text-[11px] text-slate-700 dark:text-slate-300 italic bg-slate-100 dark:bg-white/[0.04] border border-black/5 dark:border-white/5 p-1.5 rounded max-w-xs">
+                                    &ldquo;{customerNote}&rdquo;
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </td>
 
                         {/* Course / Year */}
@@ -659,26 +694,34 @@ export default function MerchOrdersManagementPage() {
 
                         {/* Receipt */}
                         <td className="py-3 px-4 text-center">
-                          {order.receipt_key &&
-                            order.receipt_key !== "pending_upload" &&
-                            order.receipt_url &&
-                            order.receipt_url !== "/api/merch/orders/pending" ? (
+                          <div className="inline-flex items-center gap-1.5 justify-center">
                             <button
-                              onClick={() => {
-                                setSelectedReceiptOrder(order);
-                                setReceiptImageLoading(true);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium bg-white dark:bg-[#0a0e17] border border-black/10 dark:border-white/10 hover:border-gold text-slate-900 dark:text-white hover:text-gold transition-colors cursor-pointer shadow-xs"
-                              title="Inspect uploaded payment receipt"
+                              type="button"
+                              onClick={() => setShowOfficialReceipt(order)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-gold/15 hover:bg-gold/25 border border-gold/30 text-gold transition-colors cursor-pointer shadow-xs"
+                              title="View official generated PSITS receipt & claim slip"
                             >
-                              <Eye className="w-3 h-3" />
-                              <span>Inspect</span>
+                              <FileText className="w-3 h-3" />
+                              <span>Official Slip</span>
                             </button>
-                          ) : (
-                            <span className="text-[10px] font-mono text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
-                              Awaiting
-                            </span>
-                          )}
+
+                            {order.receipt_key &&
+                              order.receipt_key !== "pending_upload" &&
+                              order.receipt_url &&
+                              order.receipt_url !== "/api/merch/orders/pending" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedReceiptOrder(order);
+                                  setReceiptImageLoading(true);
+                                }}
+                                className="p-1 rounded-md text-slate-400 hover:text-foreground-theme hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                title="Inspect uploaded photo"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </td>
 
                         {/* Payment Verification Status */}

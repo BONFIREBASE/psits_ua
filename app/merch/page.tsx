@@ -861,32 +861,32 @@ export default function MerchPage() {
                 </div>
               )}
 
-              {/* STATE 3: ORDER IN PROCESS (RECEIPT UPLOADED ➔ AWAITING VERIFICATION / TAILORING) */}
-              {hasActiveOrder && !isCancelled && !isFulfilled && hasReceipt && activeOrder && (
+              {/* STATE 2: ACTIVE ORDER (PROCESSING OR IN PRODUCTION) */}
+              {hasActiveOrder && !isCancelled && !isFulfilled && activeOrder && (
                 <div className="rounded-3xl border border-border/80 bg-surface/90 backdrop-blur-md p-4 sm:p-8 space-y-4 sm:space-y-6 shadow-xl text-center">
                   <LottieAnimation
                     path="/assets/timer.json"
                     loop={true}
-                    className="w-32 h-32 sm:w-40 sm:h-40 mx-auto"
+                    className="w-28 h-28 sm:w-36 sm:h-36 mx-auto"
                   />
 
                   <div className="space-y-1">
                     <span className="text-[10px] font-mono uppercase tracking-widest text-amber-500 font-bold block">
-                      {activeOrder.status === "ordered" ? "In Production" : "Pending Officer Review"}
+                      {activeOrder.status === "ordered" ? "In Production & Tailoring" : "Order Placed & In Processing"}
                     </span>
                     <h1 className="font-display font-black text-2xl sm:text-3xl text-slate-900 dark:text-white">
-                      Order Is On Process
+                      #{activeOrder.id.slice(0, 8).toUpperCase()}
                     </h1>
                     <p className="text-xs font-mono text-muted">
-                      Ref #{activeOrder.id.slice(0, 8).toUpperCase()} · {activeOrder.student_name}
+                      {activeOrder.student_name} ({activeOrder.student_email})
                     </p>
                   </div>
 
-                  {/* Yellow Indicator: Student picks up at PSITS Office */}
-                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs font-mono text-amber-700 dark:text-amber-300 text-left leading-relaxed space-y-1">
-                    <p className="font-bold">Your payment receipt has been submitted.</p>
+                  {/* Informational callout: Official receipt generated */}
+                  <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 text-xs font-mono text-slate-800 dark:text-slate-200 text-left leading-relaxed space-y-1">
+                    <p className="font-bold text-gold">Official PSITS Receipt &amp; Claim Slip Ready</p>
                     <p className="text-[11px] opacity-90">
-                      Officers at the PSITS Office are verifying your receipt. You will pick up your uniform polo at the PSITS Office once tailoring is complete and marked ready.
+                      Your official receipt and claim slip has been generated. You can view, download, or print it below. Present this receipt when settling your payment and claiming your polo shirt at the PSITS Office.
                     </p>
                   </div>
 
@@ -910,7 +910,7 @@ export default function MerchPage() {
                       <span className="font-bold text-emerald-500">PSITS Office</span>
                     </div>
                     <div className="flex justify-between py-1">
-                      <span className="text-muted">Amount:</span>
+                      <span className="text-muted">Total Payable:</span>
                       <span className="font-bold text-foreground-theme">₱{activeOrder.total_amount || POLO_PRICE}.00</span>
                     </div>
                   </div>
@@ -919,149 +919,23 @@ export default function MerchPage() {
                     <button
                       type="button"
                       onClick={() => setShowFormalReceipt(true)}
-                      className="w-full py-3.5 px-4 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
+                      className="w-full py-4 px-6 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(245,166,35,0.3)] flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <FileText size={15} />
-                      <span>Download Official PSITS Receipt</span>
+                      <FileText size={16} />
+                      <span>View &amp; Print Official Receipt</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={handleOpenReceiptModal}
-                      className="w-full py-3 px-4 rounded-2xl border border-border hover:border-gold text-xs font-mono font-medium text-foreground-theme transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <Eye size={13} />
-                      <span>View Uploaded Paper Receipt</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* STATE 2: ORDER PLACED (DETAILS SUBMITTED, AWAITING CASH PAYMENT & RECEIPT) */}
-              {hasActiveOrder && !isCancelled && !hasReceipt && activeOrder && (
-                <div className="rounded-3xl border border-border/80 bg-surface/90 backdrop-blur-md p-4 sm:p-8 space-y-3 sm:space-y-6 shadow-xl text-center w-full max-w-full min-w-0 overflow-hidden">
-                  <LottieAnimation
-                    path="/assets/check.json"
-                    loop={true}
-                    className="w-24 h-24 sm:w-32 sm:h-32 mx-auto"
-                  />
-
-                  <div className="space-y-0.5 sm:space-y-1">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500 font-bold block">
-                      Order Details Placed
-                    </span>
-                    <h1 className="font-display font-black text-xl sm:text-3xl text-slate-900 dark:text-white">
-                      #{activeOrder.id.slice(0, 8).toUpperCase()}
-                    </h1>
-                    <p className="text-[11px] sm:text-xs font-mono text-muted">
-                      {activeOrder.student_name} ({activeOrder.student_email})
-                    </p>
-                  </div>
-
-                  {/* Summary Box */}
-                  <div className="p-3 sm:p-4 rounded-2xl bg-black/5 dark:bg-white/[0.03] border border-border/60 text-left font-mono text-xs space-y-1.5 sm:space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted">Quantity &amp; Size:</span>
-                      <span className="font-bold text-gold text-xs sm:text-sm">
-                        {activeOrder.quantity > 1 ? `${activeOrder.quantity}x (${activeOrder.size})` : activeOrder.size}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted">Section:</span>
-                      <span className="font-bold text-foreground-theme">{activeOrder.course_year}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted">Pickup Location:</span>
-                      <span className="font-bold text-emerald-500">PSITS Office</span>
-                    </div>
-                    <div className="flex justify-between pt-1 border-t border-border/40">
-                      <span className="text-muted">Total Payable:</span>
-                      <span className="font-black text-foreground-theme text-xs sm:text-sm">₱{activeOrder.total_amount || POLO_PRICE}.00</span>
-                    </div>
-                  </div>
-
-                  {/* Minimalist Confirmation Callout */}
-                  <div className="p-3 sm:p-4 rounded-2xl bg-gold/10 border border-gold/30 text-xs font-mono text-slate-800 dark:text-slate-200 text-left space-y-0.5 sm:space-y-1">
-                    <p className="font-bold text-gold text-[11px] sm:text-xs">To confirm your order:</p>
-                    <p className="text-[10.5px] sm:text-[11px] leading-relaxed opacity-95">
-                      Pay ₱{activeOrder.total_amount || POLO_PRICE} in cash at the PSITS Office, then upload your paper receipt below to proceed to processing.
-                    </p>
-                  </div>
-
-                  {receiptError && (
-                    <div className="p-2.5 sm:p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-mono text-rose-600 dark:text-rose-400 flex items-center gap-2 text-left">
-                      <AlertCircle size={14} className="shrink-0" />
-                      <span>{receiptError}</span>
-                    </div>
-                  )}
-
-                  {/* Upload Receipt Form */}
-                  <form onSubmit={handleUploadReceipt} className="space-y-2.5 sm:space-y-4 pt-0.5">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg,image/webp"
-                      className="hidden"
-                      onChange={handleReceiptChange}
-                    />
-
-                    {receiptFile && receiptPreview ? (
-                      <div className="relative p-2.5 sm:p-3 rounded-2xl bg-black/5 dark:bg-white/[0.04] border border-gold/40 flex items-center justify-between gap-2.5 text-left w-full max-w-full min-w-0 overflow-hidden">
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={receiptPreview}
-                            alt="Receipt Preview"
-                            className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-xl border border-border shrink-0"
-                          />
-                          <div className="min-w-0 flex-1 overflow-hidden font-mono text-xs">
-                            <span className="font-bold text-foreground-theme block truncate text-[11px] sm:text-xs max-w-full">
-                              {receiptFile.name}
-                            </span>
-                            <span className="text-[10px] text-muted block truncate">
-                              {(receiptFile.size / 1024).toFixed(1)} KB · Ready to upload
-                            </span>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-surface border border-border hover:border-gold font-mono text-[10px] sm:text-[11px] text-foreground-theme shrink-0 cursor-pointer"
-                        >
-                          Change
-                        </button>
-                      </div>
-                    ) : (
+                    {hasReceipt && (
                       <button
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full py-3 sm:py-5 px-3 sm:px-4 rounded-2xl border border-dashed border-gold/50 hover:border-gold bg-gold/5 text-xs font-mono text-muted hover:text-foreground-theme transition-colors flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer"
+                        onClick={handleOpenReceiptModal}
+                        className="w-full py-2.5 px-4 rounded-xl border border-border hover:border-gold text-xs font-mono font-medium text-foreground-theme transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        <Camera size={18} className="text-gold" />
-                        <span className="font-bold text-foreground-theme text-xs">Tap to Upload Paper Receipt</span>
-                        <span className="text-[10px] opacity-75">PNG, JPG, or WebP up to 15MB</span>
+                        <Eye size={13} />
+                        <span>View Uploaded Paper Receipt</span>
                       </button>
                     )}
-
-                    <button
-                      type="submit"
-                      disabled={!receiptFile || isUploadingReceipt}
-                      className="w-full py-3.5 sm:py-4 px-5 sm:px-6 rounded-2xl bg-gold hover:bg-gold-light disabled:opacity-40 disabled:cursor-not-allowed text-[#0D1117] font-mono text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_25px_rgba(245,166,35,0.35)] flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      {isUploadingReceipt ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          <span>Uploading Receipt...</span>
-                        </>
-                      ) : (
-                        <>
-                          <UploadCloud size={16} />
-                          <span>Confirm Order with Receipt</span>
-                        </>
-                      )}
-                    </button>
-                  </form>
+                  </div>
                 </div>
               )}
 
