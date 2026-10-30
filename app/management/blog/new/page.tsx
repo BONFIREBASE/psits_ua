@@ -129,14 +129,14 @@ export default function NewBlogPostPage() {
 
       const res = await createBlogPost(formData)
       if (!res.success) {
-        toast(res.error || 'Failed to publish post')
+        toast(res.error || 'Failed to publish post', 'error')
         return
       }
 
       toast('Blog post published successfully!')
       router.push('/management/blog')
     } catch (err: unknown) {
-      toast(err instanceof Error ? err.message : 'Error publishing post')
+      toast(err instanceof Error ? err.message : 'Error publishing post', 'error')
     } finally {
       setIsSubmitting(false)
     }

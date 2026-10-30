@@ -184,10 +184,10 @@ export default function BlogListPage() {
         await loadPosts()
         handleCloseEdit()
       } else {
-        toast(res.error || 'Failed to update post')
+        toast(res.error || 'Failed to update post', 'error')
       }
     } catch {
-      toast('Failed to update post')
+      toast('Failed to update post', 'error')
     } finally {
       setIsUpdating(false)
     }
@@ -201,10 +201,10 @@ export default function BlogListPage() {
         setPosts((prev) => prev.filter((p) => p.id !== id))
         toast('Post deleted successfully.')
       } else {
-        toast(res.error || 'Failed to delete post')
+        toast(res.error || 'Failed to delete post', 'error')
       }
     } catch {
-      toast('Failed to delete post')
+      toast('Failed to delete post', 'error')
     } finally {
       setDeletingId(null)
       setDeleteConfirmId(null)
@@ -219,10 +219,10 @@ export default function BlogListPage() {
         await loadPosts()
         toast('Initial announcements synced into database!')
       } else {
-        toast(res.error || 'Failed to sync initial posts')
+        toast(res.error || 'Failed to sync initial posts', 'error')
       }
     } catch {
-      toast('Error syncing to database')
+      toast('Error syncing to database', 'error')
     } finally {
       setIsSeeding(false)
     }

@@ -26,13 +26,16 @@ function parseCreditsFromFormData(formData: FormData): Record<string, string> | 
         parsed.forEach((item: { role?: string; name?: string }) => {
           if (item?.role && item?.name) {
             const key = item.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
-            credits[key] = item.name.trim();
+            const name = item.name.trim();
+            credits[key] = credits[key] ? `${credits[key]}, ${name}` : name;
           }
         });
       } else if (typeof parsed === 'object' && parsed !== null) {
         Object.entries(parsed).forEach(([k, v]) => {
           if (typeof v === 'string' && v.trim()) {
-            credits[k.toLowerCase().replace(/[\s-]+/g, '_')] = v.trim();
+            const key = k.toLowerCase().replace(/[\s-]+/g, '_');
+            const val = v.trim();
+            credits[key] = credits[key] ? `${credits[key]}, ${val}` : val;
           }
         });
       }
