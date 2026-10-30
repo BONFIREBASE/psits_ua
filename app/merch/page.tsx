@@ -78,9 +78,8 @@ export default function MerchPage() {
   const [isSubmittingDetails, setIsSubmittingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
 
-  // Bulk Order State (Support multiple shirts with different sizes & student rosters)
+  // Bulk Order State (Support multiple shirts with different sizes & student roster)
   const [isBulkOrder, setIsBulkOrder] = useState(false);
-  const [bulkMode, setBulkMode] = useState<"roster" | "manual">("roster");
   const [bulkStudents, setBulkStudents] = useState<BulkStudentItem[]>([]);
   const [studentSearchInput, setStudentSearchInput] = useState("");
   const [studentSearchResults, setStudentSearchResults] = useState<Array<{ id: string; student_no: string; full_name: string; year_section: string }>>([]);
@@ -91,42 +90,22 @@ export default function MerchPage() {
   const studentCacheRef = useRef<Map<string, Array<{ id: string; student_no: string; full_name: string; year_section: string }>>>(new Map());
   const [showFormalReceipt, setShowFormalReceipt] = useState(false);
 
-  const [bulkQuantities, setBulkQuantities] = useState<Record<string, number>>({
-    XS: 0,
-    S: 0,
-    M: 0,
-    L: 0,
-    XL: 0,
-    XXL: 0,
-  });
-
-  // Calculate size counts from student roster if in roster mode and bulkStudents has items
+  // Calculate size counts directly from student list
   const activeBulkQuantities: Record<string, number> = useMemo(() => {
-    if (bulkStudents.length > 0) {
-      const counts: Record<string, number> = { XS: 0, S: 0, M: 0, L: 0, XL: 0, XXL: 0 };
-      bulkStudents.forEach((st) => {
-        if (counts[st.size] !== undefined) counts[st.size]++;
-      });
-      return counts;
-    }
-    return bulkQuantities;
-  }, [bulkStudents, bulkQuantities]);
+    const counts: Record<string, number> = { XS: 0, S: 0, M: 0, L: 0, XL: 0, XXL: 0 };
+    bulkStudents.forEach((st) => {
+      if (counts[st.size] !== undefined) counts[st.size]++;
+    });
+    return counts;
+  }, [bulkStudents]);
 
-  const bulkTotalQuantity: number = Object.values(activeBulkQuantities).reduce((acc: number, qty: number) => acc + Number(qty || 0), 0);
+  const bulkTotalQuantity: number = bulkStudents.length;
   const currentQuantity: number = isBulkOrder ? bulkTotalQuantity : 1;
   const currentTotalAmount: number = currentQuantity * POLO_PRICE;
   const bulkBreakdown: string = Object.entries(activeBulkQuantities)
     .filter(([, qty]) => Number(qty) > 0)
     .map(([size, qty]) => `${qty}x ${size}`)
     .join(", ");
-
-  const updateBulkQuantity = (size: string, delta: number) => {
-    setBulkQuantities((prev) => {
-      const current = prev[size] || 0;
-      const next = Math.max(0, Math.min(25, current + delta));
-      return { ...prev, [size]: next };
-    });
-  };
 
   // Student directory search with caching
   useEffect(() => {
@@ -393,7 +372,7 @@ export default function MerchPage() {
     }
 
     if (isBulkOrder && bulkTotalQuantity < 1) {
-      setDetailsError("Please select at least 1 shirt for your bulk order.");
+      setDetailsError("Please add at least 1 student for your bulk order.");
       return;
     }
 
@@ -1083,7 +1062,7 @@ export default function MerchPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                        1. {isBulkOrder ? "Select Bulk Sizes" : "Select Size"}
+                        1. {isBulkOrder ? "Add Students & Sizes" : "Select Size"}
                       </label>
 
                       {/* Single vs Bulk Switch */}
@@ -1144,240 +1123,142 @@ export default function MerchPage() {
                         </div>
                       </div>
                     ) : (
-                      /* BULK ORDER SECTION: ROSTER & MANUAL */
+                      /* BULK ORDER SECTION: Direct Student Selection & Sizing */
                       <div className="space-y-3">
-                        {/* Header & Mode Switch */}
-                        <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gold/10 border border-gold/30 font-mono text-[11px] text-slate-800 dark:text-slate-200">
-                          <div className="flex items-center gap-1.5">
-                            <Users size={14} className="text-gold" />
-                            <span className="font-bold text-gold">Bulk Order:</span>
-                            <span>{bulkMode === "roster" ? "Class Roster Entry" : "Quantity Steppers"}</span>
+                        {/* Autocomplete Input */}
+                        <div className="relative">
+                          <div className="relative flex items-center">
+                            <Search size={14} className="absolute left-3 text-muted pointer-events-none" />
+                            <input
+                              type="text"
+                              placeholder="Type student name or ID (e.g. Capistrano, 2026-S...)"
+                              value={studentSearchInput}
+                              onChange={(e) => setStudentSearchInput(e.target.value)}
+                              className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-black/5 dark:bg-white/[0.04] border border-border/70 focus:border-gold focus:ring-1 focus:ring-gold text-xs font-mono text-foreground-theme placeholder:text-muted transition-all outline-none"
+                            />
+                            {isSearchingStudents && (
+                              <Loader2 size={14} className="absolute right-3 animate-spin text-gold" />
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-1 bg-black/10 dark:bg-white/10 p-0.5 rounded-lg text-[10px]">
-                            <button
-                              type="button"
-                              onClick={() => setBulkMode("roster")}
-                              className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
-                                bulkMode === "roster"
-                                  ? "bg-gold text-[#0D1117]"
-                                  : "text-muted hover:text-foreground-theme"
-                              }`}
-                            >
-                              Class Roster
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setBulkMode("manual")}
-                              className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
-                                bulkMode === "manual"
-                                  ? "bg-gold text-[#0D1117]"
-                                  : "text-muted hover:text-foreground-theme"
-                              }`}
-                            >
-                              Steppers
-                            </button>
-                          </div>
+                          {/* Autocomplete Dropdown */}
+                          {studentSearchResults.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-1 z-30 max-h-56 overflow-y-auto rounded-xl border border-border/80 bg-surface shadow-2xl divide-y divide-border/40 font-mono text-xs">
+                              {studentSearchResults.map((st) => (
+                                <button
+                                  key={st.id}
+                                  type="button"
+                                  onClick={() => handleAddStudentToRoster(st)}
+                                  className="w-full p-2.5 text-left hover:bg-gold/15 transition-colors flex items-center justify-between group cursor-pointer"
+                                >
+                                  <div>
+                                    <strong className="block text-foreground-theme group-hover:text-gold transition-colors font-bold text-xs">
+                                      {st.full_name}
+                                    </strong>
+                                    <span className="text-[10.5px] text-muted">
+                                      {st.year_section} · {st.student_no}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gold/20 text-gold opacity-0 group-hover:opacity-100 transition-opacity">
+                                    + Tap to Add
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
-                        {bulkMode === "roster" ? (
-                          /* ROSTER MODE: Live Search + Autocomplete + Per-Student Size */
-                          <div className="space-y-3">
-                            {/* Autocomplete Input */}
-                            <div className="relative">
-                              <div className="relative flex items-center">
-                                <Search size={14} className="absolute left-3 text-muted pointer-events-none" />
-                                <input
-                                  type="text"
-                                  placeholder="Type student name or ID (e.g. Capistrano, 2026-S...)"
-                                  value={studentSearchInput}
-                                  onChange={(e) => setStudentSearchInput(e.target.value)}
-                                  className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-black/5 dark:bg-white/[0.04] border border-border/70 focus:border-gold focus:ring-1 focus:ring-gold text-xs font-mono text-foreground-theme placeholder:text-muted transition-all outline-none"
-                                />
-                                {isSearchingStudents && (
-                                  <Loader2 size={14} className="absolute right-3 animate-spin text-gold" />
-                                )}
-                              </div>
+                        {/* Option to Add Custom Student */}
+                        <div className="flex items-center justify-between text-[11px] font-mono text-muted">
+                          <span>Student not in list?</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomModal(true)}
+                            className="text-gold hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus size={12} />
+                            <span>Add Custom Student</span>
+                          </button>
+                        </div>
 
-                              {/* Autocomplete Dropdown */}
-                              {studentSearchResults.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-1 z-30 max-h-56 overflow-y-auto rounded-xl border border-border/80 bg-surface shadow-2xl divide-y divide-border/40 font-mono text-xs">
-                                  {studentSearchResults.map((st) => (
-                                    <button
-                                      key={st.id}
-                                      type="button"
-                                      onClick={() => handleAddStudentToRoster(st)}
-                                      className="w-full p-2.5 text-left hover:bg-gold/15 transition-colors flex items-center justify-between group cursor-pointer"
-                                    >
-                                      <div>
-                                        <strong className="block text-foreground-theme group-hover:text-gold transition-colors font-bold text-xs">
-                                          {st.full_name}
-                                        </strong>
-                                        <span className="text-[10.5px] text-muted">
-                                          {st.year_section} · {st.student_no}
-                                        </span>
-                                      </div>
-                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gold/20 text-gold opacity-0 group-hover:opacity-100 transition-opacity">
-                                        + Tap to Add
-                                      </span>
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Option to Add Custom Student */}
-                            <div className="flex items-center justify-between text-[11px] font-mono text-muted">
-                              <span>Student not in list?</span>
-                              <button
-                                type="button"
-                                onClick={() => setShowCustomModal(true)}
-                                className="text-gold hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
+                        {/* Added Students List */}
+                        {bulkStudents.length > 0 ? (
+                          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                            {bulkStudents.map((st, idx) => (
+                              <div
+                                key={`${st.studentName}-${idx}`}
+                                className="p-3 rounded-2xl bg-black/5 dark:bg-white/[0.03] border border-border/70 space-y-2"
                               >
-                                <Plus size={12} />
-                                <span>Add Custom Student</span>
-                              </button>
-                            </div>
-
-                            {/* Added Students Roster List */}
-                            {bulkStudents.length > 0 ? (
-                              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                                {bulkStudents.map((st, idx) => (
-                                  <div
-                                    key={`${st.studentName}-${idx}`}
-                                    className="p-3 rounded-2xl bg-black/5 dark:bg-white/[0.03] border border-border/70 space-y-2"
-                                  >
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="font-mono min-w-0">
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gold/15 text-gold shrink-0">
-                                            #{idx + 1}
-                                          </span>
-                                          <strong className="text-xs text-foreground-theme font-bold truncate block">
-                                            {st.studentName}
-                                          </strong>
-                                        </div>
-                                        <span className="text-[10.5px] text-muted block pl-6">
-                                          {st.yearSection || courseYear || "BSIT"} {st.studentNo ? `· ${st.studentNo}` : ""}
-                                        </span>
-                                      </div>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveStudent(idx)}
-                                        className="p-1 rounded-lg text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
-                                        title="Remove student"
-                                      >
-                                        <Trash2 size={13} />
-                                      </button>
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="font-mono min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gold/15 text-gold shrink-0">
+                                        #{idx + 1}
+                                      </span>
+                                      <strong className="text-xs text-foreground-theme font-bold truncate block">
+                                        {st.studentName}
+                                      </strong>
                                     </div>
-
-                                    {/* Per-student size selector */}
-                                    <div className="flex items-center justify-between gap-1 pt-1 border-t border-border/30">
-                                      <span className="text-[10.5px] font-mono text-muted">Size:</span>
-                                      <div className="flex items-center gap-1">
-                                        {SIZES.map((sz) => {
-                                          const isActive = st.size === sz.size;
-                                          return (
-                                            <button
-                                              key={sz.size}
-                                              type="button"
-                                              onClick={() => handleUpdateStudentSize(idx, sz.size)}
-                                              className={`px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold transition-all cursor-pointer ${
-                                                isActive
-                                                  ? "bg-gold text-[#0D1117] shadow-xs"
-                                                  : "bg-surface border border-border/60 text-muted hover:text-foreground-theme"
-                                              }`}
-                                            >
-                                              {sz.size}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
+                                    <span className="text-[10.5px] text-muted block pl-6">
+                                      {st.yearSection || courseYear || "BSIT"} {st.studentNo ? `· ${st.studentNo}` : ""}
+                                    </span>
                                   </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="p-4 rounded-2xl border border-dashed border-border/80 text-center font-mono text-xs text-muted space-y-1">
-                                <Users size={20} className="mx-auto text-muted/60" />
-                                <p>No students added yet.</p>
-                                <p className="text-[10.5px] text-muted/80">
-                                  Type classmate names in the search box above to add them to your bulk order.
-                                </p>
-                              </div>
-                            )}
 
-                            {/* Summary Badge */}
-                            {bulkTotalQuantity > 0 && (
-                              <div className="p-2.5 rounded-xl bg-surface border border-border/60 flex items-center justify-between font-mono text-xs">
-                                <span className="text-muted truncate mr-2">
-                                  Breakdown: <strong className="text-foreground-theme">{bulkBreakdown}</strong>
-                                </span>
-                                <span className="font-bold text-gold shrink-0">
-                                  {bulkTotalQuantity} {bulkTotalQuantity > 1 ? "shirts" : "shirt"}
-                                </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveStudent(idx)}
+                                    className="p-1 rounded-lg text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
+                                    title="Remove student"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+
+                                {/* Per-student size selector */}
+                                <div className="flex items-center justify-between gap-1 pt-1 border-t border-border/30">
+                                  <span className="text-[10.5px] font-mono text-muted">Size:</span>
+                                  <div className="flex items-center gap-1">
+                                    {SIZES.map((sz) => {
+                                      const isActive = st.size === sz.size;
+                                      return (
+                                        <button
+                                          key={sz.size}
+                                          type="button"
+                                          onClick={() => handleUpdateStudentSize(idx, sz.size)}
+                                          className={`px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold transition-all cursor-pointer ${
+                                            isActive
+                                              ? "bg-gold text-[#0D1117] shadow-xs"
+                                              : "bg-surface border border-border/60 text-muted hover:text-foreground-theme"
+                                          }`}
+                                        >
+                                          {sz.size}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
                               </div>
-                            )}
+                            ))}
                           </div>
                         ) : (
-                          /* MANUAL STEPPERS FALLBACK */
-                          <div className="space-y-2">
-                            <div className="divide-y divide-border/40 rounded-2xl border border-border/70 bg-black/5 dark:bg-white/[0.02] overflow-hidden">
-                              {SIZES.map((s) => {
-                                const count = bulkQuantities[s.size] || 0;
-                                return (
-                                  <div
-                                    key={s.size}
-                                    className={`flex items-center justify-between p-2.5 sm:p-3 transition-colors ${
-                                      count > 0 ? "bg-gold/10" : ""
-                                    }`}
-                                  >
-                                    <div className="font-mono">
-                                      <div className="flex items-baseline gap-2">
-                                        <span className="text-sm font-black font-display text-foreground-theme">
-                                          {s.size}
-                                        </span>
-                                        <span className="text-[11px] text-muted">({s.chest} chest)</span>
-                                      </div>
-                                      <span className="text-[10px] text-muted">₱{POLO_PRICE}.00 each</span>
-                                    </div>
+                          <div className="p-4 rounded-2xl border border-dashed border-border/80 text-center font-mono text-xs text-muted space-y-1">
+                            <Users size={20} className="mx-auto text-muted/60" />
+                            <p>No students added yet.</p>
+                            <p className="text-[10.5px] text-muted/80">
+                              Type classmate names in the search box above to add them to your bulk order.
+                            </p>
+                          </div>
+                        )}
 
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => updateBulkQuantity(s.size, -1)}
-                                        disabled={count === 0}
-                                        className="w-8 h-8 rounded-xl bg-surface border border-border disabled:opacity-30 disabled:cursor-not-allowed hover:border-gold flex items-center justify-center font-bold text-base cursor-pointer text-foreground-theme transition-all active:scale-95"
-                                      >
-                                        -
-                                      </button>
-                                      <span className="w-8 text-center font-mono font-bold text-sm text-foreground-theme">
-                                        {count}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => updateBulkQuantity(s.size, 1)}
-                                        className="w-8 h-8 rounded-xl bg-surface border border-border hover:border-gold flex items-center justify-center font-bold text-base cursor-pointer text-foreground-theme transition-all active:scale-95"
-                                      >
-                                        +
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            {bulkTotalQuantity > 0 && (
-                              <div className="p-2.5 rounded-xl bg-surface border border-border/60 flex items-center justify-between font-mono text-xs">
-                                <span className="text-muted truncate mr-2">
-                                  Breakdown: <strong className="text-foreground-theme">{bulkBreakdown}</strong>
-                                </span>
-                                <span className="font-bold text-gold shrink-0">
-                                  {bulkTotalQuantity} {bulkTotalQuantity > 1 ? "shirts" : "shirt"}
-                                </span>
-                              </div>
-                            )}
+                        {/* Summary Badge */}
+                        {bulkTotalQuantity > 0 && (
+                          <div className="p-2.5 rounded-xl bg-surface border border-border/60 flex items-center justify-between font-mono text-xs">
+                            <span className="text-muted truncate mr-2">
+                              Breakdown: <strong className="text-foreground-theme">{bulkBreakdown}</strong>
+                            </span>
+                            <span className="font-bold text-gold shrink-0">
+                              {bulkTotalQuantity} {bulkTotalQuantity > 1 ? "shirts" : "shirt"}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -1593,7 +1474,7 @@ export default function MerchPage() {
                   disabled={!customName.trim()}
                   className="flex-1 py-2 px-3 rounded-xl bg-gold text-[#0D1117] font-bold disabled:opacity-40 cursor-pointer"
                 >
-                  Add to Roster
+                  Add Student
                 </button>
               </div>
             </div>
