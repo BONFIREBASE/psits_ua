@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
+import Link from 'next/link'
 import ProgressiveImage from './ProgressiveImage'
 import { X, ArrowUpRight, MapPin, Calendar, Quote, PenTool, Camera, Palette, Clock, Video, FileText } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -329,7 +330,14 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
                           )}
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Link
+                            href={`/blog/${dispatch.slug || dispatch.id}`}
+                            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold px-4 py-2 rounded-lg bg-gold text-[#0D1117] hover:bg-gold-muted transition-colors shadow-md"
+                          >
+                            <span>Read Full Article</span>
+                            <ArrowUpRight size={14} />
+                          </Link>
                           {dispatch.applyUrl && (
                             <a
                               href={dispatch.applyUrl}

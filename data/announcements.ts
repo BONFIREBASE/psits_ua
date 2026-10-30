@@ -1,5 +1,6 @@
 export interface SocialDispatch {
   id: string
+  slug?: string
   imageUrl?: string
   date: string
   venue?: string

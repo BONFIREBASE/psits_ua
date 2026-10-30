@@ -60,10 +60,35 @@ export async function getPosts(): Promise<PostRow[]> {
   }
 }
 
+export async function getPostBySlugOrId(slugOrId: string): Promise<PostRow | null> {
+  try {
+    const { data: bySlug, error: slugErr } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('slug', slugOrId)
+      .maybeSingle();
+
+    if (!slugErr && bySlug) return bySlug as PostRow;
+
+    const { data: byId, error: idErr } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('id', slugOrId)
+      .maybeSingle();
+
+    if (!idErr && byId) return byId as PostRow;
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function postRowToSocialDispatch(row: PostRow) {
   const rowCredits = (row.credits as Record<string, string>) || {};
   return {
     id: row.id,
+    slug: row.slug || row.id,
     imageUrl: row.image_url || undefined,
     date: row.date,
     category: row.category,
