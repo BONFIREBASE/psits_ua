@@ -203,7 +203,6 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
                   <tr className="bg-slate-100 border-b border-slate-300 font-mono text-[11px] text-slate-700 uppercase">
                     <th className="py-2 px-3 w-8">#</th>
                     <th className="py-2 px-3">Student Name</th>
-                    <th className="py-2 px-3">Student ID</th>
                     <th className="py-2 px-3">Year &amp; Section</th>
                     <th className="py-2 px-3">Size</th>
                     <th className="py-2 px-3 text-right">Unit Price</th>
@@ -215,7 +214,6 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
                     <tr key={`${item.studentName}-${idx}`} className="hover:bg-slate-50/50">
                       <td className="py-2 px-3 text-slate-400">{idx + 1}</td>
                       <td className="py-2 px-3 font-bold text-slate-900">{item.studentName}</td>
-                      <td className="py-2 px-3 text-slate-600">{item.studentNo || '—'}</td>
                       <td className="py-2 px-3 text-slate-600">{item.yearSection || order.course_year || '—'}</td>
                       <td className="py-2 px-3 font-bold text-[#1B2A6B]">{item.size}</td>
                       <td className="py-2 px-3 text-right text-slate-600">₱475.00</td>
@@ -225,7 +223,7 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-50 border-t-2 border-slate-300 font-mono font-bold">
-                    <td colSpan={4} className="py-2.5 px-3 text-right uppercase text-slate-600">
+                    <td colSpan={3} className="py-2.5 px-3 text-right uppercase text-slate-600">
                       Total ({bulkItems.length} {bulkItems.length === 1 ? 'Shirt' : 'Shirts'}):
                     </td>
                     <td className="py-2.5 px-3 text-[#1B2A6B]">

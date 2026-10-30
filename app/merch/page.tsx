@@ -80,15 +80,42 @@ export default function MerchPage() {
 
   // Bulk Order State (Support multiple shirts with different sizes & student roster)
   const [isBulkOrder, setIsBulkOrder] = useState(false);
+  const [bulkYear, setBulkYear] = useState<string>("");
+  const [bulkSection, setBulkSection] = useState<string>("");
   const [bulkStudents, setBulkStudents] = useState<BulkStudentItem[]>([]);
   const [studentSearchInput, setStudentSearchInput] = useState("");
-  const [studentSearchResults, setStudentSearchResults] = useState<Array<{ id: string; student_no: string; full_name: string; year_section: string }>>([]);
+  const [studentSearchResults, setStudentSearchResults] = useState<Array<{ id: string; full_name: string; year_section: string }>>([]);
   const [isSearchingStudents, setIsSearchingStudents] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customName, setCustomName] = useState("");
-  const [customSection, setCustomSection] = useState("");
-  const studentCacheRef = useRef<Map<string, Array<{ id: string; student_no: string; full_name: string; year_section: string }>>>(new Map());
+  const studentCacheRef = useRef<Map<string, Array<{ id: string; full_name: string; year_section: string }>>>(new Map());
   const [showFormalReceipt, setShowFormalReceipt] = useState(false);
+
+  const selectedYearSection = bulkYear && bulkSection ? `BSIT ${bulkYear}-${bulkSection}` : "";
+
+  const handleBulkYearChange = (newYear: string) => {
+    if (bulkStudents.length > 0 && newYear !== bulkYear) {
+      if (typeof window !== "undefined" && !window.confirm("Changing year level will reset the added students list to avoid mixing sections. Continue?")) {
+        return;
+      }
+      setBulkStudents([]);
+    }
+    setBulkYear(newYear);
+    const newSectionStr = newYear && bulkSection ? `BSIT ${newYear}-${bulkSection}` : "";
+    setCourseYear(newSectionStr);
+  };
+
+  const handleBulkSectionChange = (newSec: string) => {
+    if (bulkStudents.length > 0 && newSec !== bulkSection) {
+      if (typeof window !== "undefined" && !window.confirm("Changing class section will reset the added students list to avoid mixing sections. Continue?")) {
+        return;
+      }
+      setBulkStudents([]);
+    }
+    setBulkSection(newSec);
+    const newSectionStr = bulkYear && newSec ? `BSIT ${bulkYear}-${newSec}` : "";
+    setCourseYear(newSectionStr);
+  };
 
   // Calculate size counts directly from student list
   const activeBulkQuantities: Record<string, number> = useMemo(() => {
@@ -107,7 +134,7 @@ export default function MerchPage() {
     .map(([size, qty]) => `${qty}x ${size}`)
     .join(", ");
 
-  // Student directory search with caching
+  // Student directory search with caching and section filtering
   useEffect(() => {
     const trimmed = studentSearchInput.trim();
     if (trimmed.length < 2) {
@@ -116,20 +143,24 @@ export default function MerchPage() {
       return;
     }
 
-    const lower = trimmed.toLowerCase();
-    if (studentCacheRef.current.has(lower)) {
-      setStudentSearchResults(studentCacheRef.current.get(lower) || []);
+    const cacheKey = `${selectedYearSection || "ALL"}:${trimmed.toLowerCase()}`;
+    if (studentCacheRef.current.has(cacheKey)) {
+      setStudentSearchResults(studentCacheRef.current.get(cacheKey) || []);
       return;
     }
 
     setIsSearchingStudents(true);
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/students/search?q=${encodeURIComponent(trimmed)}`);
+        const params = new URLSearchParams({ q: trimmed });
+        if (isBulkOrder && selectedYearSection) {
+          params.append("section", selectedYearSection);
+        }
+        const res = await fetch(`/api/students/search?${params.toString()}`);
         if (res.ok) {
           const data = await res.json();
           const results = data.students || [];
-          studentCacheRef.current.set(lower, results);
+          studentCacheRef.current.set(cacheKey, results);
           setStudentSearchResults(results);
         }
       } catch (err) {
@@ -140,11 +171,11 @@ export default function MerchPage() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [studentSearchInput]);
+  }, [studentSearchInput, selectedYearSection, isBulkOrder]);
 
-  const handleAddStudentToRoster = (student: { full_name: string; student_no: string; year_section: string }) => {
+  const handleAddStudentToRoster = (student: { full_name: string; year_section: string }) => {
     const alreadyExists = bulkStudents.some(
-      (s) => (s.studentNo && s.studentNo === student.student_no) || s.studentName.toLowerCase() === student.full_name.toLowerCase()
+      (s) => s.studentName.toLowerCase() === student.full_name.toLowerCase()
     );
     if (alreadyExists) {
       setDetailsError(`${student.full_name} is already added to this bulk order.`);
@@ -154,7 +185,6 @@ export default function MerchPage() {
     setBulkStudents((prev) => [
       ...prev,
       {
-        studentNo: student.student_no,
         studentName: student.full_name,
         yearSection: student.year_section,
         size: "M",
@@ -171,12 +201,11 @@ export default function MerchPage() {
       ...prev,
       {
         studentName: customName.trim(),
-        yearSection: customSection.trim() || courseYear || "BSIT",
+        yearSection: selectedYearSection || courseYear || "BSIT",
         size: "M",
       },
     ]);
     setCustomName("");
-    setCustomSection("");
     setShowCustomModal(false);
     setDetailsError(null);
   };
@@ -368,6 +397,11 @@ export default function MerchPage() {
 
     if (!courseYear.trim()) {
       setDetailsError("Please enter your Course and Section (e.g. BSINFO 3-A).");
+      return;
+    }
+
+    if (isBulkOrder && (!bulkYear || !bulkSection)) {
+      setDetailsError("Please choose your Year Level and Section for this bulk order.");
       return;
     }
 
@@ -1125,16 +1159,77 @@ export default function MerchPage() {
                     ) : (
                       /* BULK ORDER SECTION: Direct Student Selection & Sizing */
                       <div className="space-y-3">
+                        {/* Section Selector for Bulk Order */}
+                        <div className="p-3.5 rounded-2xl bg-gold/10 border border-gold/30 space-y-2.5">
+                          <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                            <div className="flex items-center gap-1.5 text-gold">
+                              <Users size={14} />
+                              <span>Select Class Section:</span>
+                            </div>
+                            {selectedYearSection ? (
+                              <span className="px-2 py-0.5 rounded-md bg-gold text-[#0D1117] font-bold text-xs">
+                                {selectedYearSection}
+                              </span>
+                            ) : (
+                              <span className="text-[10.5px] text-rose-500 font-semibold animate-pulse">
+                                Required for Bulk Order
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+                            <div>
+                              <label className="block text-[10.5px] text-muted mb-1 font-semibold">Year Level *</label>
+                              <select
+                                value={bulkYear}
+                                onChange={(e) => handleBulkYearChange(e.target.value)}
+                                className="w-full px-3 py-2 rounded-xl bg-surface border border-border/80 text-foreground-theme focus:border-gold outline-none cursor-pointer"
+                              >
+                                <option value="">Choose Year...</option>
+                                <option value="1">1st Year</option>
+                                <option value="2">2nd Year</option>
+                                <option value="3">3rd Year</option>
+                                <option value="4">4th Year</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10.5px] text-muted mb-1 font-semibold">Section *</label>
+                              <select
+                                value={bulkSection}
+                                onChange={(e) => handleBulkSectionChange(e.target.value)}
+                                className="w-full px-3 py-2 rounded-xl bg-surface border border-border/80 text-foreground-theme focus:border-gold outline-none cursor-pointer"
+                              >
+                                <option value="">Choose Section...</option>
+                                <option value="A">Section A</option>
+                                <option value="B">Section B</option>
+                                <option value="C">Section C</option>
+                                <option value="D">Section D</option>
+                                <option value="E">Section E</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Autocomplete Input */}
                         <div className="relative">
                           <div className="relative flex items-center">
                             <Search size={14} className="absolute left-3 text-muted pointer-events-none" />
                             <input
                               type="text"
-                              placeholder="Type student name or ID (e.g. Capistrano, 2026-S...)"
+                              disabled={!selectedYearSection}
+                              placeholder={
+                                selectedYearSection
+                                  ? `Type classmate name in ${selectedYearSection}...`
+                                  : "Select Year Level & Section above to search class roster..."
+                              }
                               value={studentSearchInput}
                               onChange={(e) => setStudentSearchInput(e.target.value)}
-                              className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-black/5 dark:bg-white/[0.04] border border-border/70 focus:border-gold focus:ring-1 focus:ring-gold text-xs font-mono text-foreground-theme placeholder:text-muted transition-all outline-none"
+                              className={`w-full pl-9 pr-9 py-2.5 rounded-xl border text-xs font-mono transition-all outline-none ${
+                                !selectedYearSection
+                                  ? "bg-black/5 dark:bg-white/[0.02] border-border/40 text-muted placeholder:text-muted/60 opacity-60 cursor-not-allowed"
+                                  : "bg-black/5 dark:bg-white/[0.04] border-border/70 focus:border-gold focus:ring-1 focus:ring-gold text-foreground-theme placeholder:text-muted"
+                              }`}
                             />
                             {isSearchingStudents && (
                               <Loader2 size={14} className="absolute right-3 animate-spin text-gold" />
@@ -1156,11 +1251,11 @@ export default function MerchPage() {
                                       {st.full_name}
                                     </strong>
                                     <span className="text-[10.5px] text-muted">
-                                      {st.year_section} · {st.student_no}
+                                      {st.year_section}
                                     </span>
                                   </div>
                                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gold/20 text-gold opacity-0 group-hover:opacity-100 transition-opacity">
-                                    + Tap to Add
+                                    + Add
                                   </span>
                                 </button>
                               ))}
@@ -1173,8 +1268,9 @@ export default function MerchPage() {
                           <span>Student not in list?</span>
                           <button
                             type="button"
+                            disabled={!selectedYearSection}
                             onClick={() => setShowCustomModal(true)}
-                            className="text-gold hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
+                            className="text-gold hover:underline font-bold inline-flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             <Plus size={12} />
                             <span>Add Custom Student</span>
@@ -1200,7 +1296,7 @@ export default function MerchPage() {
                                       </strong>
                                     </div>
                                     <span className="text-[10.5px] text-muted block pl-6">
-                                      {st.yearSection || courseYear || "BSIT"} {st.studentNo ? `· ${st.studentNo}` : ""}
+                                      {st.yearSection || selectedYearSection || "BSIT"}
                                     </span>
                                   </div>
 
@@ -1245,7 +1341,9 @@ export default function MerchPage() {
                             <Users size={20} className="mx-auto text-muted/60" />
                             <p>No students added yet.</p>
                             <p className="text-[10.5px] text-muted/80">
-                              Type classmate names in the search box above to add them to your bulk order.
+                              {selectedYearSection
+                                ? `Type names in the search box above to add students from ${selectedYearSection}.`
+                                : "Select your Year Level and Section above to begin adding students."}
                             </p>
                           </div>
                         )}
@@ -1343,16 +1441,69 @@ export default function MerchPage() {
                       </label>
 
                       <div className="space-y-2 font-mono text-xs">
-                        <div>
-                          <input
-                            type="text"
-                            required
-                            value={courseYear}
-                            onChange={(e) => setCourseYear(e.target.value)}
-                            placeholder="Course &amp; Section (e.g. BSINFO 3-A) *"
-                            className="w-full px-3.5 py-3 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme placeholder:text-muted/60 focus:outline-none focus:border-gold"
-                          />
-                        </div>
+                        {isBulkOrder ? (
+                          <div>
+                            <label className="block text-[11px] text-muted mb-1 font-semibold">
+                              Class Section (Bulk Order)
+                            </label>
+                            <div className="w-full px-3.5 py-2.5 rounded-xl bg-gold/10 border border-gold/30 text-gold font-mono font-bold text-xs flex items-center justify-between">
+                              <span>{selectedYearSection || "No Section Selected"}</span>
+                              <span className="text-[10.5px] text-muted font-normal">Locked from Step 1</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-[11px] text-muted mb-1 font-semibold">
+                              Class Year &amp; Section *
+                            </label>
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                              <select
+                                value={bulkYear}
+                                onChange={(e) => {
+                                  const yr = e.target.value;
+                                  setBulkYear(yr);
+                                  if (yr && bulkSection) {
+                                    setCourseYear(`BSIT ${yr}-${bulkSection}`);
+                                  }
+                                }}
+                                className="w-full px-3 py-2.5 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme focus:border-gold outline-none cursor-pointer text-xs"
+                              >
+                                <option value="">Year Level...</option>
+                                <option value="1">1st Year</option>
+                                <option value="2">2nd Year</option>
+                                <option value="3">3rd Year</option>
+                                <option value="4">4th Year</option>
+                              </select>
+                              <select
+                                value={bulkSection}
+                                onChange={(e) => {
+                                  const sec = e.target.value;
+                                  setBulkSection(sec);
+                                  if (bulkYear && sec) {
+                                    setCourseYear(`BSIT ${bulkYear}-${sec}`);
+                                  }
+                                }}
+                                className="w-full px-3 py-2.5 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme focus:border-gold outline-none cursor-pointer text-xs"
+                              >
+                                <option value="">Section...</option>
+                                <option value="A">Section A</option>
+                                <option value="B">Section B</option>
+                                <option value="C">Section C</option>
+                                <option value="D">Section D</option>
+                                <option value="E">Section E</option>
+                              </select>
+                            </div>
+                            {(!bulkYear || !bulkSection) && (
+                              <input
+                                type="text"
+                                value={courseYear}
+                                onChange={(e) => setCourseYear(e.target.value)}
+                                placeholder="Or specify program / faculty (e.g. BSCS 3-A, Faculty) *"
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-black/5 dark:bg-black/30 border border-border/70 text-foreground-theme placeholder:text-muted/60 focus:outline-none focus:border-gold text-xs"
+                              />
+                            )}
+                          </div>
+                        )}
 
                         <div>
                           <input
@@ -1449,14 +1600,10 @@ export default function MerchPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] text-muted mb-1">Year & Section</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. BSIT 3-A"
-                    value={customSection}
-                    onChange={(e) => setCustomSection(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-black/5 dark:bg-white/[0.04] border border-border/70 text-foreground-theme text-xs"
-                  />
+                  <label className="block text-[11px] text-muted mb-1">Class Section</label>
+                  <div className="w-full p-2.5 rounded-xl bg-gold/10 border border-gold/30 text-gold font-mono font-bold text-xs">
+                    {selectedYearSection || courseYear || "BSIT"}
+                  </div>
                 </div>
               </div>
 

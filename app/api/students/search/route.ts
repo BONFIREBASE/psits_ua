@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get('q') || '').trim();
+    const section = (searchParams.get('section') || '').trim();
 
     if (!q || q.length < 2) {
       return NextResponse.json({ students: [] });
@@ -18,12 +19,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ students: [] });
     }
 
-    const { data, error } = await supabase
+    // Omit student_no to protect student privacy and avoid identity theft
+    let query = supabase
       .from('students')
-      .select('id, student_no, full_name, year_section, program')
-      .or(`full_name.ilike.%${cleanQ}%,student_no.ilike.%${cleanQ}%`)
-      .eq('is_active', true)
-      .limit(12);
+      .select('id, full_name, year_section, program')
+      .ilike('full_name', `%${cleanQ}%`)
+      .eq('is_active', true);
+
+    if (section) {
+      query = query.eq('year_section', section);
+    }
+
+    const { data, error } = await query.limit(12);
 
     if (error) {
       console.error('Student search error:', error);
