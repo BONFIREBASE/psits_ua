@@ -80,7 +80,8 @@ export function postRowToSocialDispatch(row: PostRow) {
       photographer: rowCredits.photographer || undefined,
       pubmat: rowCredits.pubmat || undefined,
       videographer: rowCredits.videographer || undefined,
-      prepared_by: rowCredits.prepared_by || rowCredits.preparedby || undefined,
+      publish_by: rowCredits.publish_by || rowCredits.published_by || rowCredits.prepared_by || rowCredits.preparedby || undefined,
+      prepared_by: rowCredits.publish_by || rowCredits.published_by || rowCredits.prepared_by || rowCredits.preparedby || undefined,
       ...rowCredits,
     },
   };

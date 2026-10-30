@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import MarkdownContent from '@/components/MarkdownContent'
 import { socialDispatches, type SocialDispatch } from '@/data/announcements'
-import { getPosts, postRowToSocialDispatch, getOfficers, type OfficerRow } from '@/lib/supabase'
+import { getPosts, postRowToSocialDispatch, getPubmatMembers, type OfficerRow } from '@/lib/supabase'
 import { deleteBlogPost, seedInitialPosts, updateBlogPost } from './actions'
 import StatusBadge from '../_components/StatusBadge'
 import { ManagementListSkeleton } from '../_components/SkeletonPreloader'
@@ -81,7 +81,7 @@ export default function BlogListPage() {
   // Load all members (officers + pubmat) for credits
   async function loadMembers() {
     try {
-      const members = await getOfficers()
+      const members = await getPubmatMembers()
       setAllMembers(members)
     } catch (error) {
       console.error('Failed to load members:', error)
@@ -626,7 +626,7 @@ export default function BlogListPage() {
                           { value: 'Writer', label: 'Writer' },
                           { value: 'Videographer', label: 'Videographer' },
                           { value: 'Photographer', label: 'Photographer' },
-                          { value: 'Prepared by', label: 'Prepared by' },
+                          { value: 'Publish by', label: 'Publish by' },
                         ]}
                       />
                     </div>

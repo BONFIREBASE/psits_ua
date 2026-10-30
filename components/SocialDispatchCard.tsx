@@ -299,12 +299,12 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
                               </span>
                             </>
                           )}
-                          {dispatch.credits.prepared_by && (
+                          {(dispatch.credits.publish_by || dispatch.credits.prepared_by) && (
                             <>
                               {(dispatch.credits.writer || dispatch.credits.photographer || dispatch.credits.pubmat || dispatch.credits.videographer) && <span className="text-black/20 dark:text-white/20">·</span>}
                               <span className="flex items-center gap-1.5">
                                 <FileText size={13} className="text-gold" />
-                                Prepared by: <strong className="text-slate-900 dark:text-white">{dispatch.credits.prepared_by}</strong>
+                                Publish by: <strong className="text-slate-900 dark:text-white">{dispatch.credits.publish_by || dispatch.credits.prepared_by}</strong>
                               </span>
                             </>
                           )}

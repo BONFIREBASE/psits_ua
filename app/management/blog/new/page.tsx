@@ -10,7 +10,7 @@ import Select from '../../_components/Select'
 import FileUpload from '../../_components/FileUpload'
 import { useToast } from '../../_components/Toast'
 import { createBlogPost } from '../actions'
-import { getOfficers, type OfficerRow } from '@/lib/supabase'
+import { getPubmatMembers, type OfficerRow } from '@/lib/supabase'
 
 const categories = ['Event Recap', 'Campus Event', 'Recruitment', 'Official Advisory'] as const
 
@@ -42,7 +42,7 @@ export default function NewBlogPostPage() {
   useEffect(() => {
     async function loadMembers() {
       try {
-        const members = await getOfficers() // Get ALL officers + pubmat
+        const members = await getPubmatMembers() // PubMat members only
         setPubmatMembers(members)
       } catch (error) {
         console.error('Failed to load members:', error)
@@ -344,7 +344,7 @@ export default function NewBlogPostPage() {
                       { value: 'Writer', label: 'Writer' },
                       { value: 'Videographer', label: 'Videographer' },
                       { value: 'Photographer', label: 'Photographer' },
-                      { value: 'Prepared by', label: 'Prepared by' },
+                      { value: 'Publish by', label: 'Publish by' },
                     ]}
                   />
                 </FormField>

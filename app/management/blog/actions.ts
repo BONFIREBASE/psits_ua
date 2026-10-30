@@ -25,7 +25,8 @@ function parseCreditsFromFormData(formData: FormData): Record<string, string> | 
       if (Array.isArray(parsed)) {
         parsed.forEach((item: { role?: string; name?: string }) => {
           if (item?.role && item?.name) {
-            const key = item.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
+            let key = item.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (key === 'published_by' || key === 'prepared_by' || key === 'preparedby') key = 'publish_by';
             const name = item.name.trim();
             credits[key] = credits[key] ? `${credits[key]}, ${name}` : name;
           }
@@ -33,7 +34,8 @@ function parseCreditsFromFormData(formData: FormData): Record<string, string> | 
       } else if (typeof parsed === 'object' && parsed !== null) {
         Object.entries(parsed).forEach(([k, v]) => {
           if (typeof v === 'string' && v.trim()) {
-            const key = k.toLowerCase().replace(/[\s-]+/g, '_');
+            let key = k.toLowerCase().replace(/[\s-]+/g, '_');
+            if (key === 'published_by' || key === 'prepared_by' || key === 'preparedby') key = 'publish_by';
             const val = v.trim();
             credits[key] = credits[key] ? `${credits[key]}, ${val}` : val;
           }
@@ -117,36 +119,76 @@ export async function createBlogPost(formData: FormData): Promise<ActionResult> 
     // Build credits object from dynamic JSON array or fallback fields
     const credits = parseCreditsFromFormData(formData);
 
-    const { data, error } = await supabaseAdmin
-      .from('posts')
-      .insert({
-        slug,
-        title,
-        category,
-        date,
-        excerpt,
-        full_content: fullContent,
-        image_url: imageUrl,
-        highlight_quote: highlightQuote,
-        quote_author: quoteAuthor,
-        post_url: postUrl,
-        tags,
-        credits,
-      })
-      .select()
-      .maybeSingle();
+    const postPayload = {
+      slug,
+      title,
+      category,
+      date,
+      excerpt,
+      full_content: fullContent,
+      image_url: imageUrl || null,
+      highlight_quote: highlightQuote || null,
+      quote_author: quoteAuthor || null,
+      post_url: postUrl || null,
+      tags: Array.isArray(tags) ? tags : [],
+      credits: credits && Object.keys(credits).length > 0 ? credits : null,
+    };
 
-    if (error) {
-      console.error('[Supabase Insert Error]:', error);
-      const detailMsg = error.details ? ` (${error.details})` : '';
-      return { success: false, error: `${error.message}${detailMsg}` };
+    let postData: unknown = null;
+    let postErrorMsg: string | null = null;
+
+    // 1. Try Supabase Client insert
+    const { data: insertedRows, error: insertError } = await supabaseAdmin
+      .from('posts')
+      .insert([postPayload])
+      .select();
+
+    if (!insertError && insertedRows && insertedRows.length > 0) {
+      postData = insertedRows[0];
+    } else {
+      if (insertError) {
+        console.warn('[Supabase Client Insert Failed, running direct REST fallback]:', insertError);
+      }
+
+      // 2. Guaranteed Direct REST Call with verified JSON headers
+      const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://tcegaknsectohxpilrdp.supabase.co').replace(/\/$/, '');
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+      try {
+        const restRes = await fetch(`${supabaseUrl}/rest/v1/posts`, {
+          method: 'POST',
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: JSON.stringify(postPayload),
+        });
+
+        if (restRes.ok) {
+          const rows = await restRes.json();
+          postData = Array.isArray(rows) ? rows[0] : rows;
+        } else {
+          const errBody = await restRes.text();
+          console.error('[Supabase Direct REST Error]:', restRes.status, errBody);
+          postErrorMsg = insertError ? `${insertError.message} (${insertError.details || errBody})` : `Insert failed (${restRes.status}): ${errBody}`;
+        }
+      } catch (fetchErr) {
+        console.error('[Supabase Direct REST Fetch Exception]:', fetchErr);
+        postErrorMsg = fetchErr instanceof Error ? fetchErr.message : 'Database network error';
+      }
+    }
+
+    if (!postData) {
+      return { success: false, error: postErrorMsg || 'Failed to save post to database.' };
     }
 
     revalidatePath('/');
     revalidatePath('/management/blog');
     revalidatePath('/management/dashboard');
 
-    return { success: true, data };
+    return { success: true, data: postData };
   } catch (err: unknown) {
     console.error('[Create Post Error]:', err);
     return {
