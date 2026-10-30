@@ -19,7 +19,9 @@ import {
   Pencil,
   Trash2,
   AlertCircle,
+  FileText,
 } from "lucide-react";
+import FormalMerchReceipt from "@/components/FormalMerchReceipt";
 import type { MerchOrderRow, MerchOrderStatus, MerchPaymentStatus, PoloShirtSize } from "@/lib/supabase";
 import FormField, { inputStyles, textareaStyles } from "../_components/FormField";
 import { MerchOrdersTableSkeleton } from "../_components/SkeletonPreloader";
@@ -79,6 +81,7 @@ export default function MerchOrdersManagementPage() {
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedReceiptOrder, setSelectedReceiptOrder] = useState<MerchOrderRow | null>(null);
+  const [showOfficialReceipt, setShowOfficialReceipt] = useState<MerchOrderRow | null>(null);
   const [receiptImageLoading, setReceiptImageLoading] = useState(true);
 
   // Edit Order State
@@ -814,6 +817,14 @@ export default function MerchOrdersManagementPage() {
         </div>
       )}
 
+      {/* Official PSITS Generated Receipt Modal */}
+      {showOfficialReceipt && (
+        <FormalMerchReceipt
+          order={showOfficialReceipt}
+          onClose={() => setShowOfficialReceipt(null)}
+        />
+      )}
+
       {/* Receipt Preview Modal */}
       {selectedReceiptOrder && (
         <div
@@ -895,7 +906,15 @@ export default function MerchOrdersManagementPage() {
                 </span>
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowOfficialReceipt(selectedReceiptOrder)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold bg-gold hover:bg-gold-light text-[#0D1117] transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Official Receipt</span>
+                </button>
                 {selectedReceiptOrder.payment_status !== "verified" ? (
                   <button
                     onClick={() => {

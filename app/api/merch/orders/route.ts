@@ -374,11 +374,27 @@ export async function POST(req: NextRequest) {
     }
 
     const totalAmount = quantity * POLO_PRICE;
-    const finalNotes = isBulk
-      ? notes
+    const bulkItemsRaw = formData.get("bulk_items") as string;
+    let finalNotes = notes || null;
+    if (isBulk && bulkItemsRaw) {
+      try {
+        const parsedItems = JSON.parse(bulkItemsRaw);
+        if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+          finalNotes = JSON.stringify({
+            customerNote: notes || "",
+            bulkItems: parsedItems,
+          });
+        }
+      } catch {
+        finalNotes = notes
+          ? `${notes} [Bulk: ${bulkBreakdown}]`
+          : `Bulk order: ${bulkBreakdown}`;
+      }
+    } else if (isBulk) {
+      finalNotes = notes
         ? `${notes} [Bulk: ${bulkBreakdown}]`
-        : `Bulk order: ${bulkBreakdown}`
-      : notes || null;
+        : `Bulk order: ${bulkBreakdown}`;
+    }
 
     const newOrderData: Partial<MerchOrderRow> = {
       id: orderId,
