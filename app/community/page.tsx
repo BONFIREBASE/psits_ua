@@ -2123,31 +2123,6 @@ export default function CommunityPage() {
     }
   }, [selectedTag])
 
-  /* ─── 4.5 Suppress Appwrite SDK non-fatal WebSocket reconnect logs (dev only) ─── */
-  useEffect(() => {
-    if (process.env.NODE_ENV !== 'development') return
-
-    const originalConsoleError = console.error
-    console.error = (...args: unknown[]) => {
-      // The Appwrite SDK logs "Realtime got disconnected. Reconnect will be attempted in X seconds."
-      // This is a non-fatal informational message — the SDK handles reconnection automatically.
-      // Next.js Turbopack intercepts ALL console.error calls and renders a full-screen overlay,
-      // which is disruptive. Downgrade to console.warn instead.
-      if (
-        typeof args[0] === 'string' &&
-        args[0].includes('Realtime got disconnected')
-      ) {
-        console.warn('[Appwrite SDK]', ...args)
-        return
-      }
-      originalConsoleError.apply(console, args)
-    }
-
-    return () => {
-      console.error = originalConsoleError
-    }
-  }, [])
-
   /* ─── 5. Appwrite Realtime Subscriptions (Live Feed & Instant Moderator Takedown) ─── */
   /* Subscribe ONCE on mount. Uses activeCommentPostRef to avoid re-subscribing on every comment toggle. */
   useEffect(() => {

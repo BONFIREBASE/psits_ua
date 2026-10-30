@@ -528,7 +528,7 @@ export default function MerchPage() {
 
                     <div className="flex items-baseline justify-between pt-1">
                       <span className="text-2xl font-black font-display text-gold">₱{POLO_PRICE}.00</span>
-                      <span className="text-[11px] font-mono text-muted">Sizes XS – XL</span>
+                      <span className="text-[11px] font-mono text-muted">Sizes XS – XL · Single &amp; Bulk</span>
                     </div>
                   </div>
 
@@ -926,7 +926,7 @@ export default function MerchPage() {
                     <div className="flex items-baseline justify-between pt-0.5 sm:pt-1">
                       <span className="text-2xl sm:text-3xl font-black font-display text-gold">₱{currentTotalAmount}.00</span>
                       <span className="text-[11px] sm:text-xs font-mono text-muted">
-                        ₱475.00 each
+                        {isBulkOrder ? `${currentQuantity} ${currentQuantity === 1 ? "shirt" : "shirts"} selected` : "₱475.00 each"}
                       </span>
                     </div>
                   </div>
@@ -942,8 +942,34 @@ export default function MerchPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                        1. Select Size
+                        1. {isBulkOrder ? "Select Bulk Sizes" : "Select Size"}
                       </label>
+
+                      {/* Single vs Bulk Switch */}
+                      <div className="inline-flex items-center p-0.5 rounded-xl bg-black/5 dark:bg-white/[0.04] border border-border/60 text-[11px] font-mono">
+                        <button
+                          type="button"
+                          onClick={() => setIsBulkOrder(false)}
+                          className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer font-semibold ${
+                            !isBulkOrder
+                              ? "bg-gold text-[#0D1117] shadow-xs"
+                              : "text-muted hover:text-foreground-theme"
+                          }`}
+                        >
+                          Single (1)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsBulkOrder(true)}
+                          className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer font-semibold ${
+                            isBulkOrder
+                              ? "bg-gold text-[#0D1117] shadow-xs"
+                              : "text-muted hover:text-foreground-theme"
+                          }`}
+                        >
+                          Bulk Order
+                        </button>
+                      </div>
                     </div>
 
                     {!isBulkOrder ? (

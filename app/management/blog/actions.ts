@@ -26,13 +26,16 @@ function parseCreditsFromFormData(formData: FormData): Record<string, string> | 
         parsed.forEach((item: { role?: string; name?: string }) => {
           if (item?.role && item?.name) {
             const key = item.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
-            credits[key] = item.name.trim();
+            const name = item.name.trim();
+            credits[key] = credits[key] ? `${credits[key]}, ${name}` : name;
           }
         });
       } else if (typeof parsed === 'object' && parsed !== null) {
         Object.entries(parsed).forEach(([k, v]) => {
           if (typeof v === 'string' && v.trim()) {
-            credits[k.toLowerCase().replace(/[\s-]+/g, '_')] = v.trim();
+            const key = k.toLowerCase().replace(/[\s-]+/g, '_');
+            const val = v.trim();
+            credits[key] = credits[key] ? `${credits[key]}, ${val}` : val;
           }
         });
       }
@@ -131,11 +134,12 @@ export async function createBlogPost(formData: FormData): Promise<ActionResult> 
         credits,
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('[Supabase Insert Error]:', error);
-      return { success: false, error: error.message };
+      const detailMsg = error.details ? ` (${error.details})` : '';
+      return { success: false, error: `${error.message}${detailMsg}` };
     }
 
     revalidatePath('/');
@@ -226,10 +230,19 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<Ac
       .update(updatePayload)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
-      return { success: false, error: error.message };
+      console.error('[Supabase Update Error]:', error);
+      const detailMsg = error.details ? ` (${error.details})` : '';
+      return { success: false, error: `${error.message}${detailMsg}` };
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        error: 'Post record not found in database. If this is a static dispatch, please seed initial posts to the database first.',
+      };
     }
 
     revalidatePath('/');

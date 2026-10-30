@@ -116,7 +116,7 @@ export default function Navbar() {
   const myHandleNormalized = normalizeCommunityHandle(communityUser?.username || communityUser?.name || '')
 
   useEffect(() => {
-    if (!myHandleNormalized) return
+    if (!isCommunity || !myHandleNormalized) return
     let ignore = false
 
     const fetchNotifs = async () => {
@@ -180,7 +180,7 @@ export default function Navbar() {
       ignore = true
       if (unsubscribe) unsubscribe()
     }
-  }, [myHandleNormalized, communityUser?.email])
+  }, [isCommunity, myHandleNormalized, communityUser?.email])
 
   const handleNotificationClick = async (item: CommunityNotificationItem) => {
     if (!item.is_read) {

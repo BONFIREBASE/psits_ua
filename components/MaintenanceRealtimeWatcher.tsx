@@ -70,7 +70,7 @@ export default function MaintenanceRealtimeWatcher() {
       isMounted = false
       if (unsubscribe) unsubscribe()
     }
-  }, [pathname, isExempt])
+  }, [isExempt])
 
   if (isExempt || !activeConfig || !activeConfig.is_enabled) {
     return null
