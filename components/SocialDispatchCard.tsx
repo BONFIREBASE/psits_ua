@@ -232,13 +232,30 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
                         </div>
                       )}
 
-                      <div className="pb-6 border-b border-black/10 dark:border-white/10">
-                        <p
-                          className="text-base sm:text-lg leading-[1.8] font-medium text-slate-900 dark:text-white"
-                        >
-                          {dispatch.excerpt}
-                        </p>
-                      </div>
+                      {Boolean(
+                        dispatch.excerpt &&
+                          (!dispatch.fullContent ||
+                            !dispatch.fullContent
+                              .replace(/^[\s\u200B-\u200D\uFEFF\u200E\u200F]+/, '')
+                              .replace(/\s+/g, ' ')
+                              .toLowerCase()
+                              .startsWith(
+                                dispatch.excerpt
+                                  .replace(/^[\s\u200B-\u200D\uFEFF\u200E\u200F]+/, '')
+                                  .replace(/\.\.\.$/, '')
+                                  .slice(0, 40)
+                                  .replace(/\s+/g, ' ')
+                                  .toLowerCase()
+                              ))
+                      ) && (
+                        <div className="pb-6 border-b border-black/10 dark:border-white/10">
+                          <p
+                            className="text-base sm:text-lg leading-[1.8] font-medium text-slate-900 dark:text-white"
+                          >
+                            {dispatch.excerpt}
+                          </p>
+                        </div>
+                      )}
 
                       <div className="space-y-4">
                         <MarkdownContent content={dispatch.fullContent} />

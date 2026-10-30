@@ -105,16 +105,34 @@ export default function BlogListPage() {
     setEditQuoteAuthor(post.quoteAuthor || '')
     setEditPostUrl(post.postUrl || '')
     setEditTags(post.tags?.join(', ') || '')
-    // Parse credits object into array format
+    // Parse credits object into array format with role mapping and multi-name splitting
     const creditsArray: Array<{ role: string; name: string }> = []
     if (post.credits) {
+      const roleMap: Record<string, string> = {
+        writer: 'Writer',
+        photographer: 'Photographer',
+        pubmat: 'Pubmat',
+        videographer: 'Videographer',
+        publish_by: 'Publish by',
+        published_by: 'Publish by',
+        prepared_by: 'Publish by',
+      }
+      const seen = new Set<string>()
       const c = post.credits as Record<string, string>
-      Object.entries(c).forEach(([role, name]) => {
-        if (name) {
-          // Capitalize first letter of role for display
-          const displayRole = role.charAt(0).toUpperCase() + role.slice(1)
-          creditsArray.push({ role: displayRole, name })
-        }
+      Object.entries(c).forEach(([roleKey, rawName]) => {
+        if (!rawName) return
+        const normKey = roleKey.trim().toLowerCase().replace(/[\s-]+/g, '_')
+        const displayRole = roleMap[normKey] || (roleKey.charAt(0).toUpperCase() + roleKey.slice(1))
+        
+        // Split comma-separated names so each member is matched to an individual option
+        const names = rawName.split(',').map((s) => s.trim()).filter(Boolean)
+        names.forEach((name) => {
+          const dedupeKey = `${displayRole}:::${name}`
+          if (!seen.has(dedupeKey)) {
+            seen.add(dedupeKey)
+            creditsArray.push({ role: displayRole, name })
+          }
+        })
       })
     }
     setEditCredits(creditsArray)
@@ -164,7 +182,7 @@ export default function BlogListPage() {
 
     setIsUpdating(true)
     try {
-      const cleanStr = (s: string) => typeof s?.toWellFormed === 'function' ? s.toWellFormed().replace(/[\uD800-\uDFFF]/g, '').replace(/\u0000/g, '').trim() : (s || '').trim()
+      const cleanStr = (s: string) => typeof s?.toWellFormed === 'function' ? s.toWellFormed().replace(/\u0000/g, '').trim() : (s || '').trim()
       const formData = new FormData()
       formData.append('title', cleanStr(editTitle))
       formData.append('category', cleanStr(editCategory))

@@ -12,7 +12,7 @@ import { socialDispatches } from '@/data/announcements';
 function cleanUnicode(str: string | null | undefined): string | null {
   if (typeof str !== 'string') return null;
   const wellFormed = typeof str.toWellFormed === 'function' ? str.toWellFormed() : str;
-  const sanitized = wellFormed.replace(/[\uD800-\uDFFF]/g, '').replace(/\u0000/g, '').trim();
+  const sanitized = wellFormed.replace(/\u0000/g, '').trim();
   return sanitized || null;
 }
 

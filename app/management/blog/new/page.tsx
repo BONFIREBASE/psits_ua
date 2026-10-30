@@ -112,7 +112,7 @@ export default function NewBlogPostPage() {
     e.preventDefault()
     setIsSubmitting(true)
     try {
-      const cleanStr = (s: string) => typeof s?.toWellFormed === 'function' ? s.toWellFormed().replace(/[\uD800-\uDFFF]/g, '').replace(/\u0000/g, '').trim() : (s || '').trim()
+      const cleanStr = (s: string) => typeof s?.toWellFormed === 'function' ? s.toWellFormed().replace(/\u0000/g, '').trim() : (s || '').trim()
       const formData = new FormData()
       formData.append('title', cleanStr(form.title))
       formData.append('category', cleanStr(form.category))
