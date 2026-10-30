@@ -164,16 +164,18 @@ export default function BlogListPage() {
 
     setIsUpdating(true)
     try {
+      const cleanStr = (s: string) => typeof s?.toWellFormed === 'function' ? s.toWellFormed().replace(/[\uD800-\uDFFF]/g, '').replace(/\u0000/g, '').trim() : (s || '').trim()
       const formData = new FormData()
-      formData.append('title', editTitle)
-      formData.append('category', editCategory)
-      formData.append('date', editDate)
-      formData.append('fullContent', editContent)
-      formData.append('highlightQuote', editHighlightQuote)
-      formData.append('quoteAuthor', editQuoteAuthor)
-      formData.append('postUrl', editPostUrl)
-      formData.append('tags', editTags)
-      formData.append('credits', JSON.stringify(editCredits))
+      formData.append('title', cleanStr(editTitle))
+      formData.append('category', cleanStr(editCategory))
+      formData.append('date', cleanStr(editDate))
+      formData.append('fullContent', cleanStr(editContent))
+      formData.append('highlightQuote', cleanStr(editHighlightQuote))
+      formData.append('quoteAuthor', cleanStr(editQuoteAuthor))
+      formData.append('postUrl', cleanStr(editPostUrl))
+      formData.append('tags', cleanStr(editTags))
+      const safeCredits = editCredits.map(c => ({ role: cleanStr(c.role), name: cleanStr(c.name) }))
+      formData.append('credits', JSON.stringify(safeCredits))
       if (editThumbnail) {
         formData.append('thumbnail', editThumbnail)
       }

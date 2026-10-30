@@ -5,8 +5,25 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { uploadToR2, deleteFromR2 } from '@/lib/r2';
 import { socialDispatches } from '@/data/announcements';
 
+/**
+ * Sanitize string to prevent PostgreSQL "Unicode low surrogate must follow a high surrogate" (22P02)
+ * and ensure 100% valid UTF-8 and valid JSON.
+ */
+function cleanUnicode(str: string | null | undefined): string | null {
+  if (typeof str !== 'string') return null;
+  const wellFormed = typeof str.toWellFormed === 'function' ? str.toWellFormed() : str;
+  const sanitized = wellFormed.replace(/[\uD800-\uDFFF]/g, '').replace(/\u0000/g, '').trim();
+  return sanitized || null;
+}
+
+function cleanUnicodeRequired(str: string | null | undefined, fallback = ''): string {
+  const cleaned = cleanUnicode(str);
+  return cleaned !== null ? cleaned : fallback;
+}
+
 function slugify(text: string): string {
-  const base = text
+  const safeText = cleanUnicode(text) || 'post';
+  const base = safeText
     .toLowerCase()
     .trim()
     .replace(/[^\w\s-]/g, '')
@@ -27,8 +44,10 @@ function parseCreditsFromFormData(formData: FormData): Record<string, string> | 
           if (item?.role && item?.name) {
             let key = item.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
             if (key === 'published_by' || key === 'prepared_by' || key === 'preparedby') key = 'publish_by';
-            const name = item.name.trim();
-            credits[key] = credits[key] ? `${credits[key]}, ${name}` : name;
+            const name = cleanUnicode(item.name);
+            if (name) {
+              credits[key] = credits[key] ? `${credits[key]}, ${name}` : name;
+            }
           }
         });
       } else if (typeof parsed === 'object' && parsed !== null) {
@@ -36,8 +55,10 @@ function parseCreditsFromFormData(formData: FormData): Record<string, string> | 
           if (typeof v === 'string' && v.trim()) {
             let key = k.toLowerCase().replace(/[\s-]+/g, '_');
             if (key === 'published_by' || key === 'prepared_by' || key === 'preparedby') key = 'publish_by';
-            const val = v.trim();
-            credits[key] = credits[key] ? `${credits[key]}, ${val}` : val;
+            const val = cleanUnicode(v);
+            if (val) {
+              credits[key] = credits[key] ? `${credits[key]}, ${val}` : val;
+            }
           }
         });
       }
@@ -46,13 +67,15 @@ function parseCreditsFromFormData(formData: FormData): Record<string, string> | 
     }
   }
 
-  const creditWriter = (formData.get('creditWriter') as string)?.trim();
-  const creditPhotographer = (formData.get('creditPhotographer') as string)?.trim();
-  const creditPubmat = (formData.get('creditPubmat') as string)?.trim();
+  const creditWriter = cleanUnicode(formData.get('creditWriter') as string);
+  const creditPhotographer = cleanUnicode(formData.get('creditPhotographer') as string);
+  const creditPubmat = cleanUnicode(formData.get('creditPubmat') as string);
+  const creditPublishBy = cleanUnicode((formData.get('creditPublishBy') || formData.get('creditPreparedBy')) as string);
 
   if (creditWriter && !credits.writer) credits.writer = creditWriter;
   if (creditPhotographer && !credits.photographer) credits.photographer = creditPhotographer;
   if (creditPubmat && !credits.pubmat) credits.pubmat = creditPubmat;
+  if (creditPublishBy && !credits.publish_by) credits.publish_by = creditPublishBy;
 
   return Object.keys(credits).length > 0 ? credits : null;
 }
@@ -69,31 +92,35 @@ export interface ActionResult<T = unknown> {
  */
 export async function createBlogPost(formData: FormData): Promise<ActionResult> {
   try {
-    const title = (formData.get('title') as string)?.trim();
-    const category = (formData.get('category') as string)?.trim() || 'Official Advisory';
-    const date = (formData.get('date') as string)?.trim() || new Date().toISOString().split('T')[0];
-    const fullContent = (formData.get('fullContent') as string)?.trim();
-    const rawExcerpt = (formData.get('excerpt') as string)?.trim();
-    // Auto-generate clean excerpt from full content (first 160 chars) if not explicitly provided
-    const excerpt =
-      rawExcerpt ||
-      (fullContent
-        ? (fullContent.length > 160
-            ? fullContent.slice(0, 157).replace(/[\r\n#*`>-]+/g, ' ').trim() + '...'
-            : fullContent.replace(/[\r\n#*`>-]+/g, ' ').trim())
-        : '');
+    const title = cleanUnicodeRequired(formData.get('title') as string);
+    const category = cleanUnicodeRequired(formData.get('category') as string, 'Official Advisory');
+    const date = cleanUnicodeRequired(formData.get('date') as string, new Date().toISOString().split('T')[0]);
+    const fullContent = cleanUnicodeRequired(formData.get('fullContent') as string);
+    const rawExcerpt = cleanUnicode(formData.get('excerpt') as string);
+    
+    // Auto-generate clean excerpt from full content (first 160 chars) if not explicitly provided.
+    // Use code-point splitting (Array.from) to NEVER slice an emoji surrogate pair in half!
+    let excerpt = rawExcerpt;
+    if (!excerpt && fullContent) {
+      const codePoints = Array.from(fullContent);
+      const sliced = codePoints.length > 160
+        ? codePoints.slice(0, 157).join('').replace(/[\r\n#*`>-]+/g, ' ').trim() + '...'
+        : fullContent.replace(/[\r\n#*`>-]+/g, ' ').trim();
+      excerpt = cleanUnicode(sliced) || '';
+    }
+    excerpt = excerpt || '';
 
-    const highlightQuote = (formData.get('highlightQuote') as string)?.trim() || null;
-    const quoteAuthor = (formData.get('quoteAuthor') as string)?.trim() || null;
-    const postUrl = (formData.get('postUrl') as string)?.trim() || null;
-    const tagsRaw = (formData.get('tags') as string)?.trim() || '';
+    const highlightQuote = cleanUnicode(formData.get('highlightQuote') as string);
+    const quoteAuthor = cleanUnicode(formData.get('quoteAuthor') as string);
+    const postUrl = cleanUnicode(formData.get('postUrl') as string);
+    const tagsRaw = cleanUnicode(formData.get('tags') as string) || '';
 
     if (!title || !fullContent) {
       return { success: false, error: 'Title and content are required.' };
     }
 
     const tags = tagsRaw
-      ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean)
+      ? tagsRaw.split(',').map((t) => cleanUnicode(t.trim())).filter((t): t is string => Boolean(t))
       : [];
 
     let imageUrl: string | null = null;
@@ -111,7 +138,7 @@ export async function createBlogPost(formData: FormData): Promise<ActionResult> 
         contentType: thumbnailFile.type || 'application/octet-stream',
       });
 
-      imageUrl = r2Upload.url;
+      imageUrl = cleanUnicode(r2Upload.url);
     }
 
     const slug = slugify(title);
@@ -120,17 +147,17 @@ export async function createBlogPost(formData: FormData): Promise<ActionResult> 
     const credits = parseCreditsFromFormData(formData);
 
     const postPayload = {
-      slug,
-      title,
-      category,
-      date,
-      excerpt,
-      full_content: fullContent,
-      image_url: imageUrl || null,
-      highlight_quote: highlightQuote || null,
-      quote_author: quoteAuthor || null,
-      post_url: postUrl || null,
-      tags: Array.isArray(tags) ? tags : [],
+      slug: cleanUnicodeRequired(slug, `post-${Date.now().toString(36)}`),
+      title: cleanUnicodeRequired(title),
+      category: cleanUnicodeRequired(category, 'Official Advisory'),
+      date: cleanUnicodeRequired(date, new Date().toISOString().split('T')[0]),
+      excerpt: cleanUnicodeRequired(excerpt),
+      full_content: cleanUnicodeRequired(fullContent),
+      image_url: cleanUnicode(imageUrl),
+      highlight_quote: cleanUnicode(highlightQuote),
+      quote_author: cleanUnicode(quoteAuthor),
+      post_url: cleanUnicode(postUrl),
+      tags: tags,
       credits: credits && Object.keys(credits).length > 0 ? credits : null,
     };
 
@@ -203,29 +230,33 @@ export async function createBlogPost(formData: FormData): Promise<ActionResult> 
  */
 export async function updateBlogPost(id: string, formData: FormData): Promise<ActionResult> {
   try {
-    const title = (formData.get('title') as string)?.trim();
-    const category = (formData.get('category') as string)?.trim() || 'Official Advisory';
-    const date = (formData.get('date') as string)?.trim() || new Date().toISOString().split('T')[0];
-    const fullContent = (formData.get('fullContent') as string)?.trim();
-    const rawExcerpt = (formData.get('excerpt') as string)?.trim();
-    const excerpt =
-      rawExcerpt ||
-      (fullContent
-        ? (fullContent.length > 160
-            ? fullContent.slice(0, 157).replace(/[\r\n#*`>-]+/g, ' ').trim() + '...'
-            : fullContent.replace(/[\r\n#*`>-]+/g, ' ').trim())
-        : '');
-    const highlightQuote = (formData.get('highlightQuote') as string)?.trim() || null;
-    const quoteAuthor = (formData.get('quoteAuthor') as string)?.trim() || null;
-    const postUrl = (formData.get('postUrl') as string)?.trim() || null;
-    const tagsRaw = (formData.get('tags') as string)?.trim() || '';
+    const title = cleanUnicodeRequired(formData.get('title') as string);
+    const category = cleanUnicodeRequired(formData.get('category') as string, 'Official Advisory');
+    const date = cleanUnicodeRequired(formData.get('date') as string, new Date().toISOString().split('T')[0]);
+    const fullContent = cleanUnicodeRequired(formData.get('fullContent') as string);
+    const rawExcerpt = cleanUnicode(formData.get('excerpt') as string);
+    
+    let excerpt = rawExcerpt;
+    if (!excerpt && fullContent) {
+      const codePoints = Array.from(fullContent);
+      const sliced = codePoints.length > 160
+        ? codePoints.slice(0, 157).join('').replace(/[\r\n#*`>-]+/g, ' ').trim() + '...'
+        : fullContent.replace(/[\r\n#*`>-]+/g, ' ').trim();
+      excerpt = cleanUnicode(sliced) || '';
+    }
+    excerpt = excerpt || '';
+
+    const highlightQuote = cleanUnicode(formData.get('highlightQuote') as string);
+    const quoteAuthor = cleanUnicode(formData.get('quoteAuthor') as string);
+    const postUrl = cleanUnicode(formData.get('postUrl') as string);
+    const tagsRaw = cleanUnicode(formData.get('tags') as string) || '';
 
     if (!id || !title || !fullContent) {
       return { success: false, error: 'Post ID, title, and content are required.' };
     }
 
     const tags = tagsRaw
-      ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean)
+      ? tagsRaw.split(',').map((t) => cleanUnicode(t.trim())).filter((t): t is string => Boolean(t))
       : [];
 
     let imageUrl: string | undefined = undefined;
@@ -243,7 +274,7 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<Ac
         contentType: thumbnailFile.type || 'application/octet-stream',
       });
 
-      imageUrl = r2Upload.url;
+      imageUrl = cleanUnicode(r2Upload.url) || undefined;
     }
 
     // Build credits object from dynamic JSON array or fallback fields
@@ -259,13 +290,16 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<Ac
       quote_author: quoteAuthor,
       post_url: postUrl,
       tags,
-      credits,
+      credits: credits && Object.keys(credits).length > 0 ? credits : null,
       updated_at: new Date().toISOString(),
     };
 
     if (imageUrl) {
       updatePayload.image_url = imageUrl;
     }
+
+    let updatedData: unknown = null;
+    let updateErrorMsg: string | null = null;
 
     const { data, error } = await supabaseAdmin
       .from('posts')
@@ -274,16 +308,47 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<Ac
       .select()
       .maybeSingle();
 
-    if (error) {
-      console.error('[Supabase Update Error]:', error);
-      const detailMsg = error.details ? ` (${error.details})` : '';
-      return { success: false, error: `${error.message}${detailMsg}` };
+    if (!error && data) {
+      updatedData = data;
+    } else {
+      if (error) {
+        console.warn('[Supabase Client Update Failed, running direct REST fallback]:', error);
+      }
+
+      // Direct REST PATCH fallback
+      const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://tcegaknsectohxpilrdp.supabase.co').replace(/\/$/, '');
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+      try {
+        const restRes = await fetch(`${supabaseUrl}/rest/v1/posts?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: JSON.stringify(updatePayload),
+        });
+
+        if (restRes.ok) {
+          const rows = await restRes.json();
+          updatedData = Array.isArray(rows) ? rows[0] : rows;
+        } else {
+          const errText = await restRes.text();
+          console.error('[Supabase Direct REST Patch Error]:', restRes.status, errText);
+          updateErrorMsg = error ? `${error.message} (${error.details || errText})` : `Update failed (${restRes.status}): ${errText}`;
+        }
+      } catch (fetchErr) {
+        console.error('[Supabase Direct REST Patch Exception]:', fetchErr);
+        updateErrorMsg = fetchErr instanceof Error ? fetchErr.message : 'Database network error';
+      }
     }
 
-    if (!data) {
+    if (!updatedData) {
       return {
         success: false,
-        error: 'Post record not found in database. If this is a static dispatch, please seed initial posts to the database first.',
+        error: updateErrorMsg || 'Post record not found in database. If this is a static dispatch, please seed initial posts to the database first.',
       };
     }
 
@@ -291,7 +356,7 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<Ac
     revalidatePath('/management/blog');
     revalidatePath('/management/dashboard');
 
-    return { success: true, data };
+    return { success: true, data: updatedData };
   } catch (err: unknown) {
     return {
       success: false,
