@@ -292,7 +292,7 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
   ctx.font = 'bold 12px "Courier Prime", "SF Mono", "Menlo", monospace';
   ctx.fillStyle = '#0F172A';
   ctx.textAlign = 'center';
-  ctx.fillText('CLAIM VENUE: PSITS Office, CCIS Building, Main Campus', baseWidth / 2, currentY);
+  ctx.fillText('CLAIM VENUE: PSITS Office, 2nd Floor, CCIS Building', baseWidth / 2, currentY);
 
   currentY += 18;
   ctx.font = '11px "Courier Prime", "SF Mono", "Menlo", monospace';

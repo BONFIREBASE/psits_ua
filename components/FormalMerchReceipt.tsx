@@ -309,7 +309,7 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
           {/* Claim Instructions & Location (No emojis) */}
           <div className="text-center space-y-1 text-[10.5px] text-slate-600 relative z-10">
             <p className="font-bold text-slate-800">
-              CLAIM VENUE: PSITS Office, CCIS Building, Main Campus
+              CLAIM VENUE: PSITS Office, 2nd Floor, CCIS Building
             </p>
             <p className="text-[10px]">
               Present this receipt slip on your mobile phone upon claiming your shirt.
