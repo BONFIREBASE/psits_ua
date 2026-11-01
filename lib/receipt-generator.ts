@@ -36,6 +36,7 @@ function drawDashedLine(ctx: CanvasRenderingContext2D, y: number, width: number,
 
 /**
  * Generates an ultra-crisp, aesthetic receipt image as a PNG data URL.
+ * Minimalist, real-receipt style with authentic PSITS digital verification indicator.
  */
 export async function generateReceiptImage(order: MerchOrderRow): Promise<string> {
   if (typeof window === 'undefined') {
@@ -55,12 +56,12 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
     minute: '2-digit',
   });
 
-  // Calculate dynamic canvas height without QR code
+  // Calculate dynamic canvas height
   const baseWidth = 640;
   const itemRowHeight = 24;
   const itemCount = isBulk && bulkItems.length > 0 ? bulkItems.length : 1;
   const itemsSectionHeight = itemCount * itemRowHeight + 50;
-  const baseHeight = 520;
+  const baseHeight = 620;
   const totalHeight = baseHeight + itemsSectionHeight;
 
   // Setup Retina Canvas (scale: 2)
@@ -83,44 +84,61 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
   ctx.lineWidth = 2;
   ctx.strokeRect(12, 12, baseWidth - 24, totalHeight - 24);
 
-  // Load logos in parallel
-  const [psitsLogo, uaLogo] = await Promise.all([
-    loadImageSafe('/assets/logo/PSITS logo.png'),
-    loadImageSafe('/assets/logo/UA Logo.png'),
-  ]);
+  // Load PSITS Logo only (UA logo removed as requested)
+  const psitsLogo = await loadImageSafe('/assets/logo/PSITS logo.png');
+
+  // Draw Faint Watermark in the background
+  if (psitsLogo) {
+    ctx.save();
+    ctx.globalAlpha = 0.04;
+    const wmSize = 280;
+    ctx.drawImage(
+      psitsLogo,
+      (baseWidth - wmSize) / 2,
+      (totalHeight - wmSize) / 2,
+      wmSize,
+      wmSize
+    );
+    ctx.restore();
+  }
 
   let currentY = 40;
 
-  // Header Logos
-  const logoSize = 48;
-  if (uaLogo) {
-    ctx.drawImage(uaLogo, 40, currentY - 6, logoSize, logoSize);
-  }
+  // Centered Header PSITS Logo
   if (psitsLogo) {
-    ctx.drawImage(psitsLogo, baseWidth - 40 - logoSize, currentY - 6, logoSize, logoSize);
+    const logoSize = 52;
+    ctx.drawImage(psitsLogo, (baseWidth - logoSize) / 2, currentY - 6, logoSize, logoSize);
+    currentY += logoSize + 8;
+  } else {
+    currentY += 10;
   }
 
   // Header Typography
   ctx.fillStyle = '#0F172A';
   ctx.textAlign = 'center';
 
-  ctx.font = 'bold 15px "Courier Prime", "SF Mono", "Menlo", monospace';
+  ctx.font = 'bold 14px "Courier Prime", "SF Mono", "Menlo", monospace';
   ctx.fillText('PHILIPPINE SOCIETY OF INFORMATION TECHNOLOGY STUDENTS', baseWidth / 2, currentY);
 
   currentY += 18;
   ctx.font = '12px "Courier Prime", "SF Mono", "Menlo", monospace';
   ctx.fillStyle = '#475569';
-  ctx.fillText('University of Antique · CCIS Chapter · Sibalom, Antique', baseWidth / 2, currentY);
+  ctx.fillText('College of Computer Information Sciences · University of Antique', baseWidth / 2, currentY);
+
+  currentY += 16;
+  ctx.font = '11px "Courier Prime", "SF Mono", "Menlo", monospace';
+  ctx.fillStyle = '#64748B';
+  ctx.fillText('Sibalom, Antique · Academic Year 2026–2027', baseWidth / 2, currentY);
 
   currentY += 22;
-  ctx.font = 'bold 16px "Courier Prime", "SF Mono", "Menlo", monospace';
+  ctx.font = 'bold 15px "Courier Prime", "SF Mono", "Menlo", monospace';
   ctx.fillStyle = '#0F172A';
   ctx.fillText('OFFICIAL MERCHANDISE RECEIPT', baseWidth / 2, currentY);
 
   currentY += 16;
   ctx.font = '11px "Courier Prime", "SF Mono", "Menlo", monospace';
   ctx.fillStyle = '#64748B';
-  ctx.fillText('Academic Year 2026–2027 · NexGen TechTorch Polo', baseWidth / 2, currentY);
+  ctx.fillText('NexGen TechTorch Department Polo Shirt', baseWidth / 2, currentY);
 
   currentY += 20;
   drawDashedLine(ctx, currentY, baseWidth);
@@ -131,28 +149,23 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
   const leftX = 40;
   const rightX = baseWidth - 40;
 
-  const renderMetaRow = (label: string, value: string, isPill = false, pillColor = '#10B981') => {
+  const renderMetaRow = (label: string, value: string) => {
     ctx.font = 'bold 12px "Courier Prime", "SF Mono", "Menlo", monospace';
     ctx.fillStyle = '#64748B';
     ctx.textAlign = 'left';
     ctx.fillText(label, leftX, currentY);
 
     ctx.textAlign = 'right';
-    if (isPill) {
-      ctx.fillStyle = pillColor;
-      ctx.font = 'bold 12px "Courier Prime", "SF Mono", "Menlo", monospace';
-      ctx.fillText(value, rightX, currentY);
-    } else {
-      ctx.fillStyle = '#0F172A';
-      ctx.font = 'bold 12px "Courier Prime", "SF Mono", "Menlo", monospace';
-      ctx.fillText(value, rightX, currentY);
-    }
+    ctx.fillStyle = '#0F172A';
+    ctx.font = 'bold 12px "Courier Prime", "SF Mono", "Menlo", monospace';
+    ctx.fillText(value, rightX, currentY);
+
     currentY += 20;
   };
 
   renderMetaRow('RECEIPT NO', refCode);
   renderMetaRow('TRANSACTION DATE', formattedDate);
-  renderMetaRow('ORDER STATUS', isPaid ? '● PAID & VERIFIED' : '○ ORDER CONFIRMED', true, isPaid ? '#059669' : '#D97706');
+  renderMetaRow('ORDER STATUS', isPaid ? 'PAID (OFFICE VERIFIED)' : 'ORDER CONFIRMED');
   renderMetaRow('STUDENT / PAYER', (order.student_name || 'N/A').toUpperCase());
   renderMetaRow('CLASS / SECTION', order.course_year || 'N/A');
   renderMetaRow('CAMPUS EMAIL', order.student_email || 'N/A');
@@ -274,7 +287,7 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
   currentY += 16;
   drawDashedLine(ctx, currentY, baseWidth);
 
-  // Instructions & Claim Venue
+  // Instructions & Claim Venue (No emojis)
   currentY += 22;
   ctx.font = 'bold 12px "Courier Prime", "SF Mono", "Menlo", monospace';
   ctx.fillStyle = '#0F172A';
@@ -286,7 +299,50 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
   ctx.fillStyle = '#64748B';
   ctx.fillText('Present this receipt slip on your mobile phone upon claiming.', baseWidth / 2, currentY);
 
-  currentY += 20;
+  currentY += 22;
+
+  // Authentic Circular Organization Digital Verification Stamp
+  const stampY = currentY + 48;
+  const stampX = baseWidth / 2;
+  const radius = 48;
+
+  ctx.save();
+  // Outer circle
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.arc(stampX, stampY, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Inner dashed circle
+  ctx.strokeStyle = '#64748B';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 2.5]);
+  ctx.beginPath();
+  ctx.arc(stampX, stampY, radius - 4, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // PSITS Emblem inside stamp
+  if (psitsLogo) {
+    const stampLogoSize = 28;
+    ctx.drawImage(psitsLogo, stampX - stampLogoSize / 2, stampY - 26, stampLogoSize, stampLogoSize);
+  }
+
+  // Typographic seal text (No emojis, no cartoon badges)
+  ctx.font = 'bold 8.5px "Courier Prime", "SF Mono", "Menlo", monospace';
+  ctx.fillStyle = '#0F172A';
+  ctx.textAlign = 'center';
+  ctx.fillText('DIGITALLY VERIFIED', stampX, stampY + 12);
+
+  ctx.font = '7.5px "Courier Prime", "SF Mono", "Menlo", monospace';
+  ctx.fillStyle = '#475569';
+  ctx.fillText('PSITS TREASURY OFFICE', stampX, stampY + 23);
+  ctx.fillText('AY 2026–2027', stampX, stampY + 32);
+
+  ctx.restore();
+
+  currentY += 114;
   drawDashedLine(ctx, currentY, baseWidth, [2, 2]);
 
   // Clean Receipt Footer
@@ -298,7 +354,7 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
   currentY += 16;
   ctx.font = 'bold 11px "Courier Prime", "SF Mono", "Menlo", monospace';
   ctx.fillStyle = '#0F172A';
-  ctx.fillText('*** THANK YOU FOR SUPPORTING PSITS-UA ***', baseWidth / 2, currentY);
+  ctx.fillText('OFFICIAL DIGITAL RECEIPT · VALID FOR CLAIMING', baseWidth / 2, currentY);
 
   return canvas.toDataURL('image/png');
 }
