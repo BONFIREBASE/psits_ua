@@ -69,25 +69,39 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
 
   return (
     <>
-      {/* Explicit Print Styles for Real Receipt Slip / A4 Paper */}
+      {/* Explicit Print Styles: Isolates ONLY the receipt slip */}
       <style jsx global>{`
         @media print {
           @page {
             size: auto;
-            margin: 10mm;
+            margin: 8mm;
           }
-          body {
+          /* 1. Hide entire page tree */
+          body * {
+            visibility: hidden !important;
+          }
+          /* 2. Make ONLY the receipt document and its contents visible */
+          .receipt-document,
+          .receipt-document * {
+            visibility: visible !important;
+          }
+          /* 3. Explicitly hide non-print buttons and controls */
+          .print-hidden,
+          .print-hidden * {
+            display: none !important;
+            visibility: hidden !important;
+          }
+          html, body {
             background: white !important;
             color: #0f172a !important;
+            margin: 0 !important;
+            padding: 0 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
-          .print-hidden, nav, header, footer {
-            display: none !important;
-          }
           .receipt-modal-backdrop {
             position: static !important;
-            background: white !important;
+            background: transparent !important;
             padding: 0 !important;
             margin: 0 !important;
             overflow: visible !important;
@@ -97,12 +111,18 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
             box-shadow: none !important;
           }
           .receipt-document {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: 0 !important;
+            margin: 0 auto !important;
             box-shadow: none !important;
             border: 1px dashed #94a3b8 !important;
-            margin: 0 auto !important;
             padding: 24px !important;
             width: 100% !important;
-            max-width: 520px !important;
+            max-width: 480px !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
