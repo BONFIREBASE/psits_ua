@@ -1,8 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import Image from 'next/image'
-import QRCode from 'qrcode'
 import { Printer, Download, X, CheckCircle2, Clock, Loader2 } from 'lucide-react'
 import type { MerchOrderRow } from '@/lib/supabase'
 import { downloadReceiptImage } from '@/lib/receipt-generator'
@@ -37,7 +36,6 @@ export function parseBulkItemsFromNotes(notes: string | null | undefined): BulkS
 
 export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceiptProps) {
   const [isDownloading, setIsDownloading] = useState(false)
-  const [qrDataUrl, setQrDataUrl] = useState<string>('')
 
   const bulkItems = parseBulkItemsFromNotes(order.notes)
   const isBulk = bulkItems.length > 0 || order.quantity > 1
@@ -53,28 +51,12 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
 
   const receiptRef = `#POLO-${order.id.slice(0, 8).toUpperCase()}`
 
-  // Generate QR Code for receipt verification
-  useEffect(() => {
-    const verificationUrl = typeof window !== 'undefined'
-      ? `${window.location.origin}/merch?verify=${order.id}`
-      : `https://psitsua.vercel.app/merch?verify=${order.id}`
-
-    QRCode.toDataURL(verificationUrl, {
-      width: 140,
-      margin: 1,
-      color: { dark: '#0F172A', light: '#FFFFFF' },
-    })
-      .then((url) => setQrDataUrl(url))
-      .catch((err) => console.error('Failed to generate receipt QR code:', err))
-  }, [order.id])
-
   const handleDownload = async () => {
     try {
       setIsDownloading(true)
       await downloadReceiptImage(order)
     } catch (err) {
       console.error('Direct receipt download error:', err)
-      // Fallback to print if canvas download fails
       window.print()
     } finally {
       setIsDownloading(false)
@@ -271,7 +253,7 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
           {/* Items List */}
           <div className="py-2 space-y-1.5 text-[11px]">
             {isBulk && bulkItems.length > 0 ? (
-              <div className="max-h-[38vh] overflow-y-auto pr-1 divide-y divide-slate-100 print:max-h-none print:overflow-visible">
+              <div className="max-h-[42vh] overflow-y-auto pr-1 divide-y divide-slate-100 print:max-h-none print:overflow-visible">
                 {bulkItems.map((item, idx) => (
                   <div key={`${item.studentName}-${idx}`} className="flex justify-between items-center py-1">
                     <span className="flex-1 text-slate-800 truncate pr-2">
@@ -335,24 +317,6 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
               Present this receipt slip on your mobile phone upon claiming your shirt.
             </p>
           </div>
-
-          {/* Verification QR Code */}
-          {qrDataUrl && (
-            <div className="pt-3 pb-1 text-center flex flex-col items-center justify-center">
-              <div className="p-1.5 bg-white border border-slate-300 rounded-lg inline-block shadow-xs">
-                <img
-                  src={qrDataUrl}
-                  alt={`Receipt Verification QR: ${receiptRef}`}
-                  width={110}
-                  height={110}
-                  className="w-24 h-24 sm:w-28 sm:h-28 mx-auto"
-                />
-              </div>
-              <span className="text-[9.5px] text-slate-400 pt-1 tracking-wider block">
-                SCAN TO VERIFY REF: {receiptRef}
-              </span>
-            </div>
-          )}
 
           {/* Dashed Separator */}
           <div className="border-b border-dashed border-slate-300 my-3" />

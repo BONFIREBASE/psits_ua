@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 import type { MerchOrderRow } from '@/lib/supabase';
 import { parseBulkItemsFromNotes } from '@/components/FormalMerchReceipt';
 
@@ -16,7 +15,6 @@ function loadImageSafe(src: string): Promise<HTMLImageElement | null> {
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = src;
-    // Timeout after 800ms so generation never hangs
     setTimeout(() => resolve(null), 800);
   });
 }
@@ -57,12 +55,12 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
     minute: '2-digit',
   });
 
-  // Calculate dynamic canvas height
+  // Calculate dynamic canvas height without QR code
   const baseWidth = 640;
   const itemRowHeight = 24;
   const itemCount = isBulk && bulkItems.length > 0 ? bulkItems.length : 1;
   const itemsSectionHeight = itemCount * itemRowHeight + 50;
-  const baseHeight = 720;
+  const baseHeight = 520;
   const totalHeight = baseHeight + itemsSectionHeight;
 
   // Setup Retina Canvas (scale: 2)
@@ -189,25 +187,21 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
       ctx.font = '11px "Courier Prime", "SF Mono", "Menlo", monospace';
       ctx.fillStyle = '#0F172A';
 
-      // Number + Student Name
       ctx.textAlign = 'left';
       const numPrefix = String(idx + 1).padStart(2, '0');
       const maxNameLen = 30;
       const truncatedName = item.studentName.length > maxNameLen ? item.studentName.slice(0, maxNameLen) + '…' : item.studentName;
       ctx.fillText(`${numPrefix}. ${truncatedName}`, leftX, currentY);
 
-      // Size
       ctx.textAlign = 'center';
       ctx.font = 'bold 11px "Courier Prime", "SF Mono", "Menlo", monospace';
       ctx.fillStyle = '#1E3A8A';
       ctx.fillText(item.size, baseWidth - 170, currentY);
 
-      // Qty
       ctx.fillStyle = '#0F172A';
       ctx.font = '11px "Courier Prime", "SF Mono", "Menlo", monospace';
       ctx.fillText('1', baseWidth - 115, currentY);
 
-      // Price
       ctx.textAlign = 'right';
       ctx.fillText('₱475.00', rightX, currentY);
 
@@ -292,39 +286,10 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
   ctx.fillStyle = '#64748B';
   ctx.fillText('Present this receipt slip on your mobile phone upon claiming.', baseWidth / 2, currentY);
 
-  // Generate and draw QR Code
-  currentY += 20;
-  const qrVerificationUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/merch?verify=${order.id}`
-    : `https://psitsua.vercel.app/merch?verify=${order.id}`;
-
-  try {
-    const qrDataUrl = await QRCode.toDataURL(qrVerificationUrl, {
-      width: 140,
-      margin: 1,
-      color: { dark: '#0F172A', light: '#FFFFFF' },
-    });
-    const qrImg = await loadImageSafe(qrDataUrl);
-    if (qrImg) {
-      const qrSize = 130;
-      ctx.drawImage(qrImg, (baseWidth - qrSize) / 2, currentY, qrSize, qrSize);
-      currentY += qrSize + 14;
-    }
-  } catch (err) {
-    console.error('Failed to draw QR on receipt canvas:', err);
-    currentY += 20;
-  }
-
-  // Scan Verification Caption
-  ctx.font = '10px "Courier Prime", "SF Mono", "Menlo", monospace';
-  ctx.fillStyle = '#94A3B8';
-  ctx.textAlign = 'center';
-  ctx.fillText(`SCAN TO VERIFY REF: ${refCode}`, baseWidth / 2, currentY);
-
   currentY += 20;
   drawDashedLine(ctx, currentY, baseWidth, [2, 2]);
 
-  // Clean Receipt Signature / Footer
+  // Clean Receipt Footer
   currentY += 20;
   ctx.font = '10px "Courier Prime", "SF Mono", "Menlo", monospace';
   ctx.fillStyle = '#64748B';
