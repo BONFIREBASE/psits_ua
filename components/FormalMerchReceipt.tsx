@@ -316,32 +316,11 @@ export default function FormalMerchReceipt({ order, onClose }: FormalMerchReceip
             </p>
           </div>
 
-          {/* Authentic Circular Organization Digital Verification Stamp */}
-          <div className="pt-4 pb-2 flex flex-col items-center justify-center relative z-10">
-            <div className="w-28 h-28 rounded-full border-[1.5px] border-slate-700/80 p-1 flex items-center justify-center relative select-none">
-              <div className="w-full h-full rounded-full border border-dashed border-slate-400 flex flex-col items-center justify-center text-center p-2">
-                <div className="w-7 h-7 relative mb-1 opacity-90">
-                  <Image src="/assets/logo/PSITS logo.png" alt="PSITS" fill className="object-contain" />
-                </div>
-                <span className="text-[7.5px] font-bold text-slate-800 tracking-widest uppercase leading-tight">
-                  DIGITALLY VERIFIED
-                </span>
-                <span className="text-[6.5px] text-slate-500 tracking-wider uppercase pt-0.5">
-                  PSITS TREASURY OFFICE
-                </span>
-                <span className="text-[6px] text-slate-400 tracking-wider uppercase">
-                  AY 2026–2027
-                </span>
-              </div>
-            </div>
-          </div>
-
           {/* Dashed Separator */}
           <div className="border-b border-dashed border-slate-300 my-3 relative z-10" />
 
           {/* Receipt Footer */}
-          <div className="text-center space-y-1 text-[10px] text-slate-500 relative z-10">
-            <p>PSITS CHAPTER TREASURY OFFICE · SIBALOM, ANTIQUE</p>
+          <div className="text-center text-[10px] text-slate-500 relative z-10">
             <p className="font-bold text-slate-900 tracking-wider uppercase">
               OFFICIAL DIGITAL RECEIPT · VALID FOR CLAIMING
             </p>

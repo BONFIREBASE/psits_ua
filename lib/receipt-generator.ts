@@ -61,7 +61,7 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
   const itemRowHeight = 24;
   const itemCount = isBulk && bulkItems.length > 0 ? bulkItems.length : 1;
   const itemsSectionHeight = itemCount * itemRowHeight + 50;
-  const baseHeight = 620;
+  const baseHeight = 500;
   const totalHeight = baseHeight + itemsSectionHeight;
 
   // Setup Retina Canvas (scale: 2)
@@ -300,58 +300,10 @@ export async function generateReceiptImage(order: MerchOrderRow): Promise<string
   ctx.fillText('Present this receipt slip on your mobile phone upon claiming.', baseWidth / 2, currentY);
 
   currentY += 22;
-
-  // Authentic Circular Organization Digital Verification Stamp
-  const stampY = currentY + 48;
-  const stampX = baseWidth / 2;
-  const radius = 48;
-
-  ctx.save();
-  // Outer circle
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.arc(stampX, stampY, radius, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Inner dashed circle
-  ctx.strokeStyle = '#64748B';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 2.5]);
-  ctx.beginPath();
-  ctx.arc(stampX, stampY, radius - 4, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // PSITS Emblem inside stamp
-  if (psitsLogo) {
-    const stampLogoSize = 28;
-    ctx.drawImage(psitsLogo, stampX - stampLogoSize / 2, stampY - 26, stampLogoSize, stampLogoSize);
-  }
-
-  // Typographic seal text (No emojis, no cartoon badges)
-  ctx.font = 'bold 8.5px "Courier Prime", "SF Mono", "Menlo", monospace';
-  ctx.fillStyle = '#0F172A';
-  ctx.textAlign = 'center';
-  ctx.fillText('DIGITALLY VERIFIED', stampX, stampY + 12);
-
-  ctx.font = '7.5px "Courier Prime", "SF Mono", "Menlo", monospace';
-  ctx.fillStyle = '#475569';
-  ctx.fillText('PSITS TREASURY OFFICE', stampX, stampY + 23);
-  ctx.fillText('AY 2026–2027', stampX, stampY + 32);
-
-  ctx.restore();
-
-  currentY += 114;
   drawDashedLine(ctx, currentY, baseWidth, [2, 2]);
 
   // Clean Receipt Footer
-  currentY += 20;
-  ctx.font = '10px "Courier Prime", "SF Mono", "Menlo", monospace';
-  ctx.fillStyle = '#64748B';
-  ctx.fillText('PSITS CHAPTER TREASURY OFFICE · SIBALOM, ANTIQUE', baseWidth / 2, currentY);
-
-  currentY += 16;
+  currentY += 24;
   ctx.font = 'bold 11px "Courier Prime", "SF Mono", "Menlo", monospace';
   ctx.fillStyle = '#0F172A';
   ctx.fillText('OFFICIAL DIGITAL RECEIPT · VALID FOR CLAIMING', baseWidth / 2, currentY);
