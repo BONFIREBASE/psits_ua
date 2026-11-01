@@ -27,6 +27,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import FormalMerchReceipt, { type BulkStudentItem } from "@/components/FormalMerchReceipt";
+import { downloadReceiptImage } from "@/lib/receipt-generator";
 import MerchLockWrapper from "@/components/MerchLockWrapper";
 import LottieAnimation from "@/components/LottieAnimation";
 import { supabase } from "@/lib/supabase";
@@ -555,6 +556,21 @@ export default function MerchPage() {
       activeOrder?.status === "ready_for_pickup" ||
       activeOrder?.status === "completed");
 
+  const [isDownloadingReceipt, setIsDownloadingReceipt] = useState(false);
+
+  const handleDownloadReceipt = async () => {
+    if (!activeOrder) return;
+    try {
+      setIsDownloadingReceipt(true);
+      await downloadReceiptImage(activeOrder);
+    } catch (err) {
+      console.error("Direct receipt download failed, opening preview:", err);
+      setShowFormalReceipt(true);
+    } finally {
+      setIsDownloadingReceipt(false);
+    }
+  };
+
   // Handle switching to mobile order form
   const handleProceedToMobileForm = () => {
     if (!user) {
@@ -849,15 +865,39 @@ export default function MerchPage() {
                   </div>
 
                   <div className="space-y-2.5 pt-2">
+                    {/* Mobile: Direct Download Button */}
+                    <button
+                      type="button"
+                      onClick={handleDownloadReceipt}
+                      disabled={isDownloadingReceipt}
+                      className="sm:hidden w-full py-3.5 px-4 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60"
+                    >
+                      {isDownloadingReceipt ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        <Download size={15} />
+                      )}
+                      <span>{isDownloadingReceipt ? "Downloading Receipt..." : "Download Official Receipt"}</span>
+                    </button>
+
+                    {/* Desktop: View & Print Modal Button */}
                     <button
                       type="button"
                       onClick={() => setShowFormalReceipt(true)}
-                      className="w-full py-3.5 px-4 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 active:scale-[0.99]"
+                      className="hidden sm:flex w-full py-3.5 px-4 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md items-center justify-center gap-2 active:scale-[0.99]"
                     >
-                      <Download size={15} className="sm:hidden" />
-                      <FileText size={15} className="hidden sm:inline" />
-                      <span className="sm:hidden">Download Official Receipt</span>
-                      <span className="hidden sm:inline">View &amp; Print Official Receipt</span>
+                      <FileText size={15} />
+                      <span>View &amp; Print Official Receipt</span>
+                    </button>
+
+                    {/* Mobile: Preview Receipt Link */}
+                    <button
+                      type="button"
+                      onClick={() => setShowFormalReceipt(true)}
+                      className="sm:hidden w-full py-1 text-center text-[11px] font-mono text-slate-400 hover:text-gold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Eye size={12} />
+                      <span>Preview Receipt Slip on Screen</span>
                     </button>
 
                     <button
@@ -943,16 +983,42 @@ export default function MerchPage() {
 
                   <div className="space-y-2.5 pt-2">
                     {isReceiptUnlocked ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowFormalReceipt(true)}
-                        className="w-full py-4 px-6 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(245,166,35,0.3)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
-                      >
-                        <Download size={16} className="sm:hidden" />
-                        <FileText size={16} className="hidden sm:inline" />
-                        <span className="sm:hidden">Download Official Receipt</span>
-                        <span className="hidden sm:inline">View &amp; Print Official Receipt</span>
-                      </button>
+                      <div className="space-y-2">
+                        {/* Mobile: Direct Download Button */}
+                        <button
+                          type="button"
+                          onClick={handleDownloadReceipt}
+                          disabled={isDownloadingReceipt}
+                          className="sm:hidden w-full py-4 px-6 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(245,166,35,0.3)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-60"
+                        >
+                          {isDownloadingReceipt ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Download size={16} />
+                          )}
+                          <span>{isDownloadingReceipt ? "Downloading Receipt..." : "Download Official Receipt"}</span>
+                        </button>
+
+                        {/* Desktop: View & Print Modal Button */}
+                        <button
+                          type="button"
+                          onClick={() => setShowFormalReceipt(true)}
+                          className="hidden sm:flex w-full py-4 px-6 rounded-2xl bg-gold hover:bg-gold-light text-[#0D1117] font-mono text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(245,166,35,0.3)] items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                        >
+                          <FileText size={16} />
+                          <span>View &amp; Print Official Receipt</span>
+                        </button>
+
+                        {/* Mobile: Preview Receipt Link */}
+                        <button
+                          type="button"
+                          onClick={() => setShowFormalReceipt(true)}
+                          className="sm:hidden w-full py-1.5 text-center text-[11px] font-mono text-slate-400 hover:text-gold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Eye size={12} />
+                          <span>Preview Receipt Slip on Screen</span>
+                        </button>
+                      </div>
                     ) : (
                       <button
                         type="button"
