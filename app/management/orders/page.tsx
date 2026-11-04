@@ -378,7 +378,8 @@ export default function MerchOrdersManagementPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className={`space-y-6 ${showOfficialReceipt ? "print:hidden" : ""}`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -885,13 +886,6 @@ export default function MerchOrdersManagementPage() {
         </div>
       )}
 
-      {/* Official PSITS Generated Receipt Modal */}
-      {showOfficialReceipt && (
-        <FormalMerchReceipt
-          order={showOfficialReceipt}
-          onClose={() => setShowOfficialReceipt(null)}
-        />
-      )}
 
       {/* Receipt Preview Modal */}
       {selectedReceiptOrder && (
@@ -1268,6 +1262,15 @@ export default function MerchOrdersManagementPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Official PSITS Generated Receipt Modal */}
+      {showOfficialReceipt && (
+        <FormalMerchReceipt
+          order={showOfficialReceipt}
+          onClose={() => setShowOfficialReceipt(null)}
+        />
+      )}
+    </>
   );
 }
