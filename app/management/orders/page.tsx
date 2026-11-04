@@ -28,20 +28,31 @@ import type { MerchOrderRow, MerchOrderStatus, MerchPaymentStatus, PoloShirtSize
 import FormField, { inputStyles, textareaStyles } from "../_components/FormField";
 import { MerchOrdersTableSkeleton } from "../_components/SkeletonPreloader";
 
-function parseOrderNotes(rawNotes: string | null | undefined): { customerNote: string | null; bulkCount: number } {
-  if (!rawNotes) return { customerNote: null, bulkCount: 0 };
+export interface BulkStudentItem {
+  studentNo?: string;
+  studentName: string;
+  yearSection?: string;
+  size: string;
+}
+
+function parseOrderNotes(rawNotes: string | null | undefined): {
+  customerNote: string | null;
+  bulkCount: number;
+  bulkItems: BulkStudentItem[];
+} {
+  if (!rawNotes) return { customerNote: null, bulkCount: 0, bulkItems: [] };
   const trimmed = rawNotes.trim();
   if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
     try {
       const parsed = JSON.parse(trimmed);
-      const bulkCount = Array.isArray(parsed.bulkItems) ? parsed.bulkItems.length : 0;
+      const bulkItems: BulkStudentItem[] = Array.isArray(parsed.bulkItems) ? parsed.bulkItems : [];
       const note = typeof parsed.customerNote === "string" && parsed.customerNote.trim() ? parsed.customerNote.trim() : null;
-      return { customerNote: note, bulkCount };
+      return { customerNote: note, bulkCount: bulkItems.length, bulkItems };
     } catch {
       // fallback
     }
   }
-  return { customerNote: trimmed || null, bulkCount: 0 };
+  return { customerNote: trimmed || null, bulkCount: 0, bulkItems: [] };
 }
 
 const STATUS_CONFIG: Record<
@@ -244,6 +255,15 @@ export default function MerchOrdersManagementPage() {
     setEditError(null);
     const token = getSessionToken();
 
+    const { bulkItems } = parseOrderNotes(editingOrder.notes);
+    let finalNotes = editFormData.notes;
+    if (bulkItems.length > 0) {
+      finalNotes = JSON.stringify({
+        customerNote: editFormData.notes || "",
+        bulkItems: bulkItems,
+      });
+    }
+
     try {
       const res = await fetch(`/api/merch/orders/${editingOrder.id}`, {
         method: "PATCH",
@@ -251,7 +271,10 @@ export default function MerchOrdersManagementPage() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(editFormData),
+        body: JSON.stringify({
+          ...editFormData,
+          notes: finalNotes,
+        }),
       });
 
       const data = await res.json();
@@ -282,9 +305,14 @@ export default function MerchOrdersManagementPage() {
     const ordered = orders.filter((o) => o.status === "ordered").length;
     const ready = orders.filter((o) => o.status === "ready_for_pickup").length;
     const completed = orders.filter((o) => o.status === "completed").length;
-    const totalRevenue = orders
-      .filter((o) => o.status !== "cancelled")
-      .reduce((acc, curr) => acc + (Number(curr.total_amount) || 475), 0);
+
+    const activeOrders = orders.filter((o) => o.status !== "cancelled");
+    const totalActiveShirts = activeOrders.reduce((acc, curr) => acc + (Number(curr.quantity) || 1), 0);
+
+    const totalRevenue = activeOrders.reduce(
+      (acc, curr) => acc + (Number(curr.total_amount) || (Number(curr.quantity) || 1) * 475),
+      0
+    );
 
     const sizeTallies: Record<PoloShirtSize, number> = {
       XS: 0,
@@ -294,20 +322,52 @@ export default function MerchOrdersManagementPage() {
       XL: 0,
       XXL: 0,
     };
-    orders.forEach((o) => {
-      if (o.status !== "cancelled" && sizeTallies[o.size] !== undefined) {
-        sizeTallies[o.size]++;
+
+    activeOrders.forEach((o) => {
+      const { bulkItems } = parseOrderNotes(o.notes);
+      if (bulkItems.length > 0) {
+        bulkItems.forEach((item) => {
+          const sz = item.size?.trim().toUpperCase() as PoloShirtSize;
+          if (sizeTallies[sz] !== undefined) {
+            sizeTallies[sz]++;
+          }
+        });
+      } else if (o.size) {
+        const breakdownMatches = [...o.size.matchAll(/(\d+)\s*x\s*([A-Za-z]+)/gi)];
+        if (breakdownMatches.length > 0) {
+          breakdownMatches.forEach((m) => {
+            const count = parseInt(m[1], 10) || 1;
+            const sz = m[2].trim().toUpperCase() as PoloShirtSize;
+            if (sizeTallies[sz] !== undefined) {
+              sizeTallies[sz] += count;
+            }
+          });
+        } else {
+          const sz = o.size.trim().toUpperCase() as PoloShirtSize;
+          if (sizeTallies[sz] !== undefined) {
+            sizeTallies[sz] += (o.quantity || 1);
+          }
+        }
       }
     });
 
-    return { total, processing, ordered, ready, completed, totalRevenue, sizeTallies };
+    return { total, processing, ordered, ready, completed, totalRevenue, totalActiveShirts, sizeTallies };
   }, [orders]);
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       if (statusFilter !== "all" && order.status !== statusFilter) return false;
-      if (sizeFilter !== "all" && order.size !== sizeFilter) return false;
+      if (sizeFilter !== "all") {
+        const { bulkItems } = parseOrderNotes(order.notes);
+        const matchesBulk = bulkItems.some(
+          (item) => item.size?.trim().toUpperCase() === sizeFilter
+        );
+        const matchesDirect =
+          order.size?.toUpperCase() === sizeFilter ||
+          order.size?.toUpperCase().includes(sizeFilter);
+        if (!matchesBulk && !matchesDirect) return false;
+      }
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -507,7 +567,7 @@ export default function MerchOrdersManagementPage() {
               ₱{metrics.totalRevenue.toLocaleString()}
             </p>
           )}
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">₱475 × {metrics.total - orders.filter(o => o.status === 'cancelled').length}</p>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">₱475 × {metrics.totalActiveShirts} shirts</p>
         </div>
       </div>
 
@@ -518,7 +578,7 @@ export default function MerchOrdersManagementPage() {
             Manufacturing Size Breakdown (Active Orders)
           </span>
           <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-            Total Shirts: {metrics.total - orders.filter(o => o.status === 'cancelled').length}
+            Total Shirts: {metrics.totalActiveShirts}
           </span>
         </div>
         <div className="grid grid-cols-6 gap-2 pt-1">
@@ -684,9 +744,28 @@ export default function MerchOrdersManagementPage() {
 
                         {/* Size */}
                         <td className="py-3 px-4 text-center">
-                          <span className="inline-block px-2.5 py-1 rounded-md font-mono font-bold text-xs bg-gold/15 text-gold border border-gold/30">
-                            {order.size}
-                          </span>
+                          {(() => {
+                            const parts = order.size.split(",").map((s) => s.trim()).filter(Boolean);
+                            if (parts.length > 1) {
+                              return (
+                                <div className="flex flex-wrap gap-1 justify-center max-w-[140px] mx-auto">
+                                  {parts.map((part, i) => (
+                                    <span
+                                      key={i}
+                                      className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-gold/15 text-gold border border-gold/30"
+                                    >
+                                      {part}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return (
+                              <span className="inline-block px-2.5 py-1 rounded-md font-mono font-bold text-xs bg-gold/15 text-gold border border-gold/30">
+                                {order.size}
+                              </span>
+                            );
+                          })()}
                         </td>
 
                         {/* Amount */}
@@ -809,6 +888,7 @@ export default function MerchOrdersManagementPage() {
                             <button
                               type="button"
                               onClick={() => {
+                                const { customerNote } = parseOrderNotes(order.notes);
                                 setEditingOrder(order);
                                 setEditFormData({
                                   size: order.size,
@@ -816,7 +896,7 @@ export default function MerchOrdersManagementPage() {
                                   total_amount: order.total_amount,
                                   course_year: order.course_year || "",
                                   contact_number: order.contact_number || "",
-                                  notes: order.notes || "",
+                                  notes: customerNote ?? order.notes ?? "",
                                   status: order.status,
                                   payment_status: order.payment_status,
                                 });
