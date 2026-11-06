@@ -23,10 +23,11 @@ import {
   Users,
   Lock,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import FormalMerchReceipt from "@/components/FormalMerchReceipt";
-import type { MerchOrderRow, MerchOrderStatus, MerchPaymentStatus, PoloShirtSize } from "@/lib/supabase";
+import { supabase, type MerchOrderRow, type MerchOrderStatus, type MerchPaymentStatus, type PoloShirtSize } from "@/lib/supabase";
 import FormField, { inputStyles, textareaStyles } from "../_components/FormField";
-import { MerchOrdersTableSkeleton } from "../_components/SkeletonPreloader";
+import { MerchOrdersExecutiveHubSkeleton, MerchOrdersTableSkeleton } from "../_components/SkeletonPreloader";
 
 export interface BulkStudentItem {
   studentNo?: string;
@@ -151,37 +152,25 @@ export default function MerchOrdersManagementPage() {
     }
   }, [getSessionToken]);
 
-  // Initial load
+  // Initial load + Realtime Supabase Subscription
   useEffect(() => {
-    let isMounted = true;
-    const token =
-      typeof window !== "undefined"
-        ? localStorage.getItem("psits_mgmt_token") ||
-        sessionStorage.getItem("psits_mgmt_token") ||
-        ""
-        : "";
+    fetchOrders();
 
-    async function load() {
-      try {
-        const res = await fetch("/api/merch/orders?all=true", {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (res.ok && isMounted) {
-          const data = await res.json();
-          setOrders(data.orders || []);
+    const channel = supabase
+      .channel("merch-orders-mgmt-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "merch_orders" },
+        () => {
+          fetchOrders();
         }
-      } catch (err) {
-        console.error("Failed to load orders:", err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    }
+      )
+      .subscribe();
 
-    load();
     return () => {
-      isMounted = false;
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchOrders]);
 
   // Handle status update
   const handleUpdateStatus = async (
@@ -314,6 +303,29 @@ export default function MerchOrdersManagementPage() {
       0
     );
 
+    const verifiedPaidOrders = activeOrders.filter((o) => o.payment_status === "verified");
+    const verifiedPaidRevenue = verifiedPaidOrders.reduce(
+      (acc, curr) => acc + (Number(curr.total_amount) || (Number(curr.quantity) || 1) * 475),
+      0
+    );
+    const verifiedPaidShirts = verifiedPaidOrders.reduce(
+      (acc, curr) => acc + (Number(curr.quantity) || 1),
+      0
+    );
+
+    const pendingPaymentOrders = activeOrders.filter((o) => o.payment_status !== "verified");
+    const pendingPaymentRevenue = pendingPaymentOrders.reduce(
+      (acc, curr) => acc + (Number(curr.total_amount) || (Number(curr.quantity) || 1) * 475),
+      0
+    );
+    const pendingPaymentShirts = pendingPaymentOrders.reduce(
+      (acc, curr) => acc + (Number(curr.quantity) || 1),
+      0
+    );
+
+    const bulkSubmissions = orders.filter((o) => parseOrderNotes(o.notes).bulkCount > 0).length;
+    const individualSubmissions = orders.length - bulkSubmissions;
+
     const sizeTallies: Record<PoloShirtSize, number> = {
       XS: 0,
       S: 0,
@@ -351,7 +363,22 @@ export default function MerchOrdersManagementPage() {
       }
     });
 
-    return { total, processing, ordered, ready, completed, totalRevenue, totalActiveShirts, sizeTallies };
+    return {
+      total,
+      processing,
+      ordered,
+      ready,
+      completed,
+      totalRevenue,
+      totalActiveShirts,
+      verifiedPaidRevenue,
+      verifiedPaidShirts,
+      pendingPaymentRevenue,
+      pendingPaymentShirts,
+      bulkSubmissions,
+      individualSubmissions,
+      sizeTallies,
+    };
   }, [orders]);
 
   // Filtered orders
@@ -385,56 +412,202 @@ export default function MerchOrdersManagementPage() {
     });
   }, [orders, statusFilter, sizeFilter, searchQuery]);
 
-  // Export orders to CSV for tailoring manufacturing
-  const handleExportCSV = () => {
+  // Export orders to Excel (.xlsx) with detailed individual student roster & bulk breakdown
+  const handleExportExcel = () => {
     if (orders.length === 0) return;
 
-    const headers = [
-      "Order ID",
-      "Student Name",
-      "Student Email",
-      "Course & Section",
-      "Contact Number",
-      "Shirt Size",
-      "Quantity",
-      "Unit Price (PHP)",
-      "Total (PHP)",
-      "Order Status",
-      "Payment Status",
-      "Student Notes",
-      "Date Placed",
+    // 1. Build Sheet 1: "Student Master Roster" (Individual line-item for every student with payment verification)
+    const masterRosterRows: Record<string, string | number>[] = [];
+    let lineNo = 1;
+
+    filteredOrders.forEach((order) => {
+      const { customerNote, bulkItems } = parseOrderNotes(order.notes);
+      const isBulk = bulkItems.length > 0;
+      const orderRef = `#POLO-${order.id.slice(0, 8).toUpperCase()}`;
+      const placedDate = new Date(order.created_at).toLocaleString();
+      const isPaid = order.payment_status === "verified";
+      const verifier = order.verified_by || (isPaid ? "Authorized Officer" : "Pending Verification");
+      const verifiedDate = order.verified_at ? new Date(order.verified_at).toLocaleString() : "—";
+
+      if (isBulk) {
+        bulkItems.forEach((item) => {
+          masterRosterRows.push({
+            "Line #": lineNo++,
+            "Order Ref ID": orderRef,
+            "Order Type": `Bulk Order (${bulkItems.length} Students)`,
+            "Student Name": item.studentName,
+            "Course & Section": item.yearSection || order.course_year || "N/A",
+            "Shirt Size": item.size?.trim().toUpperCase() || "M",
+            "Quantity": 1,
+            "Unit Price (PHP)": 475,
+            "Payment Status": isPaid ? "VERIFIED PAID" : "UNPAID (Pending Collection / Cash on Claim)",
+            "Amount Paid (PHP)": isPaid ? 475 : 0,
+            "Balance Due (PHP)": isPaid ? 0 : 475,
+            "Verified By": verifier,
+            "Verified At": verifiedDate,
+            "Pipeline Status": STATUS_CONFIG[order.status]?.label || order.status,
+            "Representative / Payer": order.student_name,
+            "Representative Email": order.student_email,
+            "Contact Number": order.contact_number || "—",
+            "Notes / Instructions": customerNote || "—",
+            "Date Placed": placedDate,
+          });
+        });
+      } else {
+        masterRosterRows.push({
+          "Line #": lineNo++,
+          "Order Ref ID": orderRef,
+          "Order Type": "Individual",
+          "Student Name": order.student_name,
+          "Course & Section": order.course_year || "N/A",
+          "Shirt Size": order.size,
+          "Quantity": order.quantity || 1,
+          "Unit Price (PHP)": order.unit_price || 475,
+          "Payment Status": isPaid ? "VERIFIED PAID" : "UNPAID (Pending Collection / Cash on Claim)",
+          "Amount Paid (PHP)": isPaid ? (order.total_amount || 475) : 0,
+          "Balance Due (PHP)": isPaid ? 0 : (order.total_amount || 475),
+          "Verified By": verifier,
+          "Verified At": verifiedDate,
+          "Pipeline Status": STATUS_CONFIG[order.status]?.label || order.status,
+          "Representative / Payer": order.student_name,
+          "Representative Email": order.student_email,
+          "Contact Number": order.contact_number || "—",
+          "Notes / Instructions": customerNote || "—",
+          "Date Placed": placedDate,
+        });
+      }
+    });
+
+    // 2. Build Sheet 2: "Order Submissions Summary" (Order-level financial summary)
+    const orderSummaryRows = filteredOrders.map((o, idx) => {
+      const { customerNote, bulkCount } = parseOrderNotes(o.notes);
+      const isPaid = o.payment_status === "verified";
+      return {
+        "#": idx + 1,
+        "Order Ref ID": `#POLO-${o.id.slice(0, 8).toUpperCase()}`,
+        "Order ID (UUID)": o.id,
+        "Payer / Representative": o.student_name,
+        "Student Email": o.student_email,
+        "Course & Section": o.course_year || "—",
+        "Contact Number": o.contact_number || "—",
+        "Size / Breakdown": o.size,
+        "Total Quantity": o.quantity || (bulkCount > 0 ? bulkCount : 1),
+        "Unit Price (PHP)": o.unit_price || 475,
+        "Total Order Amount (PHP)": o.total_amount || 475,
+        "Payment Status": isPaid ? "VERIFIED PAID" : "UNPAID (Pending Collection)",
+        "Amount Collected (PHP)": isPaid ? (o.total_amount || 475) : 0,
+        "Balance Due (PHP)": isPaid ? 0 : (o.total_amount || 475),
+        "Verified By": o.verified_by || (isPaid ? "Authorized Officer" : "Pending"),
+        "Verified At": o.verified_at ? new Date(o.verified_at).toLocaleString() : "—",
+        "Pipeline Status": STATUS_CONFIG[o.status]?.label || o.status,
+        "Order Type": bulkCount > 0 ? `Bulk (${bulkCount} items)` : "Individual",
+        "Student Note": customerNote || "—",
+        "Date Placed": new Date(o.created_at).toLocaleString(),
+      };
+    });
+
+    // 3. Build Sheet 3: "Manufacturing & Financial Audit" (Tailor & Treasury breakdown)
+    const sizeTallyMap: Record<PoloShirtSize, number> = {
+      XS: 0,
+      S: 0,
+      M: 0,
+      L: 0,
+      XL: 0,
+      XXL: 0,
+    };
+    filteredOrders
+      .filter((o) => o.status !== "cancelled")
+      .forEach((o) => {
+        const { bulkItems } = parseOrderNotes(o.notes);
+        if (bulkItems.length > 0) {
+          bulkItems.forEach((item) => {
+            const sz = item.size?.trim().toUpperCase() as PoloShirtSize;
+            if (sizeTallyMap[sz] !== undefined) sizeTallyMap[sz]++;
+          });
+        } else if (o.size) {
+          const matches = [...o.size.matchAll(/(\d+)\s*x\s*([A-Za-z]+)/gi)];
+          if (matches.length > 0) {
+            matches.forEach((m) => {
+              const count = parseInt(m[1], 10) || 1;
+              const sz = m[2].trim().toUpperCase() as PoloShirtSize;
+              if (sizeTallyMap[sz] !== undefined) sizeTallyMap[sz] += count;
+            });
+          } else {
+            const sz = o.size.trim().toUpperCase() as PoloShirtSize;
+            if (sizeTallyMap[sz] !== undefined) sizeTallyMap[sz] += (o.quantity || 1);
+          }
+        }
+      });
+
+    const sizeTallyRows = (["XS", "S", "M", "L", "XL", "XXL"] as PoloShirtSize[]).map((sz) => ({
+      "Polo Shirt Size": sz,
+      "Quantity (Pcs)": sizeTallyMap[sz],
+      "Unit Price (PHP)": 475,
+      "Subtotal (PHP)": sizeTallyMap[sz] * 475,
+    }));
+    const totalPcs = Object.values(sizeTallyMap).reduce((a, b) => a + b, 0);
+    sizeTallyRows.push({
+      "Polo Shirt Size": "TOTAL ACTIVE SHIRTS",
+      "Quantity (Pcs)": totalPcs,
+      "Unit Price (PHP)": 475,
+      "Subtotal (PHP)": totalPcs * 475,
+    });
+
+    // Financial Reconciliation Audit Table
+    const financialAuditRows = [
+      {
+        "Treasury Financial Metric": "VERIFIED CASH IN HAND (Paid & Verified)",
+        "Shirts Count": `${metrics.verifiedPaidShirts} shirts`,
+        "Total Amount (PHP)": metrics.verifiedPaidRevenue,
+      },
+      {
+        "Treasury Financial Metric": "PENDING RECEIVABLES (Unverified / Cash on Claim)",
+        "Shirts Count": `${metrics.pendingPaymentShirts} shirts`,
+        "Total Amount (PHP)": metrics.pendingPaymentRevenue,
+      },
+      {
+        "Treasury Financial Metric": "GROSS EXPECTED TOTAL REVENUE",
+        "Shirts Count": `${metrics.totalActiveShirts} shirts`,
+        "Total Amount (PHP)": metrics.totalRevenue,
+      },
     ];
 
-    const rows = filteredOrders.map((o) => [
-      `"${o.id}"`,
-      `"${o.student_name.replace(/"/g, '""')}"`,
-      `"${o.student_email}"`,
-      `"${(o.course_year || "").replace(/"/g, '""')}"`,
-      `"${(o.contact_number || "").replace(/"/g, '""')}"`,
-      `"${o.size}"`,
-      o.quantity,
-      o.unit_price,
-      o.total_amount,
-      `"${o.status}"`,
-      `"${o.payment_status}"`,
-      `"${(o.notes || "").replace(/"/g, '""')}"`,
-      `"${new Date(o.created_at).toLocaleString()}"`,
-    ]);
+    // Create workbook and append sheets
+    const wb = XLSX.utils.book_new();
 
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const wsRoster = XLSX.utils.json_to_sheet(masterRosterRows);
+    const wsSummary = XLSX.utils.json_to_sheet(orderSummaryRows);
+    const wsTally = XLSX.utils.json_to_sheet(sizeTallyRows);
+    const wsFinance = XLSX.utils.json_to_sheet(financialAuditRows);
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `PSITS_CCIS_Polo_Orders_${new Date().toISOString().split("T")[0]}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Auto-fit column widths
+    const setColWidths = (ws: XLSX.WorkSheet, data: Record<string, unknown>[]) => {
+      if (!data || data.length === 0) return;
+      const keys = Object.keys(data[0]);
+      ws["!cols"] = keys.map((key) => {
+        let maxLen = key.length;
+        for (const row of data) {
+          const val = row[key];
+          const strLen = val != null ? String(val).length : 0;
+          if (strLen > maxLen) maxLen = strLen;
+        }
+        return { wch: Math.min(Math.max(maxLen + 3, 10), 45) };
+      });
+    };
+
+    setColWidths(wsRoster, masterRosterRows);
+    setColWidths(wsSummary, orderSummaryRows);
+    setColWidths(wsTally, sizeTallyRows);
+    setColWidths(wsFinance, financialAuditRows);
+
+    XLSX.utils.book_append_sheet(wb, wsRoster, "Student Master Roster");
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Orders Summary");
+    XLSX.utils.book_append_sheet(wb, wsTally, "Manufacturing Tally");
+    XLSX.utils.book_append_sheet(wb, wsFinance, "Financial Reconciliation");
+
+    // Write file
+    const dateStr = new Date().toISOString().split("T")[0];
+    XLSX.writeFile(wb, `PSITS_CCIS_Polo_Orders_Master_${dateStr}.xlsx`);
   };
 
   return (
@@ -460,145 +633,257 @@ export default function MerchOrdersManagementPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={handleExportCSV}
+            onClick={handleExportExcel}
             disabled={orders.length === 0}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/[0.04] text-xs font-medium text-slate-900 dark:text-white transition-colors shadow-xs cursor-pointer disabled:opacity-50"
-            title="Download CSV size tally for tailor/manufacturing"
+            title="Export detailed orders and student roster to Excel (.xlsx)"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Export CSV</span>
-          </button>
-
-          <button
-            onClick={fetchOrders}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/[0.04] text-xs font-medium text-slate-900 dark:text-white transition-colors shadow-xs cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+            <span>Export</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-xl p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
-            <span className="text-[11px] font-medium font-mono uppercase">Total Orders</span>
-            <ShoppingBag className="w-3.5 h-3.5 text-gold" />
-          </div>
-          {loading && orders.length === 0 ? (
-            <div className="w-12 h-8 bg-slate-200 dark:bg-white/[0.08] rounded animate-pulse my-0.5" />
-          ) : (
-            <p className="text-2xl font-bold font-display text-slate-900 dark:text-white">{metrics.total}</p>
-          )}
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">1 per student account</p>
-        </div>
-
-        <div className="bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-xl p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-amber-500 mb-1">
-            <span className="text-[11px] font-medium font-mono uppercase">Processing</span>
-            <Clock className="w-3.5 h-3.5" />
-          </div>
-          {loading && orders.length === 0 ? (
-            <div className="w-12 h-8 bg-amber-500/15 rounded animate-pulse my-0.5" />
-          ) : (
-            <p className="text-2xl font-bold font-display text-amber-600 dark:text-amber-400">
-              {metrics.processing}
-            </p>
-          )}
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Awaiting verification</p>
-        </div>
-
-        <div className="bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-xl p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-blue-500 mb-1">
-            <span className="text-[11px] font-medium font-mono uppercase">In Production</span>
-            <Layers className="w-3.5 h-3.5" />
-          </div>
-          {loading && orders.length === 0 ? (
-            <div className="w-12 h-8 bg-blue-500/15 rounded animate-pulse my-0.5" />
-          ) : (
-            <p className="text-2xl font-bold font-display text-blue-600 dark:text-blue-400">
-              {metrics.ordered}
-            </p>
-          )}
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Sent to tailor</p>
-        </div>
-
-        <div className="bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-xl p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-purple-500 mb-1">
-            <span className="text-[11px] font-medium font-mono uppercase">Ready Pick Up</span>
-            <Package className="w-3.5 h-3.5" />
-          </div>
-          {loading && orders.length === 0 ? (
-            <div className="w-12 h-8 bg-purple-500/15 rounded animate-pulse my-0.5" />
-          ) : (
-            <p className="text-2xl font-bold font-display text-purple-600 dark:text-purple-400">
-              {metrics.ready}
-            </p>
-          )}
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">At PSITS office</p>
-        </div>
-
-        <div className="bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-xl p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-emerald-500 mb-1">
-            <span className="text-[11px] font-medium font-mono uppercase">Claimed</span>
-            <CheckCircle2 className="w-3.5 h-3.5" />
-          </div>
-          {loading && orders.length === 0 ? (
-            <div className="w-12 h-8 bg-emerald-500/15 rounded animate-pulse my-0.5" />
-          ) : (
-            <p className="text-2xl font-bold font-display text-emerald-600 dark:text-emerald-400">
-              {metrics.completed}
-            </p>
-          )}
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Successfully received</p>
-        </div>
-
-        <div className="bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-xl p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-gold mb-1">
-            <span className="text-[11px] font-medium font-mono uppercase">Total Revenue</span>
-            <span className="text-xs font-bold font-mono">₱</span>
-          </div>
-          {loading && orders.length === 0 ? (
-            <div className="w-24 h-7 bg-gold/15 rounded animate-pulse my-0.5" />
-          ) : (
-            <p className="text-xl sm:text-2xl font-bold font-display text-slate-900 dark:text-white">
-              ₱{metrics.totalRevenue.toLocaleString()}
-            </p>
-          )}
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">₱475 × {metrics.totalActiveShirts} shirts</p>
-        </div>
-      </div>
-
-      {/* Sizing Tally Bar */}
-      <div className="bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-xl p-4 shadow-xs">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider font-mono">
-            Manufacturing Size Breakdown (Active Orders)
-          </span>
-          <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-            Total Shirts: {metrics.totalActiveShirts}
-          </span>
-        </div>
-        <div className="grid grid-cols-6 gap-2 pt-1">
-          {(["XS", "S", "M", "L", "XL", "XXL"] as PoloShirtSize[]).map((sz) => (
-            <div
-              key={sz}
-              className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-50 dark:bg-black/30 border border-black/10 dark:border-white/10"
-            >
-              <span className="text-xs font-bold font-mono text-slate-900 dark:text-white">{sz}</span>
-              {loading && orders.length === 0 ? (
-                <span className="w-6 h-5 bg-gold/20 rounded animate-pulse mt-0.5" />
-              ) : (
-                <span className="text-base font-extrabold font-display text-gold">
-                  {metrics.sizeTallies[sz]}
-                </span>
-              )}
+      {/* Executive Minimalist Hub */}
+      {loading && orders.length === 0 ? (
+        <MerchOrdersExecutiveHubSkeleton />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 mb-6">
+          {/* Panel 1: Financial Health & Collection Donut */}
+          <div className="lg:col-span-5 bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
+            <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-2.5 mb-3">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
+                Financial Collection Health
+              </span>
+              <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                Gross: ₱{metrics.totalRevenue.toLocaleString()}
+              </span>
             </div>
-          ))}
+
+            <div className="flex items-center gap-4 py-1">
+              {/* Native SVG Payment Donut Chart */}
+              {(() => {
+                const total = metrics.totalRevenue;
+                const paid = metrics.verifiedPaidRevenue;
+                const paidPct = total > 0 ? (paid / total) * 100 : 0;
+                const radius = 38;
+                const circumference = 2 * Math.PI * radius;
+                const paidStroke = (paidPct / 100) * circumference;
+                const pendingStroke = circumference - paidStroke;
+
+                return (
+                  <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+                    <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+                      {/* Background Track */}
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r={radius}
+                        className="text-slate-100 dark:text-white/[0.06]"
+                        stroke="currentColor"
+                        strokeWidth="9"
+                        fill="transparent"
+                      />
+                      {/* Paid Segment (Emerald) */}
+                      {total > 0 && paid > 0 && (
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r={radius}
+                          stroke="#10b981"
+                          strokeWidth="9"
+                          strokeDasharray={`${paidStroke} ${circumference}`}
+                          strokeDashoffset="0"
+                          strokeLinecap="round"
+                          fill="transparent"
+                          className="transition-all duration-700 ease-out"
+                        />
+                      )}
+                      {/* Pending Segment (Amber) */}
+                      {total > 0 && metrics.pendingPaymentRevenue > 0 && (
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r={radius}
+                          stroke="#f59e0b"
+                          strokeWidth="9"
+                          strokeDasharray={`${pendingStroke} ${circumference}`}
+                          strokeDashoffset={`${-paidStroke}`}
+                          strokeLinecap="round"
+                          fill="transparent"
+                          className="transition-all duration-700 ease-out"
+                        />
+                      )}
+                    </svg>
+                    {/* Donut Center Label */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+                      <span className="text-sm font-black font-display text-slate-900 dark:text-white leading-none">
+                        ₱{(metrics.totalRevenue / 1000).toFixed(1)}k
+                      </span>
+                      <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 uppercase mt-0.5">
+                        {Math.round(paidPct)}% Paid
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Financial Metrics Legend */}
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="text-[10px] font-mono uppercase font-bold text-emerald-700 dark:text-emerald-400">
+                        Verified Paid
+                      </span>
+                    </div>
+                    <p className="text-base font-black font-display text-emerald-600 dark:text-emerald-400 pl-3.5">
+                      ₱{metrics.verifiedPaidRevenue.toLocaleString()}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    {metrics.verifiedPaidShirts} of {metrics.totalActiveShirts} pcs
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                      <span className="text-[10px] font-mono uppercase font-bold text-amber-700 dark:text-amber-400">
+                        Pending Claim
+                      </span>
+                    </div>
+                    <p className="text-base font-black font-display text-amber-600 dark:text-amber-400 pl-3.5">
+                      ₱{metrics.pendingPaymentRevenue.toLocaleString()}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    {metrics.pendingPaymentShirts} of {metrics.totalActiveShirts} pcs
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Hairline Dual Progress Track */}
+            <div className="mt-3 pt-2.5 border-t border-black/5 dark:border-white/5">
+              <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400 mb-1">
+                <span>Collection Progress</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  {metrics.totalRevenue > 0
+                    ? Math.round((metrics.verifiedPaidRevenue / metrics.totalRevenue) * 100)
+                    : 0}% Collected
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-amber-500/25 rounded-full overflow-hidden flex">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-700"
+                  style={{
+                    width: `${
+                      metrics.totalRevenue > 0
+                        ? (metrics.verifiedPaidRevenue / metrics.totalRevenue) * 100
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Panel 2: Pipeline & Tailor Sizing Breakdown */}
+          <div className="lg:col-span-7 bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
+            <div>
+              <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-2.5 mb-3">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
+                  Fulfillment Pipeline & Sizing
+                </span>
+                <span className="text-xs font-mono font-medium text-slate-900 dark:text-white">
+                  {metrics.totalActiveShirts} shirts · {metrics.total} orders ({metrics.bulkSubmissions} bulk)
+                </span>
+              </div>
+
+              {/* 4 Pipeline Stat Pills */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 mb-1">
+                    <span className="text-[10px] font-mono uppercase font-bold">Processing</span>
+                    <Clock className="w-3 h-3" />
+                  </div>
+                  <p className="text-xl font-bold font-display text-amber-600 dark:text-amber-400">
+                    {metrics.processing}
+                  </p>
+                  <p className="text-[9px] text-amber-600/70 font-mono">Awaiting verification</p>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                  <div className="flex items-center justify-between text-blue-600 dark:text-blue-400 mb-1">
+                    <span className="text-[10px] font-mono uppercase font-bold">Production</span>
+                    <Layers className="w-3 h-3" />
+                  </div>
+                  <p className="text-xl font-bold font-display text-blue-600 dark:text-blue-400">
+                    {metrics.ordered}
+                  </p>
+                  <p className="text-[9px] text-blue-600/70 font-mono">Sent to tailor</p>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                  <div className="flex items-center justify-between text-purple-600 dark:text-purple-400 mb-1">
+                    <span className="text-[10px] font-mono uppercase font-bold">Ready</span>
+                    <Package className="w-3 h-3" />
+                  </div>
+                  <p className="text-xl font-bold font-display text-purple-600 dark:text-purple-400">
+                    {metrics.ready}
+                  </p>
+                  <p className="text-[9px] text-purple-600/70 font-mono">At PSITS office</p>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                  <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 mb-1">
+                    <span className="text-[10px] font-mono uppercase font-bold">Claimed</span>
+                    <CheckCircle2 className="w-3 h-3" />
+                  </div>
+                  <p className="text-xl font-bold font-display text-emerald-600 dark:text-emerald-400">
+                    {metrics.completed}
+                  </p>
+                  <p className="text-[9px] text-emerald-600/70 font-mono">Received</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Compact Tailor Sizing Pills */}
+            <div className="pt-2.5 border-t border-black/5 dark:border-white/5">
+              <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                <span>Tailor Size Breakdown (Active)</span>
+                <span>Sum: {metrics.totalActiveShirts} pcs</span>
+              </div>
+              <div className="grid grid-cols-6 gap-1.5">
+                {(["XS", "S", "M", "L", "XL", "XXL"] as PoloShirtSize[]).map((sz) => {
+                  const count = metrics.sizeTallies[sz];
+                  const hasItems = count > 0;
+                  return (
+                    <div
+                      key={sz}
+                      className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-lg border transition-all ${
+                        hasItems
+                          ? "bg-gold/10 border-gold/30 text-gold"
+                          : "bg-slate-50 dark:bg-black/20 border-black/5 dark:border-white/5 text-slate-400 dark:text-slate-600"
+                      }`}
+                    >
+                      <span className="text-[10px] font-bold font-mono text-slate-700 dark:text-slate-300">
+                        {sz}
+                      </span>
+                      <span className={`text-sm font-black font-display ${hasItems ? "text-gold" : "opacity-40"}`}>
+                        {count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center gap-3 bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 p-3 rounded-xl shadow-xs">

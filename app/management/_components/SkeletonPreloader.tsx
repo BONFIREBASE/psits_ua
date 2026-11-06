@@ -517,3 +517,52 @@ export function DuesPageSkeleton() {
     </div>
   )
 }
+
+export function MerchOrdersExecutiveHubSkeleton() {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 select-none animate-pulse mb-6">
+      {/* Panel 1 Skeleton: Financial Collection & Donut */}
+      <div className="lg:col-span-5 bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-2xl p-4 flex flex-col justify-between shadow-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-2.5">
+          <div className="w-32 h-3.5 bg-slate-200 dark:bg-white/[0.06] rounded" />
+          <div className="w-16 h-3 bg-slate-200 dark:bg-white/[0.04] rounded" />
+        </div>
+        <div className="flex items-center gap-4 py-1">
+          <div className="w-24 h-24 rounded-full border-4 border-slate-200 dark:border-white/[0.08] shrink-0" />
+          <div className="space-y-3 flex-1">
+            <div className="space-y-1">
+              <div className="w-20 h-2.5 bg-slate-200 dark:bg-white/[0.05] rounded" />
+              <div className="w-28 h-5 bg-emerald-500/20 rounded" />
+            </div>
+            <div className="space-y-1">
+              <div className="w-24 h-2.5 bg-slate-200 dark:bg-white/[0.05] rounded" />
+              <div className="w-24 h-5 bg-amber-500/20 rounded" />
+            </div>
+          </div>
+        </div>
+        <div className="h-1.5 w-full bg-slate-200 dark:bg-white/[0.06] rounded-full overflow-hidden" />
+      </div>
+
+      {/* Panel 2 Skeleton: Pipeline & Sizing */}
+      <div className="lg:col-span-7 bg-white dark:bg-[#121929] border border-black/10 dark:border-white/10 rounded-2xl p-4 flex flex-col justify-between shadow-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-2.5">
+          <div className="w-36 h-3.5 bg-slate-200 dark:bg-white/[0.06] rounded" />
+          <div className="w-24 h-3 bg-slate-200 dark:bg-white/[0.04] rounded" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-12 rounded-xl bg-slate-200 dark:bg-white/[0.04] p-2 space-y-1.5" />
+          ))}
+        </div>
+        <div className="space-y-2 pt-2 border-t border-black/5 dark:border-white/5">
+          <div className="w-28 h-2.5 bg-slate-200 dark:bg-white/[0.05] rounded" />
+          <div className="grid grid-cols-6 gap-2">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="h-10 rounded-lg bg-slate-200 dark:bg-white/[0.04]" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
