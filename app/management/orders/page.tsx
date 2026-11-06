@@ -716,9 +716,9 @@ export default function MerchOrdersManagementPage() {
                       )}
                     </svg>
                     {/* Donut Center Label */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
-                      <span className="text-sm font-black font-display text-slate-900 dark:text-white leading-none">
-                        ₱{(metrics.totalRevenue / 1000).toFixed(1)}k
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none px-1">
+                      <span className="text-[13px] font-black font-display text-slate-900 dark:text-white leading-tight">
+                        ₱{Math.round(metrics.totalRevenue).toLocaleString()}
                       </span>
                       <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 uppercase mt-0.5">
                         {Math.round(paidPct)}% Paid
