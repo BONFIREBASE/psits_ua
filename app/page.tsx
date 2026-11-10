@@ -104,11 +104,29 @@ export default function HomePage() {
           setViewsData((prev) => ({
             ...prev,
             totalViews: data.totalViews || prev.totalViews,
+            activeNow: Math.max(data.activeNow || 1, prev.activeNow),
           }))
         }
       })
       .catch(() => { })
       .finally(() => setViewsLoading(false))
+
+    // Background heartbeat to keep session active in Redis/analytics every 25s
+    const heartbeatInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetch(`/api/analytics/views?heartbeat=1&sid=${encodeURIComponent(sid || 'guest')}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data?.activeNow) {
+              setViewsData((prev) => ({
+                ...prev,
+                activeNow: Math.max(1, data.activeNow),
+              }))
+            }
+          })
+          .catch(() => { })
+      }
+    }, 25000)
 
     // 2. Real-time active viewers tracking via Supabase Presence (WebSockets)
     const presenceChannel = supabase.channel('online-visitors', {
@@ -122,10 +140,12 @@ export default function HomePage() {
     const updatePresenceCount = () => {
       const state = presenceChannel.presenceState()
       const uniqueCount = Object.keys(state).length
-      setViewsData((prev) => ({
-        ...prev,
-        activeNow: Math.max(1, uniqueCount),
-      }))
+      if (uniqueCount > 0) {
+        setViewsData((prev) => ({
+          ...prev,
+          activeNow: Math.max(1, uniqueCount),
+        }))
+      }
     }
 
     presenceChannel
@@ -176,7 +196,11 @@ export default function HomePage() {
       .subscribe()
 
     return () => {
+      clearInterval(heartbeatInterval)
       supabase.removeChannel(channel)
+      try {
+        presenceChannel.untrack()
+      } catch { }
       supabase.removeChannel(presenceChannel)
     }
   }, [])

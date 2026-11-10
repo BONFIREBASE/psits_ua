@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const isHeartbeat = searchParams.get('heartbeat') === '1'
   const isSync = searchParams.get('sync') === '1'
+  const sid = searchParams.get('sid') || 'guest'
 
   // Extract client IP address from headers (reverse proxy / Vercel edge aware)
   const forwardedFor = req.headers.get('x-forwarded-for')
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
   const clientIp = (forwardedFor ? forwardedFor.split(',')[0].trim() : null) || realIp || '127.0.0.1'
 
   const isLocalhost = isLocalhostRequest(req, clientIp)
+  const sessionMember = sid && sid !== 'guest' ? `${clientIp}:${sid}` : clientIp
   const now = Date.now()
   let totalViews = BASE_VIEWS
   let activeNow = 1
@@ -71,13 +73,11 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // Track active visitors by unique IP in a 60-second window (exclude localhost from polluting production active set)
-      if (!isLocalhost) {
-        await redis.zadd('psits:analytics:active_users', { score: now, member: clientIp })
-      }
+      // Track active visitors by unique session member in a 60-second window
+      await redis.zadd('psits:analytics:active_users', { score: now, member: sessionMember })
       await redis.zremrangebyscore('psits:analytics:active_users', 0, now - 60000)
-      activeNow = await redis.zcard('psits:analytics:active_users')
-      if (activeNow < 1) activeNow = 1
+      const count = await redis.zcard('psits:analytics:active_users')
+      activeNow = count && count > 0 ? count : 1
     } catch (err) {
       console.warn('[Analytics Views Redis Warning]:', err)
       if (!isHeartbeat && !isLocalhost) {
@@ -86,6 +86,10 @@ export async function GET(req: NextRequest) {
           localViews++
           localSeenIps.set(clientIp, now)
         }
+      }
+      localActiveVisitors.set(sessionMember, now)
+      for (const [key, ts] of localActiveVisitors.entries()) {
+        if (now - ts > 60000) localActiveVisitors.delete(key)
       }
       totalViews = localViews
       activeNow = Math.max(1, localActiveVisitors.size)
@@ -99,11 +103,9 @@ export async function GET(req: NextRequest) {
         localSeenIps.set(clientIp, now)
       }
     }
-    if (!isLocalhost) {
-      localActiveVisitors.set(clientIp, now)
-    }
-    for (const [ip, ts] of localActiveVisitors.entries()) {
-      if (now - ts > 60000) localActiveVisitors.delete(ip)
+    localActiveVisitors.set(sessionMember, now)
+    for (const [key, ts] of localActiveVisitors.entries()) {
+      if (now - ts > 60000) localActiveVisitors.delete(key)
     }
     totalViews = localViews
     activeNow = Math.max(1, localActiveVisitors.size)

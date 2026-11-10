@@ -108,7 +108,6 @@ import NotificationModal from '@/components/NotificationModal'
 import { CommentsListSkeleton, CommunityFeedSkeleton } from '@/components/PublicSkeletonPreloader'
 import { motion, AnimatePresence } from 'framer-motion'
 import { NumberTicker } from '@/components/motion/number-ticker'
-import { PullToRefresh } from '@/components/motion/pull-to-refresh'
 
 const LOCAL_STORAGE_KEY = 'psits_community_cached_posts_v4'
 
@@ -467,6 +466,7 @@ export default function CommunityPage() {
   const router = useRouter()
   const [posts, setPosts] = useState<CommunityPostItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false)
   const [selectedTag, setSelectedTag] = useState('All')
   const [hasMorePosts, setHasMorePosts] = useState<boolean>(true)
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false)
@@ -1911,43 +1911,48 @@ export default function CommunityPage() {
   /* ─── Pull-to-Refresh Handler ─── */
   const handlePullToRefresh = useCallback(async () => {
     try { navigator.vibrate?.([15]) } catch {}
+    setIsRefreshing(true)
     const handleToQuery = myHandleNormalized || userProfile?.username || user?.name
-    await Promise.allSettled([
-      new Promise<void>((resolve) => {
-        getCommunityFeedAction(selectedTag)
-          .then(res => {
-            if (res.success && res.posts) {
-              const deduped = deduplicatePosts(res.posts)
-              setPosts(deduped)
-              setHasMorePosts(Boolean(res.hasMore))
-              setHasNewPosts(false)
-              try {
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(deduped))
-              } catch {}
-            }
-          })
-          .catch(err => {
-            console.warn('Feed pull-to-refresh error:', err)
-          })
-          .finally(() => {
-            setLoading(false)
-            resolve()
-          })
-      }),
-      loadThreads(user?.email, handleToQuery),
-      handleToQuery
-        ? getMutualFollowsAction(handleToQuery)
+    try {
+      await Promise.allSettled([
+        new Promise<void>((resolve) => {
+          getCommunityFeedAction(selectedTag)
             .then(res => {
-              if (res.success && res.mutuals) {
-                setMyMutuals(res.mutuals)
+              if (res.success && res.posts) {
+                const deduped = deduplicatePosts(res.posts)
+                setPosts(deduped)
+                setHasMorePosts(Boolean(res.hasMore))
+                setHasNewPosts(false)
                 try {
-                  localStorage.setItem('psits_community_my_mutuals', JSON.stringify(res.mutuals))
+                  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(deduped))
                 } catch {}
               }
             })
-            .catch(() => {})
-        : Promise.resolve(),
-    ])
+            .catch(err => {
+              console.warn('Feed pull-to-refresh error:', err)
+            })
+            .finally(() => {
+              setLoading(false)
+              resolve()
+            })
+        }),
+        loadThreads(user?.email, handleToQuery),
+        handleToQuery
+          ? getMutualFollowsAction(handleToQuery)
+              .then(res => {
+                if (res.success && res.mutuals) {
+                  setMyMutuals(res.mutuals)
+                  try {
+                    localStorage.setItem('psits_community_my_mutuals', JSON.stringify(res.mutuals))
+                  } catch {}
+                }
+              })
+              .catch(() => {})
+          : Promise.resolve(),
+      ])
+    } finally {
+      setIsRefreshing(false)
+    }
   }, [selectedTag, user?.email, myHandleNormalized, userProfile?.username, user?.name, loadThreads])
 
   /* ─── 2. Offline Detection Listeners ─── */
@@ -3670,30 +3675,39 @@ export default function CommunityPage() {
           </AnimatePresence>
         </div>
 
-        {/* Right: Mobile Notification Bell */}
-        <button
-          type="button"
-          onClick={() => {
-            try { navigator.vibrate?.([15]) } catch {}
-            setIsNotifModalOpen(true)
-          }}
-          className="md:hidden w-10 h-10 flex items-center justify-end relative text-slate-700 dark:text-slate-200 hover:text-gold transition-colors cursor-pointer select-none"
-          aria-label="Notifications"
-        >
-          <Bell size={20} />
-          {unreadNotifCount > 0 && (
-            <span className="absolute top-2 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#07090e]" />
-          )}
-        </button>
+        {/* Right Controls: Quick Refresh & Mobile Notification Bell */}
+        <div className="md:hidden flex items-center gap-1">
+          <button
+            type="button"
+            onClick={async () => {
+              try { navigator.vibrate?.([15]) } catch {}
+              await handlePullToRefresh()
+            }}
+            disabled={isRefreshing || loading}
+            className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-gold active:scale-90 transition-all cursor-pointer disabled:opacity-40"
+            aria-label="Refresh feed"
+          >
+            <RefreshCw size={18} className={isRefreshing ? 'animate-spin text-gold' : ''} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              try { navigator.vibrate?.([15]) } catch {}
+              setIsNotifModalOpen(true)
+            }}
+            className="w-10 h-10 flex items-center justify-center relative text-slate-700 dark:text-slate-200 hover:text-gold transition-colors cursor-pointer select-none"
+            aria-label="Notifications"
+          >
+            <Bell size={20} />
+            {unreadNotifCount > 0 && (
+              <span className="absolute top-2 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#07090e]" />
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* ─── Pull To Refresh Feed Scroller (Directly Above Round Profiles Only) ─── */}
-      <PullToRefresh
-        onRefresh={handlePullToRefresh}
-        disabled={isNotifModalOpen || isCreateOpen || Boolean(activeCommentPost) || isOnboardingOpen || isSearchModalOpen || Boolean(editingPost) || isCreateThreadOpen || Boolean(isDeletingPostId)}
-        className="w-full bg-transparent overflow-visible"
-        contentClassName="overflow-visible space-y-3 sm:space-y-5"
-      >
+      {/* ─── Community Feed Container ─── */}
+      <div className="w-full space-y-3 sm:space-y-5">
       {/* ─── Instagram-Style Mutuals Stories / Notes Tray ─── */}
       <div className="pb-3 pt-2 border-b border-black/[0.04] dark:border-white/[0.06] -mx-4 px-4 sm:mx-0 sm:px-0">
         <div className="flex items-end gap-3.5 sm:gap-4.5 overflow-x-auto no-scrollbar scroll-smooth pt-7 pb-1.5 px-3 sm:px-2">
@@ -4992,7 +5006,7 @@ export default function CommunityPage() {
           </div>
         </aside>
       </div>
-      </PullToRefresh>
+      </div>
     </div>
 
       {/* ─── Premium iOS-Style Community Onboarding Modal ─── */}
@@ -6493,11 +6507,11 @@ export default function CommunityPage() {
       {/* ─── Ultra-Minimalist Native Mobile Navigation Bar (Pure Icons / Instagram Style) ─── */}
       <nav
         aria-label="Mobile Navigation"
-        className={`sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-2xl border-t border-black/[0.06] dark:border-white/[0.08] px-3 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-2px_12px_rgba(0,0,0,0.3)] transition-all ${
+        className={`sm:hidden fixed bottom-0 inset-x-0 w-full z-40 bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-2xl border-t border-black/[0.06] dark:border-white/[0.08] px-2 pb-[max(env(safe-area-inset-bottom,0px),8px)] shadow-[0_-2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-2px_12px_rgba(0,0,0,0.3)] transition-all ${
           isNotifModalOpen || isCreateOpen || activeCommentPost || isOnboardingOpen ? 'hidden' : 'block'
         }`}
       >
-        <div className="flex items-center justify-around h-13 max-w-sm mx-auto">
+        <div className="flex items-center justify-around w-full h-14">
           {/* 1. Home / Feed Tab */}
           <button
             type="button"

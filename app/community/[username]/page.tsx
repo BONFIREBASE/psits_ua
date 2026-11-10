@@ -59,7 +59,6 @@ import { ProfileShareModal } from '@/components/ProfileShareModal'
 import { EditProfileModal } from '@/components/EditProfileModal'
 import { supabase } from '@/lib/supabase'
 import { NumberTicker } from '@/components/motion/number-ticker'
-import { PullToRefresh } from '@/components/motion/pull-to-refresh'
 
 import { CommentsListSkeleton } from '@/components/PublicSkeletonPreloader'
 import { type CommunityUserProfile } from '@/components/CommunityOnboardingModal'
@@ -1219,20 +1218,8 @@ export default function StudentProfilePage() {
   return (
     <div className="min-h-screen bg-white dark:bg-[#07090e] text-slate-900 dark:text-slate-100 overflow-x-hidden">
       <main className="max-w-xl mx-auto px-4 pb-24 pt-2 sm:pt-4">
-        {/* ─── Pull To Refresh Profile Scroller (Directly Above The Name Only) ─── */}
-        <PullToRefresh
-          onRefresh={handlePullToRefresh}
-          disabled={
-            isProfileShareModalOpen ||
-            isEditProfileOpen ||
-            Boolean(activeCommentPost) ||
-            Boolean(editingPost) ||
-            Boolean(confirmDeletePostId) ||
-            followModal.open
-          }
-          className="w-full bg-transparent overflow-visible"
-          contentClassName="overflow-visible space-y-4 sm:space-y-5"
-        >
+        {/* ─── Profile Content Container ─── */}
+        <div className="w-full space-y-4 sm:space-y-5">
         {/* Top Header Navigation Strip (In-flow to prevent mobile avatar cutoff) */}
         <div className="flex items-center justify-between pb-2.5 sm:pb-3 border-b border-black/[0.06] dark:border-white/[0.06]">
           <Link
@@ -1960,7 +1947,7 @@ export default function StudentProfilePage() {
             </div>
           )}
         </div>
-        </PullToRefresh>
+        </div>
       </main>
 
       {/* Edit Post Modal */}
