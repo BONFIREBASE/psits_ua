@@ -134,6 +134,61 @@ function deduplicateComments(items: CommunityCommentItem[]): CommunityCommentIte
   return result
 }
 
+function normalizeTag(rawTag: string): string {
+  return String(rawTag || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+}
+
+function getPostSignature(post: { author_display_name?: string; content?: string }): string {
+  const author = String(post.author_display_name || '').toLowerCase().replace(/^@/, '').trim()
+  const content = String(post.content || '').replace(/\r\n/g, '\n').trim()
+  return `${author}:${content}`
+}
+
+function deduplicatePosts(items: CommunityPostItem[]): CommunityPostItem[] {
+  const seenIds = new Set<string>()
+  const seenSignatures = new Set<string>()
+  const result: CommunityPostItem[] = []
+
+  // Pass 1: Collect non-optimistic (confirmed server) post IDs and content signatures
+  for (const item of items) {
+    if (!item || !item.$id) continue
+    const isTemp = item.$id.startsWith('optimistic-') || item.$id.startsWith('temp-')
+    if (!isTemp) {
+      seenIds.add(item.$id)
+      seenSignatures.add(getPostSignature(item))
+    }
+  }
+
+  // Pass 2: Reconcile and prune redundant optimistic items
+  for (const item of items) {
+    if (!item || !item.$id) continue
+    const isTemp = item.$id.startsWith('optimistic-') || item.$id.startsWith('temp-')
+
+    if (isTemp) {
+      // Discard optimistic temporary post if confirmed server document already arrived
+      if (seenSignatures.has(getPostSignature(item))) {
+        continue
+      }
+      if (seenIds.has(item.$id)) {
+        continue
+      }
+      seenIds.add(item.$id)
+      result.push(item)
+    } else {
+      // Ensure strict uniqueness for server items
+      if (result.some(r => r.$id === item.$id)) {
+        continue
+      }
+      result.push(item)
+    }
+  }
+  return result
+}
+
 function formatRelativeTime(dateStr: string): string {
   try {
     const now = Date.now()
@@ -413,6 +468,9 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState<CommunityPostItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [selectedTag, setSelectedTag] = useState('All')
+  const [hasMorePosts, setHasMorePosts] = useState<boolean>(true)
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false)
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isOffline, setIsOffline] = useState(false)
   const [user, setUser] = useState<{
@@ -608,6 +666,16 @@ export default function CommunityPage() {
         setIsOffline(!navigator.onLine)
       } catch {}
     })
+  }, [])
+
+  // Deep-Link Thread & Tag Auto-Navigation
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const threadParam = params.get('thread') || params.get('tag')
+    if (threadParam && threadParam.trim()) {
+      setSelectedTag(threadParam.trim())
+    }
   }, [])
 
   // Deep-Link Post Auto-Highlight & Auto-Scroll
@@ -1817,13 +1885,16 @@ export default function CommunityPage() {
 
   /* ─── 1. Feed Fetching with Cache Sync Helper ─── */
   const reloadFeed = useCallback((tag: string) => {
+    setIsLoadingMore(false)
     getCommunityFeedAction(tag)
       .then(res => {
         if (res.success && res.posts) {
-          setPosts(res.posts)
+          const deduped = deduplicatePosts(res.posts)
+          setPosts(deduped)
+          setHasMorePosts(Boolean(res.hasMore))
           setHasNewPosts(false)
           try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(res.posts))
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(deduped))
           } catch {
             // ignore
           }
@@ -1846,10 +1917,12 @@ export default function CommunityPage() {
         getCommunityFeedAction(selectedTag)
           .then(res => {
             if (res.success && res.posts) {
-              setPosts(res.posts)
+              const deduped = deduplicatePosts(res.posts)
+              setPosts(deduped)
+              setHasMorePosts(Boolean(res.hasMore))
               setHasNewPosts(false)
               try {
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(res.posts))
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(deduped))
               } catch {}
             }
           })
@@ -2097,13 +2170,16 @@ export default function CommunityPage() {
   /* ─── 4. Re-fetch Feed on Tag Change ─── */
   useEffect(() => {
     let isMounted = true
+    setIsLoadingMore(false)
     getCommunityFeedAction(selectedTag)
       .then(res => {
         if (isMounted && res.success && res.posts) {
-          setPosts(res.posts)
+          const deduped = deduplicatePosts(res.posts)
+          setPosts(deduped)
+          setHasMorePosts(Boolean(res.hasMore))
           setHasNewPosts(false)
           try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(res.posts))
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(deduped))
           } catch {
             // ignore
           }
@@ -2122,6 +2198,49 @@ export default function CommunityPage() {
       isMounted = false
     }
   }, [selectedTag])
+
+  /* ─── 4.1 Infinite Scroll Older Posts Loader ─── */
+  const loadMorePosts = useCallback(async () => {
+    if (isLoadingMore || !hasMorePosts || loading) return
+
+    // Identify last confirmed server document to paginate from
+    const lastServerDoc = [...posts].reverse().find(p => !p.$id.startsWith('optimistic-') && !p.$id.startsWith('temp-'))
+    if (!lastServerDoc) return
+
+    setIsLoadingMore(true)
+    try {
+      const res = await getCommunityFeedAction(selectedTag, lastServerDoc.$id, 15)
+      if (res.success && res.posts && res.posts.length > 0) {
+        setPosts(prev => deduplicatePosts([...prev, ...res.posts]))
+        setHasMorePosts(Boolean(res.hasMore))
+      } else {
+        setHasMorePosts(false)
+      }
+    } catch (err) {
+      console.warn('Failed to load more posts:', err)
+      setHasMorePosts(false)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, hasMorePosts, loading, posts, selectedTag])
+
+  useEffect(() => {
+    if (!hasMorePosts || isLoadingMore || loading) return
+    const sentinel = loadMoreSentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting) {
+          loadMorePosts()
+        }
+      },
+      { rootMargin: '300px' }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMorePosts, isLoadingMore, loading, loadMorePosts])
 
   /* ─── 5. Appwrite Realtime Subscriptions (Live Feed & Instant Moderator Takedown) ─── */
   /* Subscribe ONCE on mount. Uses activeCommentPostRef to avoid re-subscribing on every comment toggle. */
@@ -2196,8 +2315,10 @@ export default function CommunityPage() {
             // 1. If document already present, don't duplicate
             if (prev.some(p => p.$id === docId)) return prev
 
-            // 2. If matching an optimistic post (starts with temp-), replace it in-place
-            const optimisticIndex = prev.findIndex(p => p.$id.startsWith('temp-') && p.content === newPostItem.content)
+            // 2. If matching an optimistic post (starts with temp- or optimistic-), replace it in-place
+            const optimisticIndex = prev.findIndex(
+              p => (p.$id.startsWith('temp-') || p.$id.startsWith('optimistic-')) && getPostSignature(p) === getPostSignature(newPostItem)
+            )
             let next: CommunityPostItem[]
             if (optimisticIndex !== -1) {
               next = [...prev]
@@ -2207,10 +2328,11 @@ export default function CommunityPage() {
               next = [newPostItem, ...prev]
             }
 
+            const deduped = deduplicatePosts(next)
             try {
-              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next))
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(deduped))
             } catch {}
-            return next
+            return deduped
           })
           setHasNewPosts(false)
         }
@@ -2655,7 +2777,7 @@ export default function CommunityPage() {
     }
 
     // Instantly close modal and prepend post in 0ms!
-    setPosts(prev => [optimisticPost, ...prev])
+    setPosts(prev => deduplicatePosts([optimisticPost, ...prev]))
     setPostContent('')
     setAttachments([])
     setIsCreateOpen(false)
@@ -2664,7 +2786,7 @@ export default function CommunityPage() {
     try {
       const cached = localStorage.getItem(LOCAL_STORAGE_KEY)
       const parsed = cached ? JSON.parse(cached) : []
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([optimisticPost, ...parsed]))
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(deduplicatePosts([optimisticPost, ...parsed])))
     } catch {}
 
     // Dispatch network request in background
@@ -2685,16 +2807,23 @@ export default function CommunityPage() {
         if (res.success && res.post) {
           // Reconcile temporary optimistic post with real server document
           setPosts(prev => {
-            const updated = prev.map(p => p.$id === tempId ? res.post! : p)
+            const alreadyExists = prev.some(p => p.$id === res.post!.$id)
+            let updated: CommunityPostItem[]
+            if (alreadyExists) {
+              updated = prev.filter(p => p.$id !== tempId)
+            } else {
+              updated = prev.map(p => p.$id === tempId ? res.post! : p)
+            }
+            const deduped = deduplicatePosts(updated)
             try {
-              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated))
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(deduped))
             } catch {}
-            return updated
+            return deduped
           })
         } else {
           // Revert optimistic post and notify user
           setPosts(prev => {
-            const reverted = prev.filter(p => p.$id !== tempId)
+            const reverted = deduplicatePosts(prev.filter(p => p.$id !== tempId))
             try {
               localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reverted))
             } catch {}
@@ -2706,7 +2835,7 @@ export default function CommunityPage() {
       .catch(err => {
         console.error('Post creation error:', err)
         setPosts(prev => {
-          const reverted = prev.filter(p => p.$id !== tempId)
+          const reverted = deduplicatePosts(prev.filter(p => p.$id !== tempId))
           try {
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reverted))
           } catch {}
@@ -3104,6 +3233,28 @@ export default function CommunityPage() {
         return false
       }
 
+      // 0.1 Active Thread / Tag Filter
+      if (selectedTag && selectedTag !== 'All') {
+        const selectedSlug = normalizeTag(selectedTag)
+        const threadTitleSlug = currentActiveThread ? normalizeTag(currentActiveThread.title) : ''
+        const threadSlug = currentActiveThread ? normalizeTag(currentActiveThread.slug) : ''
+        const isFeedCategory = selectedSlug === 'feed' || selectedSlug === 'discussions'
+
+        const matchesTag = Array.isArray(post.tags) && post.tags.some(t => {
+          const postTagSlug = normalizeTag(t)
+          return (
+            postTagSlug === selectedSlug ||
+            (threadTitleSlug && postTagSlug === threadTitleSlug) ||
+            (threadSlug && postTagSlug === threadSlug) ||
+            (isFeedCategory && (postTagSlug === 'feed' || postTagSlug === 'discussions'))
+          )
+        })
+
+        if (!matchesTag) {
+          return false
+        }
+      }
+
       // 1. Search Query Filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
@@ -3162,7 +3313,7 @@ export default function CommunityPage() {
     }
 
     return list
-  }, [posts, searchQuery, filterOnlyWithFiles, filterOnlyOfficers, filterOnlySaved, filterOnlyMyPosts, savedPostIds, hiddenPostIds, sortBy, user, userProfile])
+  }, [posts, selectedTag, currentActiveThread, searchQuery, filterOnlyWithFiles, filterOnlyOfficers, filterOnlySaved, filterOnlyMyPosts, savedPostIds, hiddenPostIds, sortBy, user, userProfile])
 
   // Comments Tree Memos (Hierarchical nesting of comments & replies)
   const topLevelComments = useMemo(() => {
@@ -3794,40 +3945,123 @@ export default function CommunityPage() {
                 </div>
               </div>
 
-              {isHostOfThread(currentActiveThread, user?.email, userProfile?.username) && (
-                <div className="shrink-0 self-start sm:self-center">
-                  {confirmDeleteThreadId === currentActiveThread.$id ? (
-                    <div className="inline-flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-xl animate-in fade-in">
-                      <span className="text-red-500 text-xs font-semibold">Delete thread?</span>
+              <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!user) {
+                      setOnboardingInitialStep(1)
+                      setIsOnboardingOpen(true)
+                      return
+                    }
+                    setSelectedPostTag(currentActiveThread.title)
+                    setIsCreateOpen(true)
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-gold hover:bg-gold-muted text-slate-950 font-bold text-xs transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Post in #{currentActiveThread.title}</span>
+                </button>
+
+                {isHostOfThread(currentActiveThread, user?.email, userProfile?.username) && (
+                  <div>
+                    {confirmDeleteThreadId === currentActiveThread.$id ? (
+                      <div className="inline-flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-xl animate-in fade-in">
+                        <span className="text-red-500 text-xs font-semibold">Delete thread?</span>
+                        <button
+                          type="button"
+                          disabled={deletingThreadId === currentActiveThread.$id}
+                          onClick={() => handleDeleteThread(currentActiveThread)}
+                          className="px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {deletingThreadId === currentActiveThread.$id ? 'Deleting...' : 'Yes, Delete'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteThreadId(null)}
+                          className="px-1.5 py-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white text-xs cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         type="button"
-                        disabled={deletingThreadId === currentActiveThread.$id}
-                        onClick={() => handleDeleteThread(currentActiveThread)}
-                        className="px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                        onClick={() => setConfirmDeleteThreadId(currentActiveThread.$id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-500/20 text-red-500 hover:bg-red-500/10 text-xs font-medium transition-colors cursor-pointer"
+                        title="Delete your discussion thread"
                       >
-                        {deletingThreadId === currentActiveThread.$id ? 'Deleting...' : 'Yes, Delete'}
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Thread</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteThreadId(null)}
-                        className="px-1.5 py-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white text-xs cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteThreadId(currentActiveThread.$id)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-500/20 text-red-500 hover:bg-red-500/10 text-xs font-medium transition-colors cursor-pointer"
-                      title="Delete your discussion thread"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Delete Thread</span>
-                    </button>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Threads Compact Create Post Box (Desktop & Mobile) */}
+          {!isCurrentThreadPrivateLocked && (
+            <div className="rounded-2xl border border-black/[0.05] dark:border-white/[0.06] bg-white/80 dark:bg-[#0c1017]/80 backdrop-blur-xl p-2.5 sm:p-3.5 flex items-center gap-2.5 sm:gap-3 shadow-xs dark:shadow-none">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-surface-subtle border border-gold/30 flex items-center justify-center shrink-0 ring-1 ring-gold/20 overflow-hidden text-gold font-bold text-xs">
+                {userProfile?.avatar && !userProfile.avatar.startsWith('preset:') ? (
+                  <Image src={userProfile.avatar} alt="Avatar" width={36} height={36} className="w-full h-full object-cover" />
+                ) : (
+                  renderAvatarIcon(userProfile?.avatar, userProfile?.name || user?.name)
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!user) {
+                    setOnboardingInitialStep(1)
+                    setIsOnboardingOpen(true)
+                    return
+                  }
+                  setSelectedPostTag(selectedTag === 'All' ? 'general' : selectedTag)
+                  setIsCreateOpen(true)
+                }}
+                className="flex-1 bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.07] border border-black/[0.06] dark:border-white/[0.08] text-left px-3.5 py-2 rounded-xl text-slate-400 dark:text-white/40 text-xs sm:text-[13px] transition-colors cursor-pointer truncate"
+              >
+                {selectedTag === 'All' ? 'Start a discussion in #general...' : `Post to #${selectedTag}...`}
+              </button>
+              <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!user) {
+                      setOnboardingInitialStep(1)
+                      setIsOnboardingOpen(true)
+                      return
+                    }
+                    setSelectedPostTag(selectedTag === 'All' ? 'general' : selectedTag)
+                    setIsCreateOpen(true)
+                    setTimeout(() => fileInputRef.current?.click(), 100)
+                  }}
+                  className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-gold hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Attach Module or Image"
+                >
+                  <Paperclip className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!user) {
+                      setOnboardingInitialStep(1)
+                      setIsOnboardingOpen(true)
+                      return
+                    }
+                    setSelectedPostTag(selectedTag === 'All' ? 'general' : selectedTag)
+                    setIsCreateOpen(true)
+                    setIsCodeModalOpen(true)
+                  }}
+                  className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-gold hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Share Code Snippet"
+                >
+                  <Code2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
 
@@ -4423,6 +4657,32 @@ export default function CommunityPage() {
                   </ScrollReveal>
                 )
               })}
+
+              {/* ─── Infinite Scroll Sentinel / Load More Status ─── */}
+              {filteredPosts.length > 0 && (
+                <div ref={loadMoreSentinelRef} className="py-6 flex flex-col items-center justify-center gap-2">
+                  {isLoadingMore ? (
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-subtle border border-black/[0.06] dark:border-white/[0.08] text-xs font-mono text-slate-500 dark:text-white/60 animate-pulse">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-gold" />
+                      <span>Loading earlier discussions...</span>
+                    </div>
+                  ) : hasMorePosts ? (
+                    <button
+                      type="button"
+                      onClick={loadMorePosts}
+                      className="px-4 py-2 rounded-full bg-surface-subtle hover:bg-black/5 dark:hover:bg-white/5 border border-black/[0.06] dark:border-white/[0.08] text-xs font-mono text-slate-500 dark:text-white/60 hover:text-gold transition-colors cursor-pointer"
+                    >
+                      Load earlier discussions ↓
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 py-3 text-[11px] font-mono text-slate-400 dark:text-white/40">
+                      <span className="w-8 h-[1px] bg-black/[0.06] dark:bg-white/[0.08]" />
+                      <span>✓ You&apos;re all caught up</span>
+                      <span className="w-8 h-[1px] bg-black/[0.06] dark:border-white/[0.08]" />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -4473,6 +4733,8 @@ export default function CommunityPage() {
                             onClick={() => {
                               if (isMember || !ct.is_private) {
                                 setSelectedTag(ct.title)
+                                reloadFeed(ct.title)
+                                window.scrollTo({ top: 0, behavior: 'smooth' })
                               } else if (!isPending) {
                                 handleRequestJoinThread(ct)
                               }
@@ -4537,7 +4799,11 @@ export default function CommunityPage() {
                             ) : isMember ? (
                               <button
                                 type="button"
-                                onClick={() => setSelectedTag(ct.title)}
+                                onClick={() => {
+                                  setSelectedTag(ct.title)
+                                  reloadFeed(ct.title)
+                                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                                }}
                                 className="px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 flex items-center gap-1 cursor-pointer hover:bg-emerald-500/25 transition-colors"
                               >
                                 <Check className="w-2.5 h-2.5" />
@@ -5104,13 +5370,15 @@ export default function CommunityPage() {
                     <span>general</span>
                   </button>
                 )}
-                {customThreads.map(ct => (
+                {customThreads
+                  .filter(ct => !ct.is_private || isMemberOfThread(ct, user?.email, userProfile?.username))
+                  .map(ct => (
                   <button
                     key={ct.$id}
                     type="button"
                     onClick={() => setSelectedPostTag(ct.title)}
                     className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-1 ${
-                      selectedPostTag === ct.title
+                      selectedPostTag.toLowerCase().trim() === ct.title.toLowerCase().trim()
                         ? 'bg-amber-400/20 text-amber-700 dark:text-amber-300 border border-amber-400/50 font-semibold shadow-xs'
                         : 'bg-black/[0.03] dark:bg-white/[0.04] text-slate-600 dark:text-white/60 border border-black/[0.06] dark:border-white/[0.06] hover:text-slate-900 dark:hover:text-white hover:bg-black/[0.06] dark:hover:bg-white/[0.08]'
                     }`}
@@ -6287,6 +6555,8 @@ export default function CommunityPage() {
                 if (!user) {
                   setIsOnboardingOpen(true)
                 } else {
+                  const tagToSet = (isCurrentThreadPrivateLocked || selectedTag === 'All') ? 'general' : selectedTag
+                  setSelectedPostTag(tagToSet)
                   setIsCreateOpen(true)
                 }
               }}

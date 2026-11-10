@@ -476,26 +476,45 @@ export async function autoResolveStudentEligibilityAction(params: {
   }
 }
 
-export async function getCommunityFeedAction(tag?: string): Promise<{
+export async function getCommunityFeedAction(
+  tag?: string,
+  cursor?: string,
+  limit: number = 20
+): Promise<{
   success: boolean
   posts: CommunityPostItem[]
+  hasMore: boolean
+  nextCursor?: string
   fromCache: boolean
   error?: string
 }> {
   try {
+    const isFirstPage = !cursor
     const cacheKey = tag ? `${FEED_CACHE_KEY}:${tag}` : FEED_CACHE_KEY
 
-    const cached = await getCache<CommunityPostItem[]>(cacheKey)
-    if (cached && Array.isArray(cached) && cached.length > 0) {
-      return { success: true, posts: cached, fromCache: true }
+    if (isFirstPage) {
+      const cached = await getCache<CommunityPostItem[]>(cacheKey)
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        return {
+          success: true,
+          posts: cached,
+          hasMore: cached.length >= limit,
+          nextCursor: cached[cached.length - 1]?.$id,
+          fromCache: true,
+        }
+      }
     }
 
     const { databases } = createServerAppwriteClient()
     const queries = [
       Query.equal('status', 'active'),
       Query.orderDesc('$createdAt'),
-      Query.limit(30),
+      Query.limit(limit),
     ]
+
+    if (cursor) {
+      queries.push(Query.cursorAfter(cursor))
+    }
 
     if (tag && tag !== 'All') {
       if (tag === 'Feed') {
@@ -505,7 +524,19 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
           queries.push(Query.contains('tags', 'Feed'))
         }
       } else {
-        queries.push(Query.contains('tags', tag))
+        const cleanTag = tag.trim()
+        const tagLower = cleanTag.toLowerCase()
+        const slug = tagLower.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        const variants = Array.from(new Set([cleanTag, tagLower, slug])).filter(Boolean)
+        if (variants.length > 1) {
+          try {
+            queries.push(Query.or(variants.map(v => Query.contains('tags', v))))
+          } catch {
+            queries.push(Query.contains('tags', cleanTag))
+          }
+        } else {
+          queries.push(Query.contains('tags', cleanTag))
+        }
       }
     }
 
@@ -556,14 +587,19 @@ export async function getCommunityFeedAction(tag?: string): Promise<{
       }
     })
 
-    // Save to Redis cache
-    await setCache(cacheKey, sanitizedPosts, FEED_CACHE_TTL)
+    if (isFirstPage) {
+      // Save page 1 to Redis cache
+      await setCache(cacheKey, sanitizedPosts, FEED_CACHE_TTL)
+    }
 
-    return { success: true, posts: sanitizedPosts, fromCache: false }
+    const hasMore = res.documents.length === limit
+    const nextCursor = res.documents.length > 0 ? String(res.documents[res.documents.length - 1].$id) : undefined
+
+    return { success: true, posts: sanitizedPosts, hasMore, nextCursor, fromCache: false }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to load community feed.'
     console.error('[Appwrite Feed Error]:', err)
-    return { success: false, posts: [], fromCache: false, error: message }
+    return { success: false, posts: [], hasMore: false, fromCache: false, error: message }
   }
 }
 
@@ -823,6 +859,58 @@ export async function createCommunityPostAction(payload: {
     postCooldownMap.set(userKey, Date.now())
 
     const { databases } = createServerAppwriteClient()
+
+    // 1. Normalize tags: store both original casing and kebab-case slug for seamless cross-matching
+    const rawTags = (payload.tags && payload.tags.length > 0) ? payload.tags : ['Feed']
+    const normalizedTags = Array.from(
+      new Set(
+        rawTags.flatMap(t => {
+          const clean = String(t || '').trim().slice(0, 50)
+          const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 50)
+          return [clean, slug].filter(Boolean)
+        })
+      )
+    )
+
+    // 2. Private Thread Authorization Check (Prevent unauthorized posts in locked private threads)
+    for (const rawTag of rawTags) {
+      const cleanTag = String(rawTag || '').trim()
+      if (cleanTag && cleanTag !== 'Feed' && cleanTag !== 'general' && cleanTag !== 'Discussions' && cleanTag !== 'All') {
+        try {
+          const threadCheck = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            APPWRITE_COLLECTIONS.THREADS,
+            [
+              Query.equal('status', 'active'),
+              Query.or([Query.equal('title', cleanTag), Query.equal('slug', cleanTag.toLowerCase())]),
+              Query.limit(1)
+            ]
+          )
+          if (threadCheck.documents.length > 0) {
+            const threadDoc = threadCheck.documents[0]
+            if (threadDoc.is_private) {
+              const creatorEmail = String(threadDoc.creator_student_no || '').toLowerCase().trim()
+              const allowed: string[] = Array.isArray(threadDoc.allowed_users) ? threadDoc.allowed_users : []
+              const cleanUserEmail = payload.userEmail.toLowerCase().trim()
+              const cleanUserHandle = normalizeCommunityHandle(payload.userName)
+              const isAllowed =
+                creatorEmail === cleanUserEmail ||
+                cleanUserEmail === SUPER_ADMIN_EMAIL ||
+                allowed.some(u => {
+                  const uClean = String(u || '').toLowerCase().trim()
+                  return uClean === cleanUserEmail || (cleanUserHandle && uClean.includes(cleanUserHandle))
+                })
+              if (!isAllowed) {
+                return { success: false, error: 'Access restricted: You must be an approved member of this private thread to publish posts.' }
+              }
+            }
+          }
+        } catch {
+          // Gracefully continue if threads collection index query fails
+        }
+      }
+    }
+
     const [officerCheck, resolvedAvatar] = await Promise.all([
       resolveOfficerStatus(payload.userEmail, payload.userName),
       payload.isAnonymous ? Promise.resolve('') : resolveAvatarUrl(payload.userAvatar),
@@ -849,7 +937,7 @@ export async function createCommunityPostAction(payload: {
         attachment_sizes: (payload.attachmentSizes || []).map(a => String(a).slice(0, 50)),
         likes_count: 0,
         comments_count: 0,
-        tags: (payload.tags || ['Feed']).map(t => String(t).slice(0, 50)),
+        tags: normalizedTags.map(t => String(t).slice(0, 50)),
         is_locked: false,
         is_flagged: false,
         flag_count: 0,
@@ -861,7 +949,7 @@ export async function createCommunityPostAction(payload: {
     void (async () => {
       try {
         await deleteCache(FEED_CACHE_KEY)
-        for (const tag of payload.tags || []) {
+        for (const tag of normalizedTags) {
           await deleteCache(`${FEED_CACHE_KEY}:${tag}`)
         }
       } catch {}
