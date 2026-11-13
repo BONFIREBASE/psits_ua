@@ -1276,6 +1276,105 @@ export async function togglePostReactionAction(params: {
   }
 }
 
+/* ─── 4b. Article & Announcement Reactions (Appwrite Backed) ─── */
+export async function getArticleReactionsAction(params: {
+  articleId: string
+  userIdentifier?: string
+}): Promise<{ success: boolean; likesCount: number; hasReacted: boolean }> {
+  try {
+    const { articleId, userIdentifier } = params
+    if (!articleId) return { success: false, likesCount: 0, hasReacted: false }
+
+    const safeId = articleId.slice(0, 50)
+    const { databases } = createServerAppwriteClient()
+
+    const res = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.REACTIONS,
+      [Query.equal('post_id', safeId), Query.limit(100)]
+    )
+
+    let hasReacted = false
+    if (userIdentifier) {
+      const cleanUser = userIdentifier.trim().toLowerCase()
+      hasReacted = res.documents.some(doc => String(doc.student_no).toLowerCase() === cleanUser)
+    }
+
+    return {
+      success: true,
+      likesCount: res.total,
+      hasReacted,
+    }
+  } catch (err) {
+    console.error('[getArticleReactionsAction Error]:', err)
+    return { success: false, likesCount: 0, hasReacted: false }
+  }
+}
+
+export async function toggleArticleReactionAction(params: {
+  articleId: string
+  userIdentifier: string
+  reactionType?: string
+}): Promise<{ success: boolean; newLikesCount: number; hasReacted: boolean; error?: string }> {
+  try {
+    const { articleId, userIdentifier, reactionType = 'like' } = params
+    if (!articleId || !userIdentifier) {
+      return { success: false, newLikesCount: 0, hasReacted: false, error: 'Missing parameters.' }
+    }
+
+    const safeId = articleId.slice(0, 50)
+    const safeUser = userIdentifier.trim().toLowerCase().slice(0, 255)
+    const { databases } = createServerAppwriteClient()
+
+    // Check if an existing reaction exists for this user & article
+    const existing = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.REACTIONS,
+      [Query.equal('post_id', safeId), Query.equal('student_no', safeUser)]
+    )
+
+    let hasReacted = false
+
+    if (existing.total > 0) {
+      await databases.deleteDocument(
+        APPWRITE_DATABASE_ID,
+        APPWRITE_COLLECTIONS.REACTIONS,
+        existing.documents[0].$id
+      )
+      hasReacted = false
+    } else {
+      await databases.createDocument(
+        APPWRITE_DATABASE_ID,
+        APPWRITE_COLLECTIONS.REACTIONS,
+        ID.unique(),
+        {
+          post_id: safeId,
+          student_no: safeUser,
+          reaction_type: reactionType,
+        }
+      )
+      hasReacted = true
+    }
+
+    // Authoritative ACID document count query directly from Appwrite REACTIONS collection
+    const countQuery = await databases.listDocuments(
+      APPWRITE_DATABASE_ID,
+      APPWRITE_COLLECTIONS.REACTIONS,
+      [Query.equal('post_id', safeId), Query.limit(1)]
+    )
+
+    return {
+      success: true,
+      newLikesCount: countQuery.total,
+      hasReacted,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to toggle article reaction.'
+    console.error('[toggleArticleReactionAction Error]:', err)
+    return { success: false, newLikesCount: 0, hasReacted: false, error: message }
+  }
+}
+
 /* ─── 5. Add Comment ─── */
 export async function addCommentAction(params: {
   postId: string

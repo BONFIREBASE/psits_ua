@@ -1,14 +1,17 @@
 'use client'
 
-import { useState, useCallback, useEffect, useSyncExternalStore } from 'react'
+import { useState, useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import ProgressiveImage from './ProgressiveImage'
-import { X, ArrowUpRight, MapPin, Calendar, Quote, PenTool, Camera, Palette, Clock, Video, FileText } from 'lucide-react'
+import { X, ArrowUpRight, MapPin, Calendar, Quote, PenTool, Camera, Palette, Clock, Video, FileText, Maximize2, Link as LinkIcon, Check, Heart, Bookmark } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SocialDispatch } from '@/data/announcements'
 import MarkdownContent from './MarkdownContent'
+import { appwrite, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS } from '@/lib/appwrite'
+import { getArticleReactionsAction, toggleArticleReactionAction } from '@/app/community/actions'
+import { getClientUserIdentifier } from '@/lib/client-identity'
 
 interface SocialDispatchCardProps {
   dispatch: SocialDispatch
@@ -42,6 +45,158 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
     if (isOpen) window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [isOpen, close])
+
+  const [copied, setCopied] = useState(false)
+
+  const getArticleUrl = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/blog/${dispatch.slug || dispatch.id}`
+    }
+    return `https://psitsua.vercel.app/blog/${dispatch.slug || dispatch.id}`
+  }, [dispatch.slug, dispatch.id])
+
+  const handleCopy = useCallback(async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    const url = getArticleUrl()
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      const input = document.createElement('input')
+      input.value = url
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      document.body.removeChild(input)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }, [getArticleUrl])
+
+  const handleFacebookShare = useCallback((e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    const url = getArticleUrl()
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
+    window.open(fbUrl, '_blank', 'noopener,noreferrer,width=600,height=500')
+  }, [getArticleUrl])
+
+  const itemKey = dispatch.slug || dispatch.id
+  const [isLiked, setIsLiked] = useState(false)
+  const [likesCount, setLikesCount] = useState(0)
+  const [isSaved, setIsSaved] = useState(false)
+  const [isSubmittingLike, setIsSubmittingLike] = useState(false)
+  const userIdentifierRef = useRef<string>('')
+
+  useEffect(() => {
+    let isMounted = true
+    let unsubscribe: (() => void) | undefined
+
+    try {
+      const likedPosts = JSON.parse(localStorage.getItem('psits_community_liked_posts') || '[]')
+      if (likedPosts.includes(itemKey)) {
+        setIsLiked(true)
+      }
+
+      const savedPosts = JSON.parse(localStorage.getItem('psits_community_saved_posts') || '[]')
+      setIsSaved(savedPosts.includes(itemKey))
+    } catch {}
+
+    async function loadAppwriteReactions() {
+      const id = await getClientUserIdentifier()
+      userIdentifierRef.current = id
+
+      const res = await getArticleReactionsAction({
+        articleId: itemKey,
+        userIdentifier: id,
+      })
+
+      if (isMounted && res.success) {
+        setLikesCount(res.likesCount)
+        if (res.hasReacted) {
+          setIsLiked(true)
+        }
+      }
+
+      // Appwrite Realtime WebSocket subscription
+      try {
+        const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_COLLECTIONS.REACTIONS}.documents`
+        unsubscribe = appwrite.subscribe(channel, (response: { events: string[]; payload: Record<string, unknown> }) => {
+          if (!isMounted) return
+          const payload = response.payload
+          const safeKey = itemKey.slice(0, 50)
+          if (payload && String(payload.post_id) === safeKey) {
+            const isCreate = response.events.some((e) => e.includes('.create'))
+            const isDelete = response.events.some((e) => e.includes('.delete'))
+            if (isCreate) {
+              setLikesCount((prev) => prev + 1)
+            } else if (isDelete) {
+              setLikesCount((prev) => Math.max(0, prev - 1))
+            }
+          }
+        })
+      } catch (err) {
+        console.warn('[Appwrite Realtime Reaction warning]:', err)
+      }
+    }
+
+    loadAppwriteReactions()
+
+    return () => {
+      isMounted = false
+      if (unsubscribe) unsubscribe()
+    }
+  }, [itemKey])
+
+  const handleToggleLike = useCallback(async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    if (isSubmittingLike) return
+    setIsSubmittingLike(true)
+
+    const nextLiked = !isLiked
+    setIsLiked(nextLiked)
+    setLikesCount((prev) => Math.max(0, prev + (nextLiked ? 1 : -1)))
+
+    try {
+      const likedPosts = JSON.parse(localStorage.getItem('psits_community_liked_posts') || '[]')
+      const updated = nextLiked
+        ? Array.from(new Set([...likedPosts, itemKey]))
+        : likedPosts.filter((id: string) => id !== itemKey)
+      localStorage.setItem('psits_community_liked_posts', JSON.stringify(updated))
+    } catch {}
+
+    const id = userIdentifierRef.current || (await getClientUserIdentifier())
+    userIdentifierRef.current = id
+
+    try {
+      const res = await toggleArticleReactionAction({
+        articleId: itemKey,
+        userIdentifier: id,
+      })
+      if (res.success) {
+        setLikesCount(res.newLikesCount)
+        setIsLiked(res.hasReacted)
+      }
+    } catch (err) {
+      console.error('[Error toggling reaction in modal]:', err)
+    } finally {
+      setIsSubmittingLike(false)
+    }
+  }, [isLiked, isSubmittingLike, itemKey])
+
+  const handleToggleSave = useCallback((e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    const nextSaved = !isSaved
+    setIsSaved(nextSaved)
+
+    try {
+      const savedPosts = JSON.parse(localStorage.getItem('psits_community_saved_posts') || '[]')
+      const updated = nextSaved
+        ? Array.from(new Set([...savedPosts, itemKey]))
+        : savedPosts.filter((id: string) => id !== itemKey)
+      localStorage.setItem('psits_community_saved_posts', JSON.stringify(updated))
+    } catch {}
+  }, [isSaved, itemKey])
 
   return (
     <>
@@ -141,9 +296,9 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
                     onClick={(e) => e.stopPropagation()}
                     className="relative w-full sm:max-w-3xl lg:max-w-4xl bg-surface border-t border-x border-black/10 dark:border-white/10 sm:border sm:border-black/10 sm:dark:border-white/15 rounded-t-3xl sm:rounded-2xl overflow-hidden overflow-y-auto max-h-[92dvh] sm:max-h-[88vh] shadow-[0_25px_70px_rgba(0,0,0,0.18)] dark:shadow-[0_25px_70px_rgba(0,0,0,0.95)] scrollbar-minimal flex flex-col"
                   >
-                    <div className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 bg-surface/90 backdrop-blur-md border-b border-black/10 dark:border-white/10">
-                      <div className="flex items-center gap-2.5">
-                        <div className="relative w-6 h-6 rounded-full overflow-hidden shrink-0 border border-gold/40">
+                    <div className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 bg-surface/90 backdrop-blur-md border-b border-black/10 dark:border-white/10">
+                      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                        <div className="relative w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden shrink-0 border border-gold/40">
                           <Image
                             src="/assets/logo/PSITS logo.png"
                             alt="PSITS-UA"
@@ -151,21 +306,99 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
                             className="object-contain p-0.5"
                           />
                         </div>
-                        <span className="font-display font-bold text-xs sm:text-sm tracking-tight text-slate-900 dark:text-white">
+                        <span className="font-display font-bold text-xs sm:text-sm tracking-tight text-slate-900 dark:text-white truncate max-w-[110px] xs:max-w-[160px] sm:max-w-none">
                           PSITS-UA Announcement
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <kbd className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono font-semibold text-slate-500 dark:text-white/50 bg-black/5 dark:bg-white/10 rounded border border-black/10 dark:border-white/15">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        {/* React / Heart Button (Just like community) */}
+                        <button
+                          type="button"
+                          onClick={handleToggleLike}
+                          disabled={isSubmittingLike}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-rose-500/10 dark:bg-white/[0.08] dark:hover:bg-rose-500/20 border border-slate-200/80 dark:border-white/10 transition-colors cursor-pointer text-xs font-mono select-none active:scale-95 disabled:opacity-70"
+                          title={isLiked ? "Unlike announcement" : "React to announcement"}
+                          aria-label="React to announcement"
+                        >
+                          <Heart
+                            size={14}
+                            className={`transition-transform duration-200 ${
+                              isLiked ? "fill-rose-500 text-rose-500 scale-110" : "text-slate-600 dark:text-slate-300 hover:text-rose-500"
+                            }`}
+                          />
+                          <span className={`text-[11px] font-bold ${isLiked ? "text-rose-500" : "text-slate-600 dark:text-slate-300"}`}>
+                            {likesCount}
+                          </span>
+                        </button>
+
+                        {/* Save / Bookmark Button (Reflects in community profile) */}
+                        <button
+                          type="button"
+                          onClick={handleToggleSave}
+                          className="p-1.5 sm:p-2 rounded-full bg-slate-100 hover:bg-gold/15 dark:bg-white/[0.08] dark:hover:bg-gold/20 border border-slate-200/80 dark:border-white/10 transition-colors cursor-pointer select-none active:scale-95"
+                          title={isSaved ? "Saved (Remove from saved)" : "Save to community profile"}
+                          aria-label="Save announcement"
+                        >
+                          <Bookmark
+                            size={15}
+                            className={`transition-transform duration-200 ${
+                              isSaved ? "fill-gold text-gold scale-110" : "text-slate-600 dark:text-slate-300 hover:text-gold"
+                            }`}
+                          />
+                        </button>
+
+                        {/* Open Article Page (Beside Saved) */}
+                        <Link
+                          href={`/blog/${dispatch.slug || dispatch.id}`}
+                          onClick={close}
+                          className="p-1.5 sm:p-2 rounded-full bg-slate-100 hover:bg-amber-500/10 dark:bg-white/[0.08] dark:hover:bg-gold/15 border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:text-amber-600 dark:hover:text-gold hover:border-amber-500/30 dark:hover:border-gold/30 transition-colors cursor-pointer"
+                          title="Open full article page"
+                          aria-label="Open full article page"
+                        >
+                          <Maximize2 size={15} />
+                        </Link>
+
+                        {/* Copy Link Icon */}
+                        <button
+                          type="button"
+                          onClick={handleCopy}
+                          className="relative p-1.5 sm:p-2 rounded-full bg-slate-100 hover:bg-slate-200/80 dark:bg-white/[0.08] dark:hover:bg-white/[0.16] border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:text-amber-600 dark:hover:text-gold transition-colors cursor-pointer"
+                          title={copied ? "Link Copied!" : "Copy article link"}
+                          aria-label="Copy article link"
+                        >
+                          {copied ? (
+                            <Check size={15} className="text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <LinkIcon size={15} />
+                          )}
+                        </button>
+
+                        {/* Share to Facebook */}
+                        <button
+                          type="button"
+                          onClick={handleFacebookShare}
+                          className="p-1.5 sm:p-2 rounded-full bg-slate-100 hover:bg-[#1877F2]/10 dark:bg-white/[0.08] dark:hover:bg-[#1877F2]/20 border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:text-[#1877F2] dark:hover:text-[#4294ff] hover:border-[#1877F2]/30 transition-colors cursor-pointer"
+                          title="Share on Facebook"
+                          aria-label="Share on Facebook"
+                        >
+                          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                          </svg>
+                        </button>
+
+                        <div className="h-4 w-[1px] bg-slate-200 dark:bg-white/15 mx-0.5 hidden sm:block" />
+
+                        <kbd className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/[0.06] rounded border border-slate-200/80 dark:border-white/10">
                           ESC
                         </kbd>
+
                         <button
                           onClick={close}
-                          className="p-1.5 sm:p-2 rounded-full bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/15 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                          className="p-1.5 sm:p-2 rounded-full bg-slate-100 hover:bg-rose-500/10 hover:border-rose-500/30 hover:text-rose-600 dark:bg-white/[0.08] dark:hover:bg-rose-500/20 dark:hover:border-rose-500/40 dark:hover:text-rose-400 border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
                           aria-label="Close announcement"
                         >
-                          <X size={18} className="text-slate-700 dark:text-white" />
+                          <X size={18} />
                         </button>
                       </div>
                     </div>
@@ -330,35 +563,17 @@ export default function SocialDispatchCard({ dispatch, isActive = true }: Social
                           )}
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3">
-                          <Link
-                            href={`/blog/${dispatch.slug || dispatch.id}`}
-                            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold px-4 py-2 rounded-lg bg-gold text-[#0D1117] hover:bg-gold-muted transition-colors shadow-md"
-                          >
-                            <span>Read Full Article</span>
-                            <ArrowUpRight size={14} />
-                          </Link>
-                          {dispatch.applyUrl && (
-                            <a
-                              href={dispatch.applyUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 text-xs sm:text-sm font-mono font-bold px-4 py-2 rounded-lg bg-gold text-[#0D1117] hover:bg-gold-muted transition-colors shadow-md"
-                            >
-                              <span>Apply via Google Form</span>
-                              <ArrowUpRight size={14} />
-                            </a>
-                          )}
+                        {dispatch.applyUrl && (
                           <a
-                            href={dispatch.postUrl}
+                            href={dispatch.applyUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-mono font-medium px-4 py-2 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/10 dark:border-white/15 hover:bg-black/[0.08] dark:hover:bg-white/[0.12] text-slate-800 dark:text-white transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-gold/15 hover:bg-gold/25 border border-gold/30 text-gold transition-colors cursor-pointer self-start sm:self-auto"
                           >
-                            <span>Open on Facebook</span>
-                            <ArrowUpRight size={14} className="text-gold" />
+                            <span>Apply</span>
+                            <ArrowUpRight size={13} />
                           </a>
-                        </div>
+                        )}
                       </div>
 
                       <div className="pt-2 flex flex-wrap gap-2">

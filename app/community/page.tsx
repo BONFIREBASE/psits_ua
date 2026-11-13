@@ -517,11 +517,15 @@ export default function CommunityPage() {
   const [customThreads, setCustomThreads] = useState<CommunityThreadItem[]>([])
   const [isThreadsDropdownOpen, setIsThreadsDropdownOpen] = useState(false)
   const threadsDropdownRef = useRef<HTMLDivElement>(null)
+  const desktopThreadsDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!isThreadsDropdownOpen) return
     const handleClickOutside = (e: MouseEvent) => {
-      if (threadsDropdownRef.current && !threadsDropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const inMobile = threadsDropdownRef.current?.contains(target)
+      const inDesktop = desktopThreadsDropdownRef.current?.contains(target)
+      if (!inMobile && !inDesktop) {
         setIsThreadsDropdownOpen(false)
       }
     }
@@ -668,13 +672,23 @@ export default function CommunityPage() {
     })
   }, [])
 
-  // Deep-Link Thread & Tag Auto-Navigation
+  // Deep-Link Thread, Tag & Action Auto-Navigation
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const threadParam = params.get('thread') || params.get('tag')
     if (threadParam && threadParam.trim()) {
       setSelectedTag(threadParam.trim())
+    }
+    if (params.get('create') === '1') {
+      setIsCreateOpen(true)
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (params.get('search') === '1') {
+      setIsSearchModalOpen(true)
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (params.get('explore') === '1') {
+      setIsThreadsDropdownOpen(true)
+      window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
 
@@ -3536,6 +3550,92 @@ export default function CommunityPage() {
     )
   }
 
+  // ─── Reusable Instagram-Style Threads Dropdown Menu ───
+  const renderThreadsDropdownMenu = (alignClass = 'left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0') => (
+    <AnimatePresence>
+      {isThreadsDropdownOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 6, scale: 0.96 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
+          className={`absolute ${alignClass} top-full mt-2 w-64 rounded-2xl bg-white/95 dark:bg-[#0c1017]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-1.5 space-y-1 z-50 overflow-hidden`}
+        >
+          {/* Default Community Feed (All Threads) */}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedTag('All')
+              reloadFeed('All')
+              setIsThreadsDropdownOpen(false)
+            }}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+              selectedTag === 'All'
+                ? 'bg-gold/15 text-gold font-bold'
+                : 'text-slate-700 dark:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Layers size={14} className={selectedTag === 'All' ? 'text-gold' : 'text-slate-400'} />
+              <span>Community (All)</span>
+            </div>
+            {selectedTag === 'All' && <Check size={14} className="text-gold" />}
+          </button>
+
+          {/* Custom Discussion Threads */}
+          {customThreads.length > 0 && (
+            <div className="max-h-56 overflow-y-auto space-y-0.5 scrollbar-thin py-0.5 border-t border-black/[0.04] dark:border-white/[0.06]">
+              {customThreads.map(ct => {
+                const isSelected = selectedTag === ct.title || selectedTag === ct.slug
+                return (
+                  <button
+                    key={ct.$id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTag(ct.title)
+                      reloadFeed(ct.title)
+                      setIsThreadsDropdownOpen(false)
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-gold/15 text-gold font-bold'
+                        : 'text-slate-700 dark:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 font-medium'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {ct.is_private ? (
+                        <Lock size={12} className="text-amber-500 shrink-0" />
+                      ) : (
+                        <Hash size={12} className="text-slate-400 shrink-0" />
+                      )}
+                      <span className="truncate">{ct.title}</span>
+                    </div>
+                    {isSelected && <Check size={14} className="text-gold shrink-0" />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* + New Discussion Thread */}
+          <div className="pt-1 border-t border-black/[0.04] dark:border-white/[0.06]">
+            <button
+              type="button"
+              onClick={() => {
+                setIsThreadsDropdownOpen(false)
+                handleOpenCreateThread()
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-gold hover:bg-gold/10 transition-colors cursor-pointer"
+            >
+              <Plus size={14} className="stroke-[2.5]" />
+              <span>New Thread</span>
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+
   // ─── 4. Initial Auth Handshake Preloader (Zero UI Leakage) ───
   if (authLoading) {
     return <CommunityFeedSkeleton />
@@ -3543,39 +3643,89 @@ export default function CommunityPage() {
 
   return (
     <>
-      <div className="pt-3 sm:pt-24 pb-20 max-w-6xl mx-auto px-4 sm:px-6 space-y-3 sm:space-y-5 overflow-x-hidden">
+      {/* ─── Sticky Edge-to-Edge Top Header (Instagram / Threads Style for Mobile & Tablet) ─── */}
+      <header className="md:hidden sticky top-0 inset-x-0 w-full z-40 bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-xl border-b border-slate-200/90 dark:border-white/[0.1] transition-colors pt-[env(safe-area-inset-top,0px)]">
+        <div className="w-full px-4 h-12 flex items-center justify-between">
+          {/* Left: Mobile Hamburger Navigation Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              try { navigator.vibrate?.([15]) } catch {}
+              window.dispatchEvent(new CustomEvent('psits:toggle-menu'))
+            }}
+            className="w-10 h-10 flex items-center justify-start text-gold hover:opacity-80 active:scale-95 transition-all cursor-pointer select-none"
+            aria-label="Toggle navigation menu"
+          >
+            <Menu size={22} />
+          </button>
+
+          {/* Center: Instagram-Style Dropdown */}
+          <div className="relative flex justify-center flex-1" ref={threadsDropdownRef}>
+            <button
+              type="button"
+              onClick={() => {
+                try { navigator.vibrate?.([15]) } catch {}
+                setIsThreadsDropdownOpen(prev => !prev)
+              }}
+              className="flex items-center gap-1 font-display font-bold text-lg text-slate-900 dark:text-white hover:opacity-80 active:scale-98 transition-all cursor-pointer select-none py-1 px-2 rounded-xl"
+              aria-expanded={isThreadsDropdownOpen}
+              aria-haspopup="true"
+            >
+              <span className="tracking-tight">
+                {selectedTag === 'All' ? 'Community' : `#${selectedTag}`}
+              </span>
+              <ChevronDown
+                size={17}
+                className={`text-slate-400 dark:text-slate-500 transition-transform duration-200 ${
+                  isThreadsDropdownOpen ? 'rotate-180 text-gold' : ''
+                }`}
+              />
+            </button>
+
+            {renderThreadsDropdownMenu('left-1/2 -translate-x-1/2')}
+          </div>
+
+          {/* Right Controls: Mobile Notification Bell */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                try { navigator.vibrate?.([15]) } catch {}
+                setIsNotifModalOpen(true)
+              }}
+              className="w-10 h-10 flex items-center justify-end relative text-slate-700 dark:text-slate-200 hover:text-gold transition-colors cursor-pointer select-none"
+              aria-label="Notifications"
+            >
+              <Bell size={20} />
+              {unreadNotifCount > 0 && (
+                <span className="absolute top-2 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#07090e]" />
+              )}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── Main Content Container (Padded to Prevent Navbar Cutoffs) ─── */}
+      <div className="pt-2 sm:pt-4 md:pt-24 pb-28 max-w-6xl mx-auto px-4 sm:px-6 space-y-3 sm:space-y-5 overflow-x-hidden">
       {/* ─── Sticky Offline Resilience Banner ─── */}
       {isOffline && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[92%] bg-gold text-slate-950 font-semibold px-4 py-2 rounded-full shadow-2xl text-xs flex items-center justify-center gap-2 border border-gold/40 animate-pulse">
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[92%] bg-gold text-slate-950 font-semibold px-4 py-2 rounded-full shadow-2xl text-xs flex items-center justify-center gap-2 border border-gold/40 animate-pulse">
           <WifiOff className="w-4 h-4 text-slate-950 shrink-0" />
           <span className="truncate">Offline Mode: Viewing cached threads. Actions will sync when connected.</span>
         </div>
       )}
 
-      {/* ─── Native Embedded Header & Instagram-Style Thread Selector ─── */}
-      <div className="flex items-center justify-between pt-1 pb-0.5">
-        {/* Left: Mobile Hamburger Navigation Toggle */}
-        <button
-          type="button"
-          onClick={() => {
-            try { navigator.vibrate?.([15]) } catch {}
-            window.dispatchEvent(new CustomEvent('psits:toggle-menu'))
-          }}
-          className="md:hidden w-10 h-10 flex items-center justify-start text-gold hover:opacity-80 active:scale-95 transition-all cursor-pointer select-none"
-          aria-label="Toggle navigation menu"
-        >
-          <Menu size={22} />
-        </button>
-
-        {/* Center (Mobile) / Left (Desktop): Instagram-Style Dropdown */}
-        <div className="relative flex justify-center md:justify-start flex-1 md:flex-initial" ref={threadsDropdownRef}>
+      {/* ─── Desktop Header Strip (Hidden on Mobile) ─── */}
+      <div className="hidden md:flex items-center justify-between pt-1 pb-0.5">
+        {/* Left: Instagram-Style Dropdown for Desktop */}
+        <div className="relative flex justify-start flex-initial" ref={desktopThreadsDropdownRef}>
           <button
             type="button"
             onClick={() => {
               try { navigator.vibrate?.([15]) } catch {}
               setIsThreadsDropdownOpen(prev => !prev)
             }}
-            className="flex items-center gap-1 font-display font-bold text-lg sm:text-2xl text-slate-900 dark:text-white hover:opacity-80 active:scale-98 transition-all cursor-pointer select-none py-1 px-2 rounded-xl"
+            className="flex items-center gap-1 font-display font-bold text-2xl text-slate-900 dark:text-white hover:opacity-80 active:scale-98 transition-all cursor-pointer select-none py-1 px-2 rounded-xl"
             aria-expanded={isThreadsDropdownOpen}
             aria-haspopup="true"
           >
@@ -3590,119 +3740,7 @@ export default function CommunityPage() {
             />
           </button>
 
-          {/* Instagram-Style Dropdown Menu */}
-          <AnimatePresence>
-            {isThreadsDropdownOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.96 }}
-                transition={{ duration: 0.15, ease: 'easeOut' }}
-                className="absolute left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 top-full mt-2 w-64 rounded-2xl bg-white/95 dark:bg-[#0c1017]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.12] shadow-2xl p-1.5 space-y-1 z-50 overflow-hidden"
-              >
-                {/* Default Community Feed (All Threads) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedTag('All')
-                    reloadFeed('All')
-                    setIsThreadsDropdownOpen(false)
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-                    selectedTag === 'All'
-                      ? 'bg-gold/15 text-gold font-bold'
-                      : 'text-slate-700 dark:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Layers size={14} className={selectedTag === 'All' ? 'text-gold' : 'text-slate-400'} />
-                    <span>Community (All)</span>
-                  </div>
-                  {selectedTag === 'All' && <Check size={14} className="text-gold" />}
-                </button>
-
-                {/* Custom Discussion Threads */}
-                {customThreads.length > 0 && (
-                  <div className="max-h-56 overflow-y-auto space-y-0.5 scrollbar-thin py-0.5 border-t border-black/[0.04] dark:border-white/[0.06]">
-                    {customThreads.map(ct => {
-                      const isSelected = selectedTag === ct.title || selectedTag === ct.slug
-                      return (
-                        <button
-                          key={ct.$id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedTag(ct.title)
-                            reloadFeed(ct.title)
-                            setIsThreadsDropdownOpen(false)
-                          }}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
-                            isSelected
-                              ? 'bg-gold/15 text-gold font-bold'
-                              : 'text-slate-700 dark:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 font-medium'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            {ct.is_private ? (
-                              <Lock size={12} className="text-amber-500 shrink-0" />
-                            ) : (
-                              <Hash size={12} className="text-slate-400 shrink-0" />
-                            )}
-                            <span className="truncate">{ct.title}</span>
-                          </div>
-                          {isSelected && <Check size={14} className="text-gold shrink-0" />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* + New Discussion Thread */}
-                <div className="pt-1 border-t border-black/[0.04] dark:border-white/[0.06]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsThreadsDropdownOpen(false)
-                      handleOpenCreateThread()
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-gold hover:bg-gold/10 transition-colors cursor-pointer"
-                  >
-                    <Plus size={14} className="stroke-[2.5]" />
-                    <span>New Thread</span>
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Right Controls: Quick Refresh & Mobile Notification Bell */}
-        <div className="md:hidden flex items-center gap-1">
-          <button
-            type="button"
-            onClick={async () => {
-              try { navigator.vibrate?.([15]) } catch {}
-              await handlePullToRefresh()
-            }}
-            disabled={isRefreshing || loading}
-            className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-gold active:scale-90 transition-all cursor-pointer disabled:opacity-40"
-            aria-label="Refresh feed"
-          >
-            <RefreshCw size={18} className={isRefreshing ? 'animate-spin text-gold' : ''} />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              try { navigator.vibrate?.([15]) } catch {}
-              setIsNotifModalOpen(true)
-            }}
-            className="w-10 h-10 flex items-center justify-center relative text-slate-700 dark:text-slate-200 hover:text-gold transition-colors cursor-pointer select-none"
-            aria-label="Notifications"
-          >
-            <Bell size={20} />
-            {unreadNotifCount > 0 && (
-              <span className="absolute top-2 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#07090e]" />
-            )}
-          </button>
+          {renderThreadsDropdownMenu('left-0')}
         </div>
       </div>
 
@@ -6504,14 +6542,14 @@ export default function CommunityPage() {
           </div>
         </div>
       )}
-      {/* ─── Ultra-Minimalist Native Mobile Navigation Bar (Pure Icons / Instagram Style) ─── */}
+      {/* ─── Native Edge-to-Edge Mobile Navigation Bar (Instagram / Threads Style) ─── */}
       <nav
         aria-label="Mobile Navigation"
-        className={`sm:hidden fixed bottom-0 inset-x-0 w-full z-40 bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-2xl border-t border-black/[0.06] dark:border-white/[0.08] px-2 pb-[max(env(safe-area-inset-bottom,0px),8px)] shadow-[0_-2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-2px_12px_rgba(0,0,0,0.3)] transition-all ${
+        className={`md:hidden fixed bottom-0 inset-x-0 w-full h-12 z-40 bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-white/[0.1] shadow-[0_-2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-2px_12px_rgba(0,0,0,0.3)] transition-all ${
           isNotifModalOpen || isCreateOpen || activeCommentPost || isOnboardingOpen ? 'hidden' : 'block'
         }`}
       >
-        <div className="flex items-center justify-around w-full h-14">
+        <div className="flex items-center justify-around w-full h-full">
           {/* 1. Home / Feed Tab */}
           <button
             type="button"

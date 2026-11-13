@@ -22,6 +22,9 @@ import {
   FileText,
   Users,
   Lock,
+  Zap,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import FormalMerchReceipt from "@/components/FormalMerchReceipt";
@@ -124,6 +127,11 @@ export default function MerchOrdersManagementPage() {
   const [deletingOrder, setDeletingOrder] = useState<MerchOrderRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Batch Selection & Pipeline Actions State
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBatchUpdating, setIsBatchUpdating] = useState(false);
+  const [isBatchMenuOpen, setIsBatchMenuOpen] = useState(false);
+
   const getSessionToken = useCallback(() => {
     if (typeof window === "undefined") return "";
     return (
@@ -208,6 +216,55 @@ export default function MerchOrdersManagementPage() {
       console.error("Failed to update status:", err);
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  // Handle Batch Pipeline Status Update
+  const handleBatchUpdateStatus = async (
+    orderIds: string[],
+    newStatus: MerchOrderStatus,
+    paymentStatus?: "verified"
+  ) => {
+    if (!orderIds || orderIds.length === 0) return;
+    setIsBatchUpdating(true);
+    const token = getSessionToken();
+    try {
+      const res = await fetch("/api/merch/orders", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          order_ids: orderIds,
+          status: newStatus,
+          ...(paymentStatus ? { payment_status: paymentStatus } : {}),
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.orders)) {
+          const updatedMap = new Map<string, MerchOrderRow>(
+            data.orders.map((o: MerchOrderRow) => [o.id, o])
+          );
+          setOrders((prev) =>
+            prev.map((o) => updatedMap.get(o.id) || o)
+          );
+        } else {
+          await fetchOrders();
+        }
+        setSelectedIds(new Set());
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Failed to batch update orders.");
+      }
+    } catch (err) {
+      console.error("Batch update failed:", err);
+      alert("An unexpected error occurred during batch update.");
+    } finally {
+      setIsBatchUpdating(false);
+      setIsBatchMenuOpen(false);
     }
   };
 
@@ -411,6 +468,28 @@ export default function MerchOrdersManagementPage() {
       return true;
     });
   }, [orders, statusFilter, sizeFilter, searchQuery]);
+
+  const allFilteredSelected = useMemo(() => {
+    if (filteredOrders.length === 0) return false;
+    return filteredOrders.every((o) => selectedIds.has(o.id));
+  }, [filteredOrders, selectedIds]);
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredOrders.map((o) => o.id)));
+    }
+  };
+
+  const toggleSelectOrder = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Export orders to Excel (.xlsx) with detailed individual student roster & bulk breakdown
   const handleExportExcel = () => {
@@ -813,7 +892,7 @@ export default function MerchOrdersManagementPage() {
                   <p className="text-xl font-bold font-display text-amber-600 dark:text-amber-400">
                     {metrics.processing}
                   </p>
-                  <p className="text-[9px] text-amber-600/70 font-mono">Awaiting verification</p>
+                  <p className="text-[9px] text-amber-600/70 font-mono">In order queue</p>
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
@@ -931,6 +1010,109 @@ export default function MerchOrdersManagementPage() {
               <option value="XXL" className="bg-white dark:bg-[#0e1422] text-slate-900 dark:text-white">XXL</option>
             </select>
           </div>
+
+          {/* Minimalist Batch Pipeline Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsBatchMenuOpen(!isBatchMenuOpen)}
+              disabled={isBatchUpdating}
+              className="flex items-center gap-1.5 bg-slate-50 dark:bg-[#0a0e17] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 rounded-lg px-2.5 py-1 text-xs text-slate-700 dark:text-slate-300 transition-colors cursor-pointer disabled:opacity-50"
+              title="Batch update fulfillment status"
+            >
+              <Zap className="w-3.5 h-3.5 text-slate-400" />
+              <span>{selectedIds.size > 0 ? `Update (${selectedIds.size})` : "Update Pipeline"}</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {isBatchMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsBatchMenuOpen(false)}
+                />
+                <div className="absolute right-0 mt-1.5 w-52 bg-white dark:bg-[#0e1422] border border-black/10 dark:border-white/10 rounded-xl shadow-lg z-50 p-1 text-xs font-mono animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-slate-400 font-bold border-b border-black/5 dark:border-white/5 mb-1">
+                    {selectedIds.size > 0
+                      ? `Selected (${selectedIds.size})`
+                      : `All Filtered (${filteredOrders.length})`}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isBatchUpdating}
+                    onClick={() => {
+                      const targets = selectedIds.size > 0
+                        ? Array.from(selectedIds)
+                        : filteredOrders.map((o) => o.id);
+                      handleBatchUpdateStatus(targets, "ordered", "verified");
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                    <span>Production (Ordered)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isBatchUpdating}
+                    onClick={() => {
+                      const targets = selectedIds.size > 0
+                        ? Array.from(selectedIds)
+                        : filteredOrders.map((o) => o.id);
+                      handleBatchUpdateStatus(targets, "ready_for_pickup");
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                    <span>Ready for Pickup</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isBatchUpdating}
+                    onClick={() => {
+                      const targets = selectedIds.size > 0
+                        ? Array.from(selectedIds)
+                        : filteredOrders.map((o) => o.id);
+                      handleBatchUpdateStatus(targets, "completed");
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span>Completed / Claimed</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isBatchUpdating}
+                    onClick={() => {
+                      const targets = selectedIds.size > 0
+                        ? Array.from(selectedIds)
+                        : filteredOrders.map((o) => o.id);
+                      handleBatchUpdateStatus(targets, "processing");
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                    <span>Processing</span>
+                  </button>
+
+                  {selectedIds.size > 0 && (
+                    <div className="pt-1 mt-1 border-t border-black/5 dark:border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedIds(new Set())}
+                        className="w-full text-left px-2 py-1 rounded text-[10px] text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                      >
+                        Clear Selection ({selectedIds.size})
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -954,6 +1136,15 @@ export default function MerchOrdersManagementPage() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-black/10 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] text-slate-500 dark:text-slate-400 font-mono uppercase text-[10px] tracking-wider">
+                    <th className="py-3 px-3 text-center w-10">
+                      <input
+                        type="checkbox"
+                        checked={allFilteredSelected}
+                        onChange={toggleSelectAll}
+                        className="rounded border-slate-300 dark:border-white/20 text-gold focus:ring-gold/30 cursor-pointer accent-amber-500 w-3.5 h-3.5"
+                        title="Select All Filtered Orders"
+                      />
+                    </th>
                     <th className="py-3 px-4">Student</th>
                     <th className="py-3 px-4">Course & Section</th>
                     <th className="py-3 px-4 text-center">Size</th>
@@ -973,8 +1164,20 @@ export default function MerchOrdersManagementPage() {
                     return (
                       <tr
                         key={order.id}
-                        className="hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors"
+                        className={`hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors ${
+                          selectedIds.has(order.id) ? "bg-amber-500/5 dark:bg-amber-500/10" : ""
+                        }`}
                       >
+                        {/* Row Selection Checkbox */}
+                        <td className="py-3 px-3 text-center w-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(order.id)}
+                            onChange={() => toggleSelectOrder(order.id)}
+                            className="rounded border-slate-300 dark:border-white/20 text-gold focus:ring-gold/30 cursor-pointer accent-amber-500 w-3.5 h-3.5"
+                          />
+                        </td>
+
                         {/* Student Info */}
                         <td className="py-3 px-4">
                           <div className="font-semibold text-slate-900 dark:text-white font-display text-[13px]">
@@ -1248,6 +1451,64 @@ export default function MerchOrdersManagementPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Floating Minimalist Batch Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/90 dark:bg-[#0c1220]/90 text-white backdrop-blur-md px-3.5 py-1.5 rounded-xl shadow-xl border border-white/10 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-4 duration-200 text-xs font-mono">
+          <div className="flex items-center gap-1.5 pr-2.5 border-r border-white/10">
+            <span className="font-bold text-amber-400">{selectedIds.size}</span>
+            <span className="text-white/60 text-[11px]">selected</span>
+          </div>
+
+          <div className="flex items-center gap-1 text-[11px]">
+            <button
+              type="button"
+              disabled={isBatchUpdating}
+              onClick={() => handleBatchUpdateStatus(Array.from(selectedIds), "ordered", "verified")}
+              className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer disabled:opacity-50"
+              title="Set to Production and mark verified"
+            >
+              Production
+            </button>
+            <button
+              type="button"
+              disabled={isBatchUpdating}
+              onClick={() => handleBatchUpdateStatus(Array.from(selectedIds), "ready_for_pickup")}
+              className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer disabled:opacity-50"
+              title="Set to Ready for Pickup"
+            >
+              Ready
+            </button>
+            <button
+              type="button"
+              disabled={isBatchUpdating}
+              onClick={() => handleBatchUpdateStatus(Array.from(selectedIds), "completed")}
+              className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer disabled:opacity-50"
+              title="Set to Completed / Claimed"
+            >
+              Claimed
+            </button>
+            <button
+              type="button"
+              disabled={isBatchUpdating}
+              onClick={() => handleBatchUpdateStatus(Array.from(selectedIds), "processing")}
+              className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer disabled:opacity-50"
+              title="Reset to Processing"
+            >
+              Processing
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="pl-2 border-l border-white/10 text-white/40 hover:text-white text-[11px] transition-colors cursor-pointer"
+            title="Clear selection"
+          >
+            Clear
+          </button>
         </div>
       )}
 

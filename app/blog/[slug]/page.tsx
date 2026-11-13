@@ -13,7 +13,6 @@ import {
   Video,
   FileText,
   Clock,
-  Sparkles,
 } from 'lucide-react'
 import { getPostBySlugOrId, postRowToSocialDispatch } from '@/lib/supabase'
 import { socialDispatches, type SocialDispatch } from '@/data/announcements'
@@ -154,7 +153,7 @@ export default async function BlogPostPage({ params }: PageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#07090E] text-slate-100 selection:bg-gold/30 selection:text-gold pt-28 pb-24">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#07090E] text-slate-900 dark:text-slate-100 selection:bg-gold/30 selection:text-gold pt-20 sm:pt-28 pb-16 sm:pb-24 transition-colors">
       {/* JSON-LD for Search Engine Bots */}
       <script
         type="application/ld+json"
@@ -162,43 +161,44 @@ export default async function BlogPostPage({ params }: PageProps) {
       />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between gap-4 mb-8">
+        {/* Navigation Breadcrumb & Responsive Action Strip */}
+        <div className="flex items-center justify-between gap-2 sm:gap-4 mb-6 sm:mb-8">
           <Link
             href="/#community-pulse"
-            className="inline-flex items-center gap-2 text-xs font-mono font-bold tracking-wider text-muted-foreground-theme hover:text-gold transition-colors py-1.5 px-3 rounded-lg hover:bg-white/[0.04]"
+            className="inline-flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-mono font-bold tracking-wider text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-gold transition-colors py-1.5 px-2.5 sm:px-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/[0.04] shrink-0"
           >
             <ArrowLeft size={14} />
-            <span>BACK TO HOME</span>
+            <span className="hidden sm:inline">BACK TO HOME</span>
+            <span className="sm:hidden">BACK</span>
           </Link>
 
-          <ShareArticleButtons url={postUrl} title={post.title} />
+          <ShareArticleButtons url={postUrl} title={post.title} articleId={post.slug || post.id} />
         </div>
 
         {/* Header Metadata */}
-        <header className="mb-8">
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <span className="text-[11px] font-mono uppercase tracking-widest font-bold px-3 py-1 rounded-full bg-gold/15 text-gold border border-gold/30">
+        <header className="mb-6 sm:mb-8">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <span className="text-[10px] sm:text-[11px] font-mono uppercase tracking-widest font-bold px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-gold/15 text-gold border border-gold/30">
               {post.category}
             </span>
-            <span className="text-xs font-mono text-muted-foreground-theme flex items-center gap-1.5">
-              <Calendar size={13} className="text-gold" />
+            <span className="text-[11px] sm:text-xs font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <Calendar size={12} className="text-gold" />
               {post.date}
             </span>
-            <span className="text-muted-foreground-theme">·</span>
-            <span className="text-xs font-mono text-muted-foreground-theme flex items-center gap-1.5">
-              <Clock size={13} className="text-gold" />
+            <span className="text-slate-400 dark:text-slate-600">·</span>
+            <span className="text-[11px] sm:text-xs font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <Clock size={12} className="text-gold" />
               {readingTime}
             </span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[40px] font-extrabold tracking-tight leading-tight text-white mb-6">
+          <h1 className="text-xl sm:text-3xl md:text-4xl lg:text-[40px] font-extrabold tracking-tight leading-snug sm:leading-tight text-slate-900 dark:text-white mb-4 sm:mb-6">
             {post.title}
           </h1>
         </header>
 
         {/* Featured Original Thumbnail or Default PSITS Logo Fallback */}
-        <div className="relative w-full aspect-video sm:aspect-[16/9] rounded-2xl overflow-hidden border border-white/10 mb-10 shadow-2xl bg-black/40">
+        <div className="relative w-full aspect-video sm:aspect-[16/9] rounded-xl sm:rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 mb-6 sm:mb-10 shadow-md dark:shadow-2xl bg-slate-100 dark:bg-black/40">
           <Image
             src={post.imageUrl || '/assets/logo/PSITS logo.png'}
             alt={post.title}
@@ -211,15 +211,15 @@ export default async function BlogPostPage({ params }: PageProps) {
 
         {/* Highlight Quote if present */}
         {post.highlightQuote && (
-          <div className="my-8 p-6 rounded-2xl border-l-4 border-gold bg-white/[0.03] border border-white/10 shadow-sm">
+          <div className="my-6 sm:my-8 p-4 sm:p-6 rounded-xl sm:rounded-2xl border-l-4 border-gold bg-slate-100/70 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 shadow-sm">
             <div className="flex items-start gap-3">
-              <Quote size={24} className="shrink-0 mt-1 text-gold" />
-              <p className="font-display italic font-bold text-lg sm:text-xl leading-relaxed text-white">
+              <Quote size={20} className="shrink-0 mt-0.5 text-gold" />
+              <p className="font-display italic font-bold text-base sm:text-lg md:text-xl leading-relaxed text-slate-900 dark:text-white">
                 &ldquo;{post.highlightQuote}&rdquo;
               </p>
             </div>
             {post.quoteAuthor && (
-              <p className="text-xs font-mono font-semibold mt-3 pl-9 text-gold">
+              <p className="text-xs font-mono font-semibold mt-2.5 pl-8 text-gold">
                 — {post.quoteAuthor}
               </p>
             )}
@@ -227,13 +227,13 @@ export default async function BlogPostPage({ params }: PageProps) {
         )}
 
         {/* Article Body */}
-        <article className="prose prose-invert max-w-none mb-12 text-slate-200">
+        <article className="prose prose-sm sm:prose-base dark:prose-invert max-w-none mb-8 sm:mb-12 text-slate-800 dark:text-slate-200">
           <MarkdownContent content={post.fullContent || post.excerpt} />
         </article>
 
         {/* Participating Academic Departments */}
         {post.involvedColleges && post.involvedColleges.length > 0 && (
-          <div className="p-5 rounded-xl bg-white/[0.03] border border-white/10 mb-8">
+          <div className="p-5 rounded-xl bg-slate-100/70 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 mb-8">
             <p className="text-[11px] font-mono uppercase tracking-widest font-bold mb-3 text-gold">
               Participating Academic Departments
             </p>
@@ -241,7 +241,7 @@ export default async function BlogPostPage({ params }: PageProps) {
               {post.involvedColleges.map((college) => (
                 <span
                   key={college}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-white/[0.06] border border-white/15 font-mono text-white font-medium"
+                  className="text-xs px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-white/[0.06] border border-black/10 dark:border-white/15 font-mono text-slate-800 dark:text-white font-medium"
                 >
                   {college}
                 </span>
@@ -251,42 +251,42 @@ export default async function BlogPostPage({ params }: PageProps) {
         )}
 
         {/* Credits & Sign-off */}
-        <div className="border-t border-b border-white/10 py-6 mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-mono text-muted-foreground-theme">
+        <div className="border-t border-b border-black/10 dark:border-white/10 py-5 sm:py-6 mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-mono text-slate-600 dark:text-slate-400">
             {post.credits?.writer && (
               <span className="flex items-center gap-1.5">
                 <PenTool size={13} className="text-gold" />
-                Writer: <strong className="text-white">{post.credits.writer}</strong>
+                Writer: <strong className="text-slate-900 dark:text-white">{post.credits.writer}</strong>
               </span>
             )}
             {post.credits?.photographer && (
               <>
-                {post.credits.writer && <span className="text-white/20">·</span>}
+                {post.credits.writer && <span className="text-black/20 dark:text-white/20">·</span>}
                 <span className="flex items-center gap-1.5">
                   <Camera size={13} className="text-gold" />
-                  Photography: <strong className="text-white">{post.credits.photographer}</strong>
+                  Photography: <strong className="text-slate-900 dark:text-white">{post.credits.photographer}</strong>
                 </span>
               </>
             )}
             {post.credits?.pubmat && (
               <>
                 {(post.credits.writer || post.credits.photographer) && (
-                  <span className="text-white/20">·</span>
+                  <span className="text-black/20 dark:text-white/20">·</span>
                 )}
                 <span className="flex items-center gap-1.5">
                   <Palette size={13} className="text-gold" />
-                  Pubmat: <strong className="text-white">{post.credits.pubmat}</strong>
+                  Pubmat: <strong className="text-slate-900 dark:text-white">{post.credits.pubmat}</strong>
                 </span>
               </>
             )}
             {post.credits?.videographer && (
               <>
                 {(post.credits.writer || post.credits.photographer || post.credits.pubmat) && (
-                  <span className="text-white/20">·</span>
+                  <span className="text-black/20 dark:text-white/20">·</span>
                 )}
                 <span className="flex items-center gap-1.5">
                   <Video size={13} className="text-gold" />
-                  Videographer: <strong className="text-white">{post.credits.videographer}</strong>
+                  Videographer: <strong className="text-slate-900 dark:text-white">{post.credits.videographer}</strong>
                 </span>
               </>
             )}
@@ -295,11 +295,11 @@ export default async function BlogPostPage({ params }: PageProps) {
                 {(post.credits?.writer ||
                   post.credits?.photographer ||
                   post.credits?.pubmat ||
-                  post.credits?.videographer) && <span className="text-white/20">·</span>}
+                  post.credits?.videographer) && <span className="text-black/20 dark:text-white/20">·</span>}
                 <span className="flex items-center gap-1.5">
                   <FileText size={13} className="text-gold" />
                   Publish by:{' '}
-                  <strong className="text-white">
+                  <strong className="text-slate-900 dark:text-white">
                     {post.credits.publish_by || post.credits.prepared_by}
                   </strong>
                 </span>
@@ -307,7 +307,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             {post.applyUrl && (
               <a
                 href={post.applyUrl}
@@ -324,7 +324,7 @@ export default async function BlogPostPage({ params }: PageProps) {
                 href={post.postUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-mono font-medium px-4 py-2 rounded-lg bg-white/[0.06] border border-white/15 hover:bg-white/[0.12] text-white transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-mono font-medium px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200/80 dark:bg-white/[0.06] border border-slate-200 dark:border-white/15 dark:hover:bg-white/[0.12] text-slate-800 dark:text-white transition-colors"
               >
                 <span>Open on Facebook</span>
                 <ArrowUpRight size={14} className="text-gold" />
@@ -335,37 +335,17 @@ export default async function BlogPostPage({ params }: PageProps) {
 
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mb-12">
+          <div className="flex flex-wrap items-center gap-2">
             {post.tags.map((tag) => (
               <span
                 key={tag}
-                className="text-xs font-mono px-3 py-1 rounded-md bg-white/[0.04] border border-white/10 text-muted-foreground-theme"
+                className="text-xs font-mono px-3 py-1 rounded-md bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400"
               >
                 {tag.startsWith('#') ? tag : `#${tag}`}
               </span>
             ))}
           </div>
         )}
-
-        {/* Footer Back Home Banner */}
-        <div className="p-8 rounded-2xl bg-gradient-to-r from-gold/10 via-white/[0.03] to-transparent border border-gold/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-gold font-mono text-xs font-bold uppercase tracking-wider mb-1">
-              <Sparkles size={14} />
-              <span>PSITS Community Pulse</span>
-            </div>
-            <p className="text-sm text-slate-300">
-              Stay in the loop with official recaps, student highlights, and academic advisories.
-            </p>
-          </div>
-          <Link
-            href="/#community-pulse"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-mono text-xs font-bold bg-gold text-[#0D1117] hover:bg-gold-muted transition-colors shadow-lg shrink-0"
-          >
-            <span>Explore Dispatches</span>
-            <ArrowLeft size={14} className="rotate-180" />
-          </Link>
-        </div>
       </div>
     </div>
   )

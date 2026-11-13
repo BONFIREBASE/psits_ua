@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
@@ -54,6 +54,11 @@ const organizationSchema = {
     "https://facebook.com",
     "https://github.com",
   ],
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export const metadata: Metadata = {

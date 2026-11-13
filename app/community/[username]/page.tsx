@@ -35,7 +35,17 @@ import {
   EyeOff,
   Eye,
   User,
+  Newspaper,
+  ArrowUpRight,
+  Calendar,
+  Home,
+  Compass,
+  Plus,
+  Search,
 } from 'lucide-react'
+import { socialDispatches, type SocialDispatch } from '@/data/announcements'
+import { getPosts, postRowToSocialDispatch } from '@/lib/supabase'
+import { motion, AnimatePresence } from 'framer-motion'
 import { appwrite, APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS, appwriteStorage, APPWRITE_STORAGE_BUCKET_ID } from '@/lib/appwrite'
 import {
   getAuthorPostsAction,
@@ -216,7 +226,8 @@ export default function StudentProfilePage() {
   const [editingPost, setEditingPost] = useState<CommunityPostItem | null>(null)
   const [editPostContent, setEditPostContent] = useState('')
   const [isSavingEdit, setIsSavingEdit] = useState(false)
-  const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts')
+  const [activeTab, setActiveTab] = useState<'posts' | 'saved' | 'articles'>('posts')
+  const [allArticles, setAllArticles] = useState<SocialDispatch[]>(socialDispatches)
 
   // Follow System state (Stale-While-Revalidate with localStorage for 0ms instant render)
   const [followStats, setFollowStats] = useState<{
@@ -523,6 +534,39 @@ export default function StudentProfilePage() {
     if (!user) return []
     return posts.filter(p => savedPostIds.includes(p.$id))
   }, [posts, savedPostIds, user])
+
+  // Fetch dispatches/articles for the Articles tab
+  useEffect(() => {
+    let isMounted = true
+    getPosts()
+      .then((rows) => {
+        if (isMounted && rows && rows.length > 0) {
+          const dbDispatches = rows.map(postRowToSocialDispatch)
+          const seen = new Set<string>()
+          const merged: SocialDispatch[] = []
+          for (const d of [...dbDispatches, ...socialDispatches]) {
+            const key = d.slug || d.id
+            if (!seen.has(key)) {
+              seen.add(key)
+              merged.push(d)
+            }
+          }
+          setAllArticles(merged)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  // Filter saved articles (matched by slug or id against savedPostIds)
+  const savedArticles = useMemo(() => {
+    return allArticles.filter((art) => {
+      const key = art.slug || art.id
+      return savedPostIds.includes(key) || savedPostIds.includes(art.id)
+    })
+  }, [allArticles, savedPostIds])
 
   const displayedPosts = useMemo(() => {
     return activeTab === 'posts' ? authorPosts : savedPosts
@@ -1217,11 +1261,37 @@ export default function StudentProfilePage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#07090e] text-slate-900 dark:text-slate-100 overflow-x-hidden">
-      <main className="max-w-xl mx-auto px-4 pb-24 pt-2 sm:pt-4">
+      {/* ─── Sticky Edge-to-Edge Profile Top Header (Mobile & Tablet) ─── */}
+      <header className="md:hidden sticky top-0 inset-x-0 w-full z-40 bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-xl border-b border-slate-200/90 dark:border-white/[0.1] transition-colors pt-[env(safe-area-inset-top,0px)]">
+        <div className="w-full px-4 h-12 flex items-center justify-between">
+          <Link
+            href="/community"
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-white/70 hover:text-gold transition-colors py-1.5 px-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+          >
+            <ChevronLeft className="w-4.5 h-4.5" />
+            <span>Feed</span>
+          </Link>
+          <div className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+            {profileInfo.handle}
+          </div>
+          {!user ? (
+            <Link
+              href="/community"
+              className="text-xs font-semibold text-gold hover:text-gold-muted transition-colors py-1 px-2.5 rounded-lg border border-gold/30 hover:border-gold/50 bg-gold/5 active:scale-95"
+            >
+              Sign in
+            </Link>
+          ) : (
+            <div className="w-12" />
+          )}
+        </div>
+      </header>
+
+      <main className="max-w-xl mx-auto px-4 pb-28 pt-2 sm:pt-4 md:pt-24">
         {/* ─── Profile Content Container ─── */}
         <div className="w-full space-y-4 sm:space-y-5">
-        {/* Top Header Navigation Strip (In-flow to prevent mobile avatar cutoff) */}
-        <div className="flex items-center justify-between pb-2.5 sm:pb-3 border-b border-black/[0.06] dark:border-white/[0.06]">
+        {/* Desktop Top Header Navigation Strip (Hidden on Mobile) */}
+        <div className="hidden md:flex items-center justify-between pb-2.5 sm:pb-3 border-b border-black/[0.06] dark:border-white/[0.06]">
           <Link
             href="/community"
             className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-white/70 hover:text-gold transition-colors py-1.5 px-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
@@ -1485,42 +1555,181 @@ export default function StudentProfilePage() {
         </section>
         )}
 
-        {/* Minimalist Navigation Tabs (Clean Pills, No Severed Bars) */}
-        <div className="border-t border-black/[0.06] dark:border-white/[0.08] pt-3 flex items-center justify-center gap-2">
+        {/* Instagram Profile Icon-Only Tabs with Smooth Indicator */}
+        <div className={`relative border-t border-black/[0.08] dark:border-white/[0.08] ${isOwnProfile ? 'grid grid-cols-3' : 'flex justify-center'}`}>
+          {/* Posts Tab */}
           <button
             type="button"
             onClick={() => setActiveTab('posts')}
-            className={`flex items-center gap-2 py-2 px-5 rounded-full text-xs font-semibold tracking-wide uppercase transition-all cursor-pointer ${
+            className={`relative flex items-center justify-center py-3.5 transition-colors cursor-pointer select-none group ${
               activeTab === 'posts'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-bold shadow-xs'
-                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                ? 'text-slate-900 dark:text-white'
+                : 'text-slate-400 dark:text-white/35 hover:text-slate-700 dark:hover:text-white/70'
             }`}
+            title={`Posts (${authorPosts.length})`}
+            aria-label={`Posts (${authorPosts.length})`}
           >
-            <Grid className="w-3.5 h-3.5" />
-            <span>Posts</span>
-            <span className="text-[11px] font-mono opacity-80">({authorPosts.length})</span>
+            <Grid className="w-5 h-5 transition-transform duration-200 group-hover:scale-105 active:scale-90" />
+            {activeTab === 'posts' && (
+              <motion.div
+                layoutId="igProfileTabIndicator"
+                className="absolute -top-[1px] inset-x-0 h-[2px] bg-slate-900 dark:bg-white"
+                transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+              />
+            )}
           </button>
 
+          {/* Saved Posts Tab (Own Profile) */}
           {isOwnProfile && (
             <button
               type="button"
               onClick={() => setActiveTab('saved')}
-              className={`flex items-center gap-2 py-2 px-5 rounded-full text-xs font-semibold tracking-wide uppercase transition-all cursor-pointer ${
+              className={`relative flex items-center justify-center py-3.5 transition-colors cursor-pointer select-none group ${
                 activeTab === 'saved'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-bold shadow-xs'
-                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                  ? 'text-slate-900 dark:text-white'
+                  : 'text-slate-400 dark:text-white/35 hover:text-slate-700 dark:hover:text-white/70'
               }`}
+              title={`Saved Discussions (${savedPosts.length})`}
+              aria-label={`Saved Discussions (${savedPosts.length})`}
             >
-              <Bookmark className="w-3.5 h-3.5" />
-              <span>Saved</span>
-              <span className="text-[11px] font-mono opacity-80">({savedPosts.length})</span>
+              <Bookmark className={`w-5 h-5 transition-transform duration-200 group-hover:scale-105 active:scale-90 ${activeTab === 'saved' ? 'fill-current' : ''}`} />
+              {activeTab === 'saved' && (
+                <motion.div
+                  layoutId="igProfileTabIndicator"
+                  className="absolute -top-[1px] inset-x-0 h-[2px] bg-slate-900 dark:bg-white"
+                  transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                />
+              )}
+            </button>
+          )}
+
+          {/* Articles Tab (Own Profile) */}
+          {isOwnProfile && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('articles')}
+              className={`relative flex items-center justify-center py-3.5 transition-colors cursor-pointer select-none group ${
+                activeTab === 'articles'
+                  ? 'text-slate-900 dark:text-white'
+                  : 'text-slate-400 dark:text-white/35 hover:text-slate-700 dark:hover:text-white/70'
+              }`}
+              title={`Saved Articles (${savedArticles.length})`}
+              aria-label={`Saved Articles (${savedArticles.length})`}
+            >
+              <Newspaper className="w-5 h-5 transition-transform duration-200 group-hover:scale-105 active:scale-90" />
+              {activeTab === 'articles' && (
+                <motion.div
+                  layoutId="igProfileTabIndicator"
+                  className="absolute -top-[1px] inset-x-0 h-[2px] bg-slate-900 dark:bg-white"
+                  transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                />
+              )}
             </button>
           )}
         </div>
 
-        {/* Tab Content */}
-        <div className="space-y-4">
-          {loading && displayedPosts.length === 0 ? (
+        {/* Tab Content with Smooth Transitions */}
+        <div className="space-y-4 pt-1">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.16, ease: 'easeOut' }}
+            >
+              {activeTab === 'articles' ? (
+            savedArticles.length === 0 ? (
+              <div className="text-center py-16 p-8 rounded-3xl bg-white/60 dark:bg-[#0c1017]/60 border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+                <div className="w-12 h-12 rounded-full border border-black/10 dark:border-white/10 flex items-center justify-center mx-auto text-slate-400">
+                  <Newspaper className="w-6 h-6 stroke-[1.5]" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-display font-bold text-base text-slate-900 dark:text-white">Save Articles & Dispatches</h3>
+                  <p className="text-xs text-slate-500 dark:text-white/50 max-w-xs mx-auto">
+                    Articles and dispatches you bookmark will appear here in your personal collection.
+                  </p>
+                </div>
+                <Link
+                  href="/#community-pulse"
+                  className="inline-flex items-center gap-1.5 text-xs font-mono font-bold px-4 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-gold border border-gold/30 transition-colors mt-2"
+                >
+                  <span>Explore Dispatches</span>
+                  <ArrowUpRight size={13} />
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                {savedArticles.map((article) => {
+                  const itemKey = article.slug || article.id
+                  return (
+                    <Link
+                      key={itemKey}
+                      href={`/blog/${itemKey}`}
+                      className="group relative aspect-[4/5] rounded-xl sm:rounded-2xl overflow-hidden bg-slate-900 border border-black/10 dark:border-white/10 shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between p-2.5 sm:p-3.5 select-none"
+                    >
+                      {/* Background Cover Image or Default Watermark */}
+                      <div className="absolute inset-0 z-0">
+                        {article.imageUrl ? (
+                          <Image
+                            src={article.imageUrl}
+                            alt={article.title}
+                            fill
+                            className="object-cover object-center group-hover:scale-105 transition-transform duration-500 ease-out"
+                            sizes="(max-width: 640px) 50vw, 33vw"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-slate-900 via-[#0c1220] to-black flex items-center justify-center p-6 opacity-80">
+                            <Image
+                              src="/assets/logo/PSITS logo.png"
+                              alt="PSITS"
+                              width={80}
+                              height={80}
+                              className="object-contain opacity-20 filter grayscale"
+                            />
+                          </div>
+                        )}
+                        {/* Film Scrim Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/20 group-hover:via-black/50 transition-colors" />
+                      </div>
+
+                      {/* Top Header: Category Tag & Unsave Action */}
+                      <div className="relative z-10 flex items-start justify-between gap-1.5">
+                        <span className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md border border-gold/30 text-gold shadow-xs truncate max-w-[120px]">
+                          {article.category}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleToggleSavePost(itemKey)
+                          }}
+                          className="p-1 sm:p-1.5 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md text-gold hover:scale-110 active:scale-90 transition-all cursor-pointer shadow-xs"
+                          title="Remove from saved articles"
+                          aria-label="Remove from saved articles"
+                        >
+                          <Bookmark size={13} className="fill-gold" />
+                        </button>
+                      </div>
+
+                      {/* Bottom Footer: Date & Headline */}
+                      <div className="relative z-10 space-y-1">
+                        <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-mono text-white/70">
+                          <Calendar size={11} className="text-gold shrink-0" />
+                          <span className="truncate">{article.date}</span>
+                        </div>
+                        <h4 className="font-display font-bold text-xs sm:text-sm leading-snug text-white line-clamp-2 group-hover:text-gold transition-colors">
+                          {article.title}
+                        </h4>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )
+          ) : loading && displayedPosts.length === 0 ? (
             <div className="space-y-4">
               {[1, 2].map(n => (
                 <div
@@ -1946,6 +2155,8 @@ export default function StudentProfilePage() {
               })}
             </div>
           )}
+            </motion.div>
+          </AnimatePresence>
         </div>
         </div>
       </main>
@@ -2441,6 +2652,109 @@ export default function StudentProfilePage() {
         currentProfile={userProfile}
         onProfileUpdated={handleProfileUpdated}
       />
+
+      {/* ─── Native Edge-to-Edge Mobile Navigation Bar (Instagram / Threads Style) ─── */}
+      <nav
+        aria-label="Mobile Navigation"
+        className={`md:hidden fixed bottom-0 inset-x-0 w-full h-12 z-40 bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-white/[0.1] shadow-[0_-2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-2px_12px_rgba(0,0,0,0.3)] transition-all ${
+          isEditProfileOpen || isProfileShareModalOpen || followModal.open ? 'hidden' : 'block'
+        }`}
+      >
+        <div className="flex items-center justify-around w-full h-full">
+          {/* 1. Home / Feed */}
+          <Link
+            href="/community"
+            className="flex items-center justify-center flex-1 h-full active:scale-90 transition-transform cursor-pointer"
+            aria-label="Home Feed"
+          >
+            <Home className="w-5.5 h-5.5 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 stroke-[1.8]" />
+          </Link>
+
+          {/* 2. Explore / Topics */}
+          <Link
+            href="/community?explore=1"
+            className="flex items-center justify-center flex-1 h-full active:scale-90 transition-transform cursor-pointer"
+            aria-label="Explore Topics"
+          >
+            <Compass className="w-5.5 h-5.5 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 stroke-[1.8]" />
+          </Link>
+
+          {/* 3. Instagram-Style Create [+] */}
+          <div className="flex items-center justify-center flex-1 h-full">
+            <Link
+              href="/community?create=1"
+              className="flex items-center justify-center w-7.5 h-7.5 rounded-lg border-[1.75px] border-slate-800 dark:border-white/80 hover:border-gold hover:text-gold text-slate-900 dark:text-white transition-all active:scale-85 cursor-pointer"
+              aria-label="Create Post"
+            >
+              <Plus className="w-4.5 h-4.5 stroke-[2.8]" />
+            </Link>
+          </div>
+
+          {/* 4. Search */}
+          <Link
+            href="/community?search=1"
+            className="flex items-center justify-center flex-1 h-full active:scale-90 transition-transform cursor-pointer"
+            aria-label="Search Feed"
+          >
+            <Search className="w-5.5 h-5.5 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 stroke-[1.8]" />
+          </Link>
+
+          {/* 5. User Profile */}
+          <Link
+            href={
+              userProfile?.username
+                ? `/community/${userProfile.username.replace(/^@/, '')}`
+                : user?.name
+                ? `/community/${user.name.toLowerCase().replace(/[^a-z0-9_.]/g, '')}`
+                : '/community'
+            }
+            className="flex items-center justify-center flex-1 h-full active:scale-90 transition-transform cursor-pointer"
+            aria-label="My Profile"
+          >
+            {(() => {
+              const myNormalizedHandle = userProfile?.username
+                ? userProfile.username.replace(/^@/, '').toLowerCase()
+                : user?.name?.toLowerCase().replace(/[^a-z0-9_.]/g, '')
+              const currentHandle = profileInfo.handle.replace(/^@/, '').toLowerCase()
+              const isViewingOwnProfile = Boolean(myNormalizedHandle && myNormalizedHandle === currentHandle)
+
+              const avatarUrl = userProfile?.avatar || user?.avatar || ''
+              const isPreset = avatarUrl.startsWith('preset:')
+              const hasRealPhoto = avatarUrl && !isPreset
+
+              if (hasRealPhoto) {
+                return (
+                  <div className={`w-6 h-6 rounded-full overflow-hidden ring-1.5 transition-all ${
+                    isViewingOwnProfile ? 'ring-slate-900 dark:ring-white scale-105' : 'ring-slate-400 dark:ring-slate-500'
+                  }`}>
+                    <Image
+                      src={avatarUrl}
+                      alt={userProfile?.name || user?.name || 'Profile'}
+                      width={24}
+                      height={24}
+                      className="w-full h-full object-cover"
+                      unoptimized={avatarUrl.startsWith('data:') || avatarUrl.includes('appwrite')}
+                    />
+                  </div>
+                )
+              }
+
+              if (user) {
+                const initial = (userProfile?.name || user.name || 'U').charAt(0).toUpperCase()
+                return (
+                  <div className={`w-6 h-6 rounded-full bg-gold/15 text-gold font-bold text-[10px] flex items-center justify-center ring-1 ${
+                    isViewingOwnProfile ? 'ring-gold ring-2 scale-105' : 'ring-gold/40'
+                  }`}>
+                    {initial}
+                  </div>
+                )
+              }
+
+              return <User className="w-5.5 h-5.5 text-slate-400 stroke-[1.8]" />
+            })()}
+          </Link>
+        </div>
+      </nav>
     </div>
   )
 }

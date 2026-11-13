@@ -447,3 +447,82 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+/**
+ * PATCH /api/merch/orders
+ * Batch updates pipeline status and/or payment status for multiple orders at once.
+ * Restricted to PSITS Officers & Administrators.
+ */
+export async function PATCH(req: NextRequest) {
+  try {
+    const auth = await authenticateUser(req);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    if (!auth.isAdmin && !auth.isOfficer) {
+      return NextResponse.json(
+        { error: "Access denied. Only PSITS officers and administrators can update orders." },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const { order_ids, status, payment_status } = body;
+
+    if (!Array.isArray(order_ids) || order_ids.length === 0) {
+      return NextResponse.json(
+        { error: "An array of order IDs is required for batch update." },
+        { status: 400 }
+      );
+    }
+
+    const updates: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    const VALID_STATUSES = new Set(["processing", "ordered", "ready_for_pickup", "completed", "cancelled"]);
+    const VALID_PAYMENT_STATUSES = new Set(["pending_verification", "verified", "rejected"]);
+
+    if (status !== undefined) {
+      if (!VALID_STATUSES.has(status)) {
+        return NextResponse.json({ error: "Invalid status value." }, { status: 400 });
+      }
+      updates.status = status;
+    }
+
+    if (payment_status !== undefined) {
+      if (!VALID_PAYMENT_STATUSES.has(payment_status)) {
+        return NextResponse.json({ error: "Invalid payment_status value." }, { status: 400 });
+      }
+      updates.payment_status = payment_status;
+      if (payment_status === "verified") {
+        updates.verified_by = auth.user.name || "PSITS Officer";
+        updates.verified_at = new Date().toISOString();
+      }
+    }
+
+    const { data: updatedOrders, error: updateError } = await supabaseAdmin
+      .from("merch_orders")
+      .update(updates)
+      .in("id", order_ids)
+      .select();
+
+    if (updateError) {
+      console.error("Batch update error:", updateError.message);
+      return NextResponse.json({ error: "Failed to batch update orders." }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Successfully updated ${updatedOrders?.length || 0} orders.`,
+      orders: updatedOrders || [],
+    });
+  } catch (err) {
+    console.error("PATCH /api/merch/orders error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to batch update orders." },
+      { status: 500 }
+    );
+  }
+}
