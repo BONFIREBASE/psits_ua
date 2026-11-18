@@ -43,20 +43,25 @@ export async function proxy(request: NextRequest) {
 
   // Maintenance Interceptor
   try {
-    const { isUnderMaintenance, config } = await isPathUnderMaintenance(pathname)
-    if (isUnderMaintenance) {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json(
-          {
-            error: config?.message || 'This service is currently undergoing scheduled maintenance.',
-            maintenance: true,
-          },
-          { status: 503 }
-        )
+    const isBypass = request.nextUrl.searchParams.get('bypass') === 'true'
+    const hasAdminToken = request.cookies.has('psits_mgmt_token')
+
+    if (!isBypass && !hasAdminToken) {
+      const { isUnderMaintenance, config } = await isPathUnderMaintenance(pathname)
+      if (isUnderMaintenance) {
+        if (pathname.startsWith('/api/')) {
+          return NextResponse.json(
+            {
+              error: config?.message || 'This service is currently undergoing scheduled maintenance.',
+              maintenance: true,
+            },
+            { status: 503 }
+          )
+        }
+        const url = request.nextUrl.clone()
+        url.pathname = '/maintenance'
+        return NextResponse.rewrite(url, { status: 503 })
       }
-      const url = request.nextUrl.clone()
-      url.pathname = '/maintenance'
-      return NextResponse.rewrite(url, { status: 503 })
     }
   } catch {
     // If maintenance check fails, fail open to prevent service disruption

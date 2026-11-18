@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createServerAppwriteClient } from '@/lib/appwrite-server'
 import { APPWRITE_DATABASE_ID, APPWRITE_COLLECTIONS } from '@/lib/appwrite'
-import { invalidateMaintenanceCache, type MaintenanceConfigData } from '@/lib/maintenance'
+import { invalidateMaintenanceCache, isReturnTimePassed, type MaintenanceConfigData } from '@/lib/maintenance'
 
 export interface MaintenanceActionResult<T = unknown> {
   success: boolean
@@ -57,13 +57,19 @@ export async function updateMaintenanceConfigAction(
   try {
     const { databases } = createServerAppwriteClient()
 
+    // Sanitize estimated return: if disabling, or if the estimated return is already in the past, clear it to null
+    let cleanEstimatedReturn = payload.estimated_return || null
+    if (!payload.is_enabled || isReturnTimePassed(cleanEstimatedReturn)) {
+      cleanEstimatedReturn = null
+    }
+
     const updatePayload = {
-      is_enabled: payload.is_enabled,
+      is_enabled: payload.is_enabled && !isReturnTimePassed(payload.estimated_return),
       scope: payload.scope,
       blocked_routes: payload.blocked_routes || [],
       title: payload.title.trim() || 'System Under Scheduled Maintenance',
       message: payload.message.trim() || 'We are performing scheduled updates to improve our services.',
-      estimated_return: payload.estimated_return || null,
+      estimated_return: cleanEstimatedReturn,
       updated_at: new Date().toISOString(),
       updated_by: payload.updated_by || 'Admin',
     }

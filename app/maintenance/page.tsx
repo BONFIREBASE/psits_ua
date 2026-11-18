@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Home, Clock } from 'lucide-react'
+import { Home, Clock, ShieldCheck } from 'lucide-react'
 import MaintenanceAnimation from '@/components/MaintenanceAnimation'
 import type { MaintenanceConfigData } from '@/lib/maintenance'
 
@@ -69,11 +69,39 @@ export default function MaintenancePage({ initialConfig }: MaintenancePageProps 
   // Live ticking countdown timer
   useEffect(() => {
     const target = config?.estimated_return
-    setRemaining(calculateRemaining(target))
+    const rem = calculateRemaining(target)
+    setRemaining(rem)
     if (!target) return
 
+    if (!rem) {
+      // If target exists but is already expired on mount, trigger status recheck & reload
+      fetch('/api/maintenance/status', { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.config?.is_enabled) {
+            window.location.reload()
+          }
+        })
+        .catch(() => {})
+      return
+    }
+
     const timer = setInterval(() => {
-      setRemaining(calculateRemaining(target))
+      const currentRem = calculateRemaining(target)
+      setRemaining(currentRem)
+      if (!currentRem) {
+        clearInterval(timer)
+        fetch('/api/maintenance/status', { cache: 'no-store' })
+          .then((res) => res.json())
+          .then((data) => {
+            if (!data.config?.is_enabled) {
+              window.location.reload()
+            }
+          })
+          .catch(() => {
+            window.location.reload()
+          })
+      }
     }, 1000)
 
     return () => clearInterval(timer)
@@ -158,15 +186,31 @@ export default function MaintenancePage({ initialConfig }: MaintenancePageProps 
           </p>
         </div>
 
-        {/* Return Home Action */}
-        <div className="pt-1 sm:pt-2 flex items-center justify-center shrink-0">
+        {/* Action Controls: Home + Management Access */}
+        <div className="pt-2 flex flex-col items-center justify-center gap-2 shrink-0">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              aria-label="Return Home"
+              title="Return to Home"
+              className="p-2.5 sm:p-3 rounded-full border border-card-border bg-surface text-gold hover:text-[#0D1117] hover:bg-gold hover:border-gold hover:shadow-[0_0_25px_rgba(245,166,35,0.4)] transition-all duration-300 active:scale-95 group cursor-pointer shadow-sm"
+            >
+              <Home size={18} className="group-hover:scale-110 transition-transform" />
+            </Link>
+            <Link
+              href="/management"
+              aria-label="Management Portal Access"
+              title="Management Portal Access"
+              className="p-2.5 sm:p-3 rounded-full border border-card-border bg-surface text-muted hover:text-text hover:border-gold/50 transition-all duration-300 active:scale-95 group cursor-pointer shadow-sm"
+            >
+              <ShieldCheck size={18} className="group-hover:scale-110 group-hover:text-gold transition-all" />
+            </Link>
+          </div>
           <Link
-            href="/"
-            aria-label="Return Home"
-            title="Return to Home"
-            className="p-2.5 sm:p-3 rounded-full border border-card-border bg-surface text-gold hover:text-[#0D1117] hover:bg-gold hover:border-gold hover:shadow-[0_0_25px_rgba(245,166,35,0.4)] transition-all duration-300 active:scale-95 group cursor-pointer shadow-sm"
+            href="/management"
+            className="text-[11px] text-muted/70 hover:text-gold transition-colors font-mono cursor-pointer"
           >
-            <Home size={18} className="group-hover:scale-110 transition-transform" />
+            Management Portal
           </Link>
         </div>
       </div>

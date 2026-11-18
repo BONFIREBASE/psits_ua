@@ -62,6 +62,19 @@ function formatPSTDateTime(isoString: string | null | undefined): string | null 
   }
 }
 
+function toLocalDatetimeInputString(isoString: string | null | undefined): string {
+  if (!isoString) return ''
+  try {
+    const d = new Date(isoString)
+    if (isNaN(d.getTime())) return ''
+    const offsetMs = d.getTimezoneOffset() * 60000
+    const local = new Date(d.getTime() - offsetMs)
+    return local.toISOString().slice(0, 16)
+  } catch {
+    return ''
+  }
+}
+
 export default function MaintenanceManagementPage() {
   const { toast } = useToast()
   const { user } = useAuth()
@@ -99,7 +112,7 @@ export default function MaintenanceManagementPage() {
         setBlockedRoutes(d.blocked_routes || [])
         setTitle(d.title || 'System Under Scheduled Maintenance')
         setMessage(d.message || '')
-        setEstimatedReturn(d.estimated_return ? d.estimated_return.slice(0, 16) : '')
+        setEstimatedReturn(toLocalDatetimeInputString(d.estimated_return))
 
         setOriginalState({
           is_enabled: d.is_enabled,
@@ -192,16 +205,17 @@ export default function MaintenanceManagementPage() {
         blocked_routes: blockedRoutes,
         title,
         message,
-        estimated_return: estimatedReturn ? new Date(estimatedReturn).toISOString() : null,
+        estimated_return: null, // Clear expired return date on lift
         updated_by: user?.email || user?.displayName || 'Admin',
       }
 
       const res = await updateMaintenanceConfigAction(payload)
       if (res.success && res.data) {
         setIsEnabled(false)
+        setEstimatedReturn('')
         setPersistedConfig(res.data)
         if (originalState) {
-          setOriginalState({ ...originalState, is_enabled: false })
+          setOriginalState({ ...originalState, is_enabled: false, estimated_return: null })
         }
         toast('Maintenance mode lifted. All public routes are now accessible.', 'success')
       } else {
@@ -297,7 +311,7 @@ export default function MaintenanceManagementPage() {
       setBlockedRoutes(originalState.blocked_routes)
       setTitle(originalState.title)
       setMessage(originalState.message)
-      setEstimatedReturn(originalState.estimated_return ? originalState.estimated_return.slice(0, 16) : '')
+      setEstimatedReturn(toLocalDatetimeInputString(originalState.estimated_return))
       toast('Reverted to last saved settings.', 'success')
     }
   }
@@ -308,7 +322,7 @@ export default function MaintenanceManagementPage() {
       originalState.scope !== scope ||
       originalState.title !== title ||
       originalState.message !== message ||
-      (originalState.estimated_return ? originalState.estimated_return.slice(0, 16) : '') !== estimatedReturn ||
+      toLocalDatetimeInputString(originalState.estimated_return) !== estimatedReturn ||
       JSON.stringify(originalState.blocked_routes) !== JSON.stringify(blockedRoutes))
 
   if (isLoading) {

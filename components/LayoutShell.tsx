@@ -4,7 +4,6 @@ import { usePathname } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import CookieConsent from '@/components/CookieConsent'
-import MaintenanceWrapper from '@/components/MaintenanceWrapper'
 import AuthRedirectHandler from '@/components/AuthRedirectHandler'
 import SiteSplashSkeleton from '@/components/SiteSplashSkeleton'
 
@@ -17,7 +16,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   }
 
   return (
-    <MaintenanceWrapper>
+    <>
       <SiteSplashSkeleton />
       <AuthRedirectHandler />
       <Navbar />
@@ -27,6 +26,6 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
         <Footer />
       </div>
       <CookieConsent />
-    </MaintenanceWrapper>
+    </>
   )
 }

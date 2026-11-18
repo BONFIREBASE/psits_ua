@@ -50,6 +50,8 @@ function persistSession(token: string, user: AuthUser, expiresAt?: string) {
   if (expiresAt) {
     localStorage.setItem(EXPIRY_KEY, expiresAt)
   }
+  // Sync session cookie for Next.js proxy and middleware
+  document.cookie = `${TOKEN_KEY}=${token}; path=/; max-age=${8 * 3600}; SameSite=Lax`
   // Clear legacy sessionStorage
   sessionStorage.removeItem(TOKEN_KEY)
   sessionStorage.removeItem(STORAGE_KEY)
@@ -61,6 +63,8 @@ function clearSessionStorage() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(STORAGE_KEY)
   localStorage.removeItem(EXPIRY_KEY)
+  // Clear session cookie
+  document.cookie = `${TOKEN_KEY}=; path=/; max-age=0; SameSite=Lax`
   sessionStorage.removeItem(TOKEN_KEY)
   sessionStorage.removeItem(STORAGE_KEY)
   sessionStorage.removeItem(EXPIRY_KEY)
@@ -69,6 +73,15 @@ function clearSessionStorage() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Sync token to cookie on mount if active session exists in storage
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const token = getStoredToken()
+    if (token) {
+      document.cookie = `${TOKEN_KEY}=${token}; path=/; max-age=${8 * 3600}; SameSite=Lax`
+    }
+  }, [])
 
   // Verify and resolve user role & identity
   const resolveUserSession = useCallback(async (email: string): Promise<AuthUser | null> => {

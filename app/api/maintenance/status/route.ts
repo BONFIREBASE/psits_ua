@@ -13,7 +13,7 @@ export async function GET() {
         scope: 'all',
         blocked_routes: [],
         title: 'System Under Scheduled Maintenance',
-        message: 'We are currently performing scheduled maintenance to improve our services.',
+        message: 'We are performing scheduled updates to improve our services.',
         estimated_return: null,
       },
     })

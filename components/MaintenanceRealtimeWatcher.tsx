@@ -14,17 +14,37 @@ const EXEMPT_PREFIXES = [
   '/assets',
 ]
 
+function isConfigExpired(config: MaintenanceConfigData | null): boolean {
+  if (!config || !config.is_enabled || !config.estimated_return) return false
+  const target = new Date(config.estimated_return).getTime()
+  return !isNaN(target) && target <= Date.now()
+}
+
 export default function MaintenanceRealtimeWatcher() {
   const pathname = usePathname()
   const router = useRouter()
   const [activeConfig, setActiveConfig] = useState<MaintenanceConfigData | null>(null)
+  const [isOfficerOrAdmin, setIsOfficerOrAdmin] = useState(false)
+
+  // Check if current client holds an officer or admin session
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const token =
+      localStorage.getItem('psits_mgmt_token') ||
+      sessionStorage.getItem('psits_mgmt_token')
+    if (token) {
+      setIsOfficerOrAdmin(true)
+      // Sync cookie so server proxy also permits navigation
+      document.cookie = `psits_mgmt_token=${token}; path=/; max-age=${8 * 3600}; SameSite=Lax`
+    }
+  }, [])
 
   const isExempt = EXEMPT_PREFIXES.some((prefix) =>
     pathname === prefix || pathname.startsWith(prefix + '/')
   )
 
   useEffect(() => {
-    if (isExempt) return
+    if (isExempt || isOfficerOrAdmin) return
 
     // 1. Initial fetch of maintenance status
     let isMounted = true
@@ -72,7 +92,32 @@ export default function MaintenanceRealtimeWatcher() {
     }
   }, [isExempt])
 
-  if (isExempt || !activeConfig || !activeConfig.is_enabled) {
+  // 3. Live countdown check to auto-lift the overlay the exact second the estimated return arrives
+  useEffect(() => {
+    if (!activeConfig?.is_enabled || !activeConfig.estimated_return) return
+
+    const returnTime = new Date(activeConfig.estimated_return).getTime()
+    if (isNaN(returnTime)) return
+
+    const delay = returnTime - Date.now()
+    if (delay <= 0) {
+      // Already expired! Auto-lift immediately
+      setActiveConfig((prev) => (prev ? { ...prev, is_enabled: false } : null))
+      router.refresh()
+      fetch('/api/maintenance/status', { cache: 'no-store' }).catch(() => {})
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setActiveConfig((prev) => (prev ? { ...prev, is_enabled: false } : null))
+      router.refresh()
+      fetch('/api/maintenance/status', { cache: 'no-store' }).catch(() => {})
+    }, delay)
+
+    return () => clearTimeout(timer)
+  }, [activeConfig?.is_enabled, activeConfig?.estimated_return, router])
+
+  if (isExempt || isOfficerOrAdmin || !activeConfig || !activeConfig.is_enabled || isConfigExpired(activeConfig)) {
     return null
   }
 

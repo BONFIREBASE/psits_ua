@@ -43,9 +43,28 @@ export const EXEMPT_ROUTE_PREFIXES = [
  * Checks if a given path is exempted from maintenance restrictions
  */
 export function isRouteExempt(pathname: string): boolean {
-  return EXEMPT_ROUTE_PREFIXES.some((prefix) => 
-    pathname === prefix || pathname.startsWith(prefix + '/') || pathname.startsWith(prefix)
-  )
+  const clean = pathname.toLowerCase()
+  return EXEMPT_ROUTE_PREFIXES.some((prefix) => {
+    const p = prefix.toLowerCase()
+    return clean === p || clean.startsWith(p + '/') || clean.startsWith(p + '?')
+  })
+}
+
+/**
+ * Helper to check if an estimated return date has already passed
+ */
+export function isReturnTimePassed(estimatedReturn: string | null | undefined): boolean {
+  if (!estimatedReturn) return false
+  const returnTime = new Date(estimatedReturn).getTime()
+  return !isNaN(returnTime) && returnTime <= Date.now()
+}
+
+/**
+ * Helper to check if a maintenance config has expired based on estimated_return
+ */
+export function isMaintenanceExpired(config: MaintenanceConfigData | null): boolean {
+  if (!config || !config.estimated_return) return false
+  return isReturnTimePassed(config.estimated_return)
 }
 
 /**
@@ -54,6 +73,10 @@ export function isRouteExempt(pathname: string): boolean {
 export async function getActiveMaintenanceConfig(): Promise<MaintenanceConfigData | null> {
   const now = Date.now()
   if (memoryCache.data && now < memoryCache.expiresAt) {
+    if (isReturnTimePassed(memoryCache.data.estimated_return)) {
+      memoryCache.data.is_enabled = false
+      memoryCache.data.estimated_return = null
+    }
     return memoryCache.data
   }
 
@@ -75,6 +98,28 @@ export async function getActiveMaintenanceConfig(): Promise<MaintenanceConfigDat
       estimated_return: doc.estimated_return ? String(doc.estimated_return) : null,
       updated_at: doc.updated_at ? String(doc.updated_at) : doc.$updatedAt,
       updated_by: doc.updated_by ? String(doc.updated_by) : null,
+    }
+
+    // Auto-lift check & stale date cleanup:
+    // If estimated return timestamp has passed, disable maintenance and clear stale date from Appwrite
+    if (isReturnTimePassed(config.estimated_return)) {
+      const wasEnabled = config.is_enabled
+      config.is_enabled = false
+      config.estimated_return = null
+
+      databases.updateDocument(
+        APPWRITE_DATABASE_ID,
+        APPWRITE_COLLECTIONS.MAINTENANCE,
+        'active',
+        {
+          is_enabled: false,
+          estimated_return: null,
+          updated_at: new Date().toISOString(),
+          updated_by: wasEnabled
+            ? 'System (Auto-Lift Expired Timer)'
+            : 'System (Cleared Stale Expired Date)',
+        }
+      ).catch(() => {})
     }
 
     memoryCache = {
@@ -99,8 +144,8 @@ export async function isPathUnderMaintenance(pathname: string): Promise<{
   }
 
   const config = await getActiveMaintenanceConfig()
-  if (!config || !config.is_enabled) {
-    return { isUnderMaintenance: false, config }
+  if (!config || !config.is_enabled || isMaintenanceExpired(config)) {
+    return { isUnderMaintenance: false, config: config ? { ...config, is_enabled: false } : null }
   }
 
   // If site-wide maintenance
